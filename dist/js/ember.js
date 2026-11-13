@@ -1833,6 +1833,38 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function bigBell(c0,c1){shape(()=>{ctx.moveTo(-30,0);ctx.quadraticCurveTo(-52,8,-58,70);ctx.quadraticCurveTo(-64,160,-104,230);ctx.lineTo(104,230);ctx.quadraticCurveTo(64,160,58,70);ctx.quadraticCurveTo(52,8,30,0);ctx.closePath();},lg(-104,0,104,0,c0,c1,c0),OL,3);}
   // 剪影配色：把典狱长画成黑影，只留眼缝和灯里的魂火亮着
   let SIL_W=null;function silWarden(){if(!SIL_W){SIL_W={};Object.keys(WARDEN).forEach(k=>SIL_W[k]=/Hi$/.test(k)?'#3a2a20':/Dark$/.test(k)?'#0a0706':'#1a120e');SIL_W.soul='#8be1ce';SIL_W.soulHi='#effff9';SIL_W.glow='#ffb04a';SIL_W.glass='#1a2a2a';}return SIL_W;}
+  // Cast members share the hero's scalloped spirit body. Props stay attached
+  // in local coordinates so the long shot and close-up use the same design.
+  const STORY_SPIRITS={
+    smith:{body:'#acd1ce',shade:'#618589',scarf:'#b97b47',scarfDark:'#67432d',eye:'#253238',w:1.24,h:.91},
+    bearer:{body:'#dcd4ec',shade:'#978baa',scarf:'#aa5261',scarfDark:'#623b50',eye:'#332d43',w:.90,h:1.19},
+    child:{body:'#fff1cb',shade:'#dbbc91',scarf:'#65cabe',scarfDark:'#388e93',eye:'#443c49',w:.95,h:.83},
+    warden:{body:'#637082',shade:'#33394b',scarf:'#796579',scarfDark:'#473d51',eye:'#ffca87',w:1.38,h:1.12}
+  };
+  function storySpirit(role,x,y,size,facing,t){
+    const coat=STORY_SPIRITS[role],wave=Math.sin(t*2);
+    ctx.save();ctx.translate(x,y+wave*2);ctx.scale(size*facing,size);
+    if(role==='bearer'){
+      line([-13,-3,-17,-71],2,'#cfaf81');
+      poly([-17,-71,-42,-68+wave*2,-36,-61,-41,-56+wave*2,-16,-58],'#a75667',OL,1);
+    }
+    if(role==='child')ribbon(-8,-17,-20,-21+wave*3,-30,-14+wave*4,5,1,'#65cabe',OL,8);
+    ctx.save();ctx.scale(coat.w,coat.h);drawGhost(coat,t*4,0);ctx.restore();
+    if(role==='smith'){
+      poly([-18,-34,-13,-42,-4,-45,10,-41,15,-35], '#977958',OL,1.5);
+      line([8,-11,24,-40],3,'#916846');
+      poly([18,-44,24,-48,34,-41,28,-35],'#bbbfad',OL,1.5);
+    }else if(role==='child'){
+      poly([-11,-21,-20,-26,-18,-18,-23,-16,-12,-16],'#8ce2ce',OL,1);
+    }else if(role==='warden'){
+      poly([-18,-40,-20,-57,-10,-49,0,-61,9,-49,19,-57,16,-41],'#343848','#bc9970',1.4);
+      for(let i=0;i<6;i++)link(-13+i*5,-26+Math.sin(i*.63)*4,i%2?.4:2,'#c2a788',1.6);
+      line([12,-23,25,-32,29,-25],1.8,'#ccae82');
+      poly([21,-24,34,-24,36,-12,27,-7,19,-13],'#263143','#bf9d75',1.5);
+      fl(27,-12,.38,['#458f89','#98e8d1','#f2ffe5']);
+    }
+    ctx.restore();
+  }
   const SCENES={
     // 很久以前：夜空下的钟楼，钟声一圈圈荡开；小引灯人提着灯，领着魂火沿山路往钟下走
     bell(t){stageIn();stageFill([[0,'#070d1c'],[.5,'#14223c'],[1,'#26304a']]);stageStars(90,7,.8);
@@ -1841,15 +1873,9 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       ctx.fillStyle='#101828';ctx.beginPath();ctx.moveTo(-800,190);ctx.quadraticCurveTo(-200,92,180,62);ctx.lineTo(260,72);ctx.quadraticCurveTo(-120,132,-800,262);ctx.fill();
       const walk=Math.min(t*.12,1),x=-110+walk*140,y=105-walk*16;
       ghostAt(x,y,1.7,1,GH,true);
-      // A bent bellfounder with a long hammer, a flag bearer and a small ribboned child.
-      for(let i=0;i<3;i++){ctx.save();ctx.translate(x-90-i*68,y+12+i*7+Math.sin(t*2+i)*3);
-        const h=[52,68,34][i],coat=['#748e92','#936360','#bca680'][i];
-        poly([-12,0,-9,-h+12,4,-h+8,13,0,2,-5,-5,1],coat,OL,2);oval(-1,-h,9,11,'#d4d6bb');
-        if(i===0){line([3,-32,21,-49],3,'#907252');poly([14,-53,22,-59,31,-49,24,-43],'#bfaa80',OL,1);}
-        if(i===1){line([-7,-9,-13,-90],2,'#baae8b');poly([-13,-90,-45,-86,-33,-75,-12,-79],'#904e50',OL,1);}
-        if(i===2){line([-7,-38,-19,-44,-25,-39],3,'#94daca');circle(6,-25,3,'#ffe09e');}
-        ctx.restore();}
-
+      storySpirit('smith',x-84,y+12,1.55,1,t+.8);
+      storySpirit('bearer',x-162,y+18,1.4,1,t+1.7);
+      storySpirit('child',x-238,y+21,1.12,1,t+2.4);
       ctx.fillStyle='#070b14';for(let i=0;i<24;i++){const x=-620+i*55;ctx.beginPath();ctx.moveTo(x,330);ctx.quadraticCurveTo(x+6,290,x+(i%2?14:-4),270-(i*13)%30);ctx.lineTo(x+8,330);ctx.fill();}},
     // 典狱长锁住钟舌：巨钟的钟舌被铁链和锁缠死；典狱长的黑影提着灯，魂火一盏盏被吸进灯里
     procession(t){
@@ -1868,13 +1894,12 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       bloom(-152,lampY,110,'#ffd89c',.48);oval(-152,lampY,11,16,'#f6cd8d');
       line([-163,lampY-14,-152,lampY-23,-141,lampY-14],2,'#9c805b');
       const childX=-328+Math.min(1,t/6)*82;
-      soulAt(childX,55+sway*4,1.35,.95);
-      ribbon(childX,54,childX-18,52+sway*3,childX-38,60+sway*4,6,2,'#61b9b1',OL,8);
+      storySpirit('child',childX,94,1.65,1,t+2.4);
       for(let i=0;i<14;i++){const u=(t*.12+i/14)%1;circle(-157+Math.sin(i*2+t)*28,lampY-u*75,1.4,'rgba(255,217,147,'+(1-u)*.7+')');}
     },
     warden(t){stageIn();stageFill([[0,'#120a07'],[.6,'#24140d'],[1,'#120a07']]);ctx.fillStyle='#1c120c';for(let i=0;i<6;i++)ctx.fillRect(-560+i*200,-340,26,700);
       ctx.save();ctx.translate(-150,-290);chain(-60,0,110,'#3a2c20');chain(60,0,110,'#3a2c20');ctx.translate(0,110);bigBell('#3a2614','#8a6234');for(let i=0;i<9;i++)link(-34+i*8.5,232+Math.sin(i)*4,i%2?.4:2,'#7c828a',4);ctx.save();ctx.translate(0,244);padlock(LOCK,false,1.4);ctx.restore();ctx.restore();
-      ctx.save();ctx.translate(270,192);ctx.scale(1.6,1.6);const e=fakeFoe('warden');e.move='lantern';e.wind=.5;e.wt=1;drawWarden(e,silWarden());ctx.restore();const lx=270-16*1.6,ly=192-91*1.6;bloom(lx,ly,110,'#8be1ce',.55);
+      storySpirit('warden',270,192,3.6,-1,t);const lx=270-27*3.6,ly=192-15*3.6;bloom(lx,ly,110,'#8be1ce',.55);
       for(let i=0;i<7;i++){const u=(t*.18+i/7)%1,x=-480+u*(lx+480),y=-40+u*(ly+40)-Math.sin(u*Math.PI)*110+Math.sin(time*3+i)*10;soulAt(x,y,1-u*.4,Math.min(1,u*4)*(1-u*.6));}},
     // 被扔进焚炉：小引灯人护着怀里那团小火，被扔向通红的炉口
     furnace(t){stageIn();stageFill([[0,'#0c0606'],[1,'#1a0c08']]);const fx=180,fy=40;
