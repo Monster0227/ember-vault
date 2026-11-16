@@ -1335,7 +1335,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     updateTraps(dt);if(lamps.length)updateLamps();updateSigns();teachOnRoad();if(p.ringT>0)ringHits(dt);if(p.domeT>0)domeBlock(dt);if(state!=='play')return;
     if(L.checkpoint&&!checkpoint&&p.x>L.checkpoint){checkpoint=true;p.hp=p.max;p.potions=Math.max(p.potions,1);p.soul=3;burst(L.checkpoint,FLOOR-40,'#f4c27f',26);say('钟火已点燃 · 生命与魂火恢复\n倒下后会从这里再战',3.5);beep(520,.3);}
     // 走进首领房：第一次是一段登场对白，倒下再来时只说一句；对白结束亮出名号卡，身后的铁闸落下
-    if(L.arena&&!flags.boss&&p.x>L.trigger&&enemies.some(e=>e.type==='boss'&&!e.dead)){flags.boss=true;bossCue('enter');const key='bossMet_'+L.bossKind,story=BOSSES[L.bossKind];startTalk(run[key]?story.again:story.intro,()=>{bossCardT=3.4;});run[key]=true;return;}
+    if(L.arena&&!flags.boss&&p.x>L.trigger&&enemies.some(e=>e.type==='boss'&&!e.dead)){flags.boss=true;titleT=0;messageT=0;notice.style.opacity=0;bossCue('enter');const key='bossMet_'+L.bossKind,story=BOSSES[L.bossKind];startTalk(run[key]?story.again:story.intro,()=>{titleT=0;messageT=0;notice.style.opacity=0;bossCardT=2.05;});run[key]=true;return;}
     const bossAlive=enemies.some(e=>e.type==='boss'&&!e.dead),bossOn=!!(L.arena&&flags.boss&&bossAlive);gateK=clamp(gateK+(bossOn?dt:-dt)*3,0,1);if(L.arena)sealK=clamp(sealK+(bossAlive?dt:-dt)*1.6,0,1);if(bossOn&&p.x<L.gate+6){p.x=L.gate+6;if(p.vx<0)p.vx=0;}
     enemies.forEach(e=>{if(e.dead){e.dieT=Math.max(0,e.dieT-dt);e.flash=Math.max(0,e.flash-dt);if(e.type==='boss'&&e.dieT>0&&Math.random()<dt*30)ember(e.x+Math.random()*e.w,e.y+Math.random()*e.h,1,BOSSES[e.kind].color);if(e.type==='flyer')e.y=Math.min(e.floor-e.h,e.y+300*dt);return;}
       e.flash=Math.max(0,e.flash-dt);e.swing=Math.max(0,e.swing-dt);e.hitT=Math.max(0,e.hitT-dt);e.cd-=dt;if(e.blockT>0)e.blockT-=dt;const boss=e.type==='boss',el=e.elite,dx=p.x-e.x,dy=Math.abs(p.y+p.h-e.floor),ox=e.x,kind=boss?e.kind:el?'elite':e.type,frozen=e.frozen>0,dazed=e.daze>0;
@@ -1388,7 +1388,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(L.seal){if(p.x>L.seal+10){if(enemies.some(e=>e.type==='boss'&&!e.dead)){p.x=L.seal;say('铁闸紧闭 · 先击败首领',2);}else if(L.bossKind==='warden')finish(true);else{nextStage();return;}}}
     else if(p.x+p.w/2>L.exit+20&&p.ground){nextStage();return;}
     // 镜头：首领战时框住铁闸与封印之间的场地
-    const lead=p.face>0?.35:.62,lo=bossOn?Math.min(L.gate-40,WORLD-W):0,hi=bossOn?Math.max(lo,Math.min(WORLD-W,L.seal+130-W)):Math.max(0,WORLD-W);cam+=(clamp(p.x-W*lead,lo,hi)-cam)*Math.min(1,dt*5);if(bossCardT>0)bossCardT=Math.max(0,bossCardT-dt);markSeen();
+    const lead=p.face>0?.35:.62,lo=bossOn?Math.min(L.gate-40,WORLD-W):0,hi=bossOn?Math.max(lo,Math.min(WORLD-W,L.seal+130-W)):Math.max(0,WORLD-W);cam+=(clamp(p.x-W*lead,lo,hi)-cam)*Math.min(1,dt*5);if(bossCardT>0){bossCardT=Math.max(0,bossCardT-dt);notice.style.opacity=0;}markSeen();
     // 墨翁的哼曲：越近越清楚
     if(L.ink!=null&&!hasMap()){const dd=Math.abs(p.x-L.ink);if(dd<620){inkHum-=dt;if(inkHum<=0){inkHum=.36;const mel=[0,2,4,2,0,-1,7,4,2,-1,0,-1],nn=mel[inkStep++%mel.length];if(nn>=0)musicTone(330*Math.pow(2,nn/12),.32,.014*(1-dd/620)+.002,'sine');}}}
     noteBand();syncHud();
@@ -1932,19 +1932,33 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   }
   const SCENES={
     // 很久以前：夜空下的钟楼，钟声一圈圈荡开；小引灯人提着灯，领着魂火沿山路往钟下走
-    bell(t){stageIn();stageFill([[0,'#070d1c'],[.5,'#14223c'],[1,'#26304a']]);stageStars(90,7,.8);
-      ctx.fillStyle='#18223a';ctx.beginPath();ctx.moveTo(-800,140);for(let x=-800;x<=800;x+=40)ctx.lineTo(x,70-60*Math.sin(x*.004)-30*Math.sin(x*.011+1));ctx.lineTo(800,400);ctx.lineTo(-800,400);ctx.fill();
-      rings(230,-128,1,.9);towerSil(230,-300,1,'#0c1220',1);
-      ctx.fillStyle='#101828';ctx.beginPath();ctx.moveTo(-800,190);ctx.quadraticCurveTo(-200,92,180,62);ctx.lineTo(260,72);ctx.quadraticCurveTo(-120,132,-800,262);ctx.fill();
-      const walk=Math.min(t*.12,1),x=-110+walk*140,y=105-walk*16;
-      ghostAt(x,y,1.7,1,GH,true);
-      storySpirit('smith',x-84,y+12,1.55,1,t+.8);
-      storySpirit('bearer',x-162,y+18,1.4,1,t+1.7);
-      storySpirit('child',x-238,y+21,1.12,1,t+2.4);
-      ctx.fillStyle='#070b14';for(let i=0;i<24;i++){const x=-620+i*55;ctx.beginPath();ctx.moveTo(x,330);ctx.quadraticCurveTo(x+6,290,x+(i%2?14:-4),270-(i*13)%30);ctx.lineTo(x+8,330);ctx.fill();}},
+    bell(t){
+      // Wide night road. The tower sits deep on the right; the procession walks up toward it, larger in the foreground.
+      const s=tall?Math.min(W/700,H/620):Math.min(W/1100,H/620),push=1+Math.min(.035,t*.006);
+      ctx.translate(W/2+70,H/2+46);ctx.scale(s*push*.92,s*push*.92);ctx.translate(Math.sin(time*.12)*10,Math.cos(time*.1)*4);
+      stageFill([[0,'#04060f'],[.38,'#0a1428'],[.7,'#16304c'],[.86,'#2a4460'],[1,'#121820']]);stageStars(80,11,.85);
+      bloom(-460,-200,220,'#8eafd4',.1);
+      ctx.fillStyle='#0c1828';ctx.beginPath();ctx.moveTo(-980,40);for(let x=-980;x<=980;x+=28)ctx.lineTo(x,-10-46*Math.sin(x*.0028)-16*Math.sin(x*.01));ctx.lineTo(980,160);ctx.lineTo(-980,160);ctx.fill();
+      ctx.fillStyle='#13263a';ctx.beginPath();ctx.moveTo(-980,90);for(let x=-980;x<=980;x+=22)ctx.lineTo(x,36-26*Math.sin(x*.005+1)-8*Math.sin(x*.018));ctx.lineTo(980,210);ctx.lineTo(-980,210);ctx.fill();
+      towerSil(300,-250,1.45,'#070d16',1);rings(300,-70,.65,.4);
+      ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=.2;ctx.fillStyle='#ffd09a';ctx.beginPath();ctx.moveTo(262,-70);ctx.lineTo(338,-58);ctx.lineTo(150,200);ctx.lineTo(-80,220);ctx.closePath();ctx.fill();ctx.restore();
+      bloom(300,-55,200,'#ffcf86',.42);
+      ctx.fillStyle='#101820';ctx.beginPath();ctx.moveTo(-620,280);ctx.lineTo(20,78);ctx.lineTo(190,86);ctx.lineTo(120,300);ctx.closePath();ctx.fill();
+      ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=.16;ctx.fillStyle='#ffc48a';ctx.beginPath();ctx.ellipse(30,170,150,26,-.35,0,TAU);ctx.fill();ctx.restore();
+      ctx.strokeStyle='rgba(190,210,226,.28)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-620,280);ctx.lineTo(20,78);ctx.stroke();ctx.beginPath();ctx.moveTo(120,300);ctx.lineTo(190,86);ctx.stroke();
+      const seat=(x,y,sc,shade)=>{ctx.save();ctx.globalAlpha=.5*shade;ctx.fillStyle='#04070c';ctx.beginPath();ctx.ellipse(x,y+sc*6,sc*18,sc*4.2,0,0,TAU);ctx.fill();ctx.restore();};
+      seat(70,100,.72,.55);storySpirit('child',70,96,.72,1,t+2);
+      seat(-40,128,.95,.7);storySpirit('bearer',-40,124,.95,1,t+1.2);
+      seat(-160,162,1.2,.85);storySpirit('smith',-160,156,1.2,1,t+.4);
+      seat(-340,214,1.85,1);ghostAt(-340,208,1.85,1,GH,true);
+      bloom(-340+32,208-46,110,'#ffcf86',.62);
+      ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=.28;ctx.fillStyle='#ffb060';ctx.beginPath();ctx.ellipse(-290,228,78,16,0,0,TAU);ctx.fill();ctx.restore();
+      ctx.fillStyle='#070b12';ctx.beginPath();ctx.moveTo(-980,200);ctx.quadraticCurveTo(-520,250,-180,340);ctx.lineTo(-980,420);ctx.fill();
+      ctx.beginPath();ctx.moveTo(980,170);ctx.quadraticCurveTo(460,230,200,360);ctx.lineTo(980,420);ctx.fill();
+      ctx.fillStyle='#0b1118';ctx.fillRect(-700,150,16,180);ctx.fillRect(680,120,14,200);},
     // 典狱长锁住钟舌：巨钟的钟舌被铁链和锁缠死；典狱长的黑影提着灯，魂火一盏盏被吸进灯里
     procession(t){
-      stageIn();stageFill([[0,'#0c1723'],[.62,'#243c47'],[1,'#100f19']]);
+      stageIn();ctx.translate(40,70);ctx.scale(1.38,1.38);stageFill([[0,'#0c1723'],[.62,'#243c47'],[1,'#100f19']]);
       const drift=Math.min(t,8)*5, sway=Math.sin(t*2);
       for(let i=0;i<8;i++){
         const x=-700+i*200-drift;
@@ -2506,7 +2520,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;}
   function drawOrbs(){if(!orbs.length)return;ctx.globalCompositeOperation='lighter';for(const o of orbs){ctx.globalAlpha=.35;ctx.fillStyle='#ff9a3a';ctx.beginPath();ctx.arc(o.x,o.y,6,0,TAU);ctx.fill();ctx.globalAlpha=1;ctx.fillStyle='#ffe1a6';ctx.beginPath();ctx.arc(o.x,o.y,2.2,0,TAU);ctx.fill();}ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;}
   // 伤害数字先弹大再回落，重劈的更大
-  function drawFloats(){for(const f of floats){ctx.globalAlpha=clamp(f.life/.35,0,1);if(f.art){const k=f.life/1.2,sz=28*(k>.85?1+(k-.85)*2.2:1);drawArt(f.art,f.x-(f.t?11:0),f.y-4,sz);if(f.t)text(f.t,f.x+5,f.y+2,15,f.c,'left',true);continue;}const k=f.life/.75,s=(f.big?23:17)*(k>.82?1+(k-.82)*2.5:1);text(f.t,f.x,f.y,Math.round(s),f.c,'center',true);}ctx.globalAlpha=1;}
+  function drawFloats(){if(bossCardT>0)return;for(const f of floats){ctx.globalAlpha=clamp(f.life/.35,0,1);if(f.art){const k=f.life/1.2,sz=28*(k>.85?1+(k-.85)*2.2:1);drawArt(f.art,f.x-(f.t?11:0),f.y-4,sz);if(f.t)text(f.t,f.x+5,f.y+2,15,f.c,'left',true);continue;}const k=f.life/.75,s=(f.big?23:17)*(k>.82?1+(k-.82)*2.5:1);text(f.t,f.x,f.y,Math.round(s),f.c,'center',true);}ctx.globalAlpha=1;}
   // 斩痕：沿刀势的一道细长亮光，先拉长再变细消失；星芒：命中点一闪；冲击波：重劈和击杀时扩散的圆环
   function drawFx(){if(!fx.length)return;ctx.save();ctx.globalCompositeOperation='lighter';
     for(const f of fx){if(f.k==='icon')continue;const k=f.life/f.max,u=1-k;ctx.save();ctx.translate(f.x,f.y);
@@ -2657,7 +2671,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     drawFore();drawMotes(z);drawWeather();
     ctx.save();ctx.globalCompositeOperation='lighter';const n=lowFx?Math.min(6,lights.length):lights.length;for(let i=0;i<n;i++)glow(lights[i]);ctx.restore();
     drawFog();if(L.dark)drawDark();ctx.restore();drawVignette(z);drawGrade();drawBandWash();drawCineOverlay();
-    if(state==='play'){const boss=enemies.find(e=>e.type==='boss'&&!e.dead);if(boss&&L.arena&&p.x>L.trigger-120)drawBossBar(boss);drawBossCard();
+    if(state==='play'){const boss=enemies.find(e=>e.type==='boss'&&!e.dead);if(boss&&L.arena&&p.x>L.trigger-120&&bossCardT<=0)drawBossBar(boss);drawBossCard();
       if(!coarse()&&W>800&&!L.tutorial)text(K('left')+' / '+K('right')+' 移动　'+K('jump')+' 跳　'+K('attack')+' 攻击　'+K('up')+' / '+K('down')+' + '+K('attack')+' 上挑 / 下劈　'+K('roll')+' 翻滚　'+K('skill1')+' '+K('skill2')+' '+K('skill3')+' 技能　'+K('heal')+' 治疗　'+K('use')+' 道具　'+K('interact')+' 互动　'+K('bag')+' 行囊　'+K('map')+' 地图　Esc 暂停',W/2,H-34,12,'#a9b8c0','center',true);}
     drawTitle();drawStory();frameN++;if(frameN%6===0)drawMinimap();}
   // 溺灯的蓄水池：脚下一层浅浅的污水，挡住脚踝
@@ -2668,13 +2682,14 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     box(bx,by,bw,7,'#221a26');const g=ctx.createLinearGradient(bx,0,bx+bw,0);g.addColorStop(0,tint(B.color,.5));g.addColorStop(1,boss.rage?tint(B.color,1.15):B.color);ctx.fillStyle=g;ctx.fillRect(bx,by,bw*k,7);box(bx,by,bw*k,2,'rgba(255,255,255,.28)');box(bx+bw/2-1,by-2,2,11,'rgba(240,225,190,.75)');
     text(B.name,W/2,by-11,13,'#e9dcc0','center',true);}
   // 首领名号卡：登场对白结束后淡入，小字是名号，大字是名字
-  function drawBossCard(){if(bossCardT<=0||!L.arena)return;const B=BOSSES[L.bossKind],t=3.4-bossCardT,a=clamp(t/.45,0,1)*clamp(bossCardT/.7,0,1),y=tall?H*.36:H*.44,wl=clamp(t/.8,0,1);
-    ctx.save();ctx.globalAlpha=a;const g=ctx.createLinearGradient(0,y-70,0,y+44);g.addColorStop(0,'rgba(4,6,10,0)');g.addColorStop(.5,'rgba(4,6,10,.55)');g.addColorStop(1,'rgba(4,6,10,0)');ctx.fillStyle=g;ctx.fillRect(0,y-70,W,114);
-    text(B.sub,W/2,y-34,14,'#d9c7a6','center',true);ctx.font='bold 48px "SimSun","Songti SC",Georgia,serif';ctx.textAlign='center';ctx.lineWidth=4;ctx.strokeStyle='rgba(5,8,12,.85)';ctx.strokeText(B.title,W/2,y+16);ctx.fillStyle=B.color;ctx.fillText(B.title,W/2,y+16);
-    box(W/2-190*wl,y+30,380*wl,1.5,B.color);sparkle2(W/2-190*wl,y+31,4,B.color);sparkle2(W/2+190*wl,y+31,4,B.color);ctx.restore();}
+  function drawBossCard(){if(bossCardT<=0||!L.arena)return;const B=BOSSES[L.bossKind],t=2.05-bossCardT,a=clamp(t/.25,0,1)*clamp(bossCardT/.45,0,1);if(a<=.01)return;const y=tall?H*.22:H*.2;
+    ctx.save();ctx.globalAlpha=a;ctx.fillStyle='rgba(5,8,12,'+(.72*a).toFixed(3)+')';ctx.fillRect(0,y-28,W,78);
+    ctx.fillStyle=B.color;ctx.fillRect(0,y-28,W,2);ctx.fillRect(0,y+48,W,2);
+    text(B.sub,W/2,y-6,13,'#d9c7a6','center',true);
+    ctx.font='bold 36px "SimSun","Songti SC",Georgia,serif';ctx.textAlign='center';ctx.fillStyle=B.color;ctx.fillText(B.title,W/2,y+32);ctx.restore();}
   // 进入新地图时的标题卡：先从黑场淡入，章节的纹章、层名停留一会儿再淡出
   const CH_ART=['carving','shade','flag','bell'];
-  function drawTitle(){if(titleT<=0||state==='menu'||state==='cine'||state==='upgrade'||state==='chest'||state==='shop'||state==='bag'||state==='win'||state==='dead'||(talk&&talk.lines!==TALK.prologue)||sceneA)return;const a=clamp((titleT-1.9)/.7,0,1),b=clamp(titleT/.6,0,1)*clamp((2.6-titleT)/.35,0,1);
+  function drawTitle(){if(titleT<=0||(L&&L.arena)||state==='menu'||state==='cine'||state==='upgrade'||state==='chest'||state==='shop'||state==='bag'||state==='win'||state==='dead'||(talk&&talk.lines!==TALK.prologue)||sceneA)return;const a=clamp((titleT-1.9)/.7,0,1),b=clamp(titleT/.6,0,1)*clamp((2.6-titleT)/.35,0,1);
     if(a>0){ctx.fillStyle='rgba(4,6,10,'+a.toFixed(3)+')';ctx.fillRect(0,0,W,H);}
     if(b>0){const y=tall?H*.37:H*.45;ctx.globalAlpha=b;drawArt(L.rest?'fire':CH_ART[clamp((L.chapter||1)-1,0,3)],W/2,y-72,48);box(W/2-150,y-14,300,1,'rgba(219,188,135,.45)');text(L.rest?'歇 脚':L.n,W/2,y-24,14,'#c9b28a','center',true);text(L.name,W/2,y+26,34,'#f2e3c4','center',true);text(L.en,W/2,y+50,13,'#b6a58c','center',true);box(W/2-150,y+62,300,1,'rgba(219,188,135,.45)');ctx.globalAlpha=1;}}
   // 剧情插画：旁白的句子带着场景名时铺满画面，换场景时从黑场淡入
