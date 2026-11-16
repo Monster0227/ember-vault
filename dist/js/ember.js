@@ -46,7 +46,8 @@ class Physics {
         else{this.box.x=a.x;this.box.y=a.y;this.box.w=a.w;this.box.h=a.h||floor-a.y;if(sweepAABB(p,dx,dy,this.box,this.hit)&&this.hit.time<=best){best=this.hit.time;nx=this.hit.nx;ny=this.hit.ny;target=a;}}
       }
       p.x+=dx*best;p.y+=dy*best;if(!target)break;dx*=1-best;dy*=1-best;
-      if(nx){dx=0;p.vx=0;}if(ny){dy=0;p.vy=0;if(ny===-1){p.ground=true;p.jumps=0;this.landed=target;}}if(best===1)break;
+      if(nx){const rise=p.y+p.h-target.y;if(rise>-1&&rise<=16){p.y-=rise;p.vy=0;p.ground=true;if(p.jumps!=null)p.jumps=0;this.landed=target;}else{dx=0;p.vx=0;}}
+      if(ny){dy=0;p.vy=0;if(ny===-1){p.ground=true;if(p.jumps!=null)p.jumps=0;this.landed=target;}}if(best===1)break;
     }
   }
 }
@@ -314,7 +315,15 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   {const S=th=>STAGES.find(s=>s.theme===th&&!s.arena&&!s.rest),D={prison:{ink:2600,secrets:[[3080,FLOOR,'shard'],[4420,255,'embers']]},sewers:{ink:980,secrets:[[2180,FLOOR,'blue'],[6215,320,'shard']]},ramparts:{ink:1720,secrets:[[2560,FLOOR,'relic'],[6420,FLOOR,'shard']]},ossuary:{ink:3150,secrets:[[3620,FLOOR,'shard'],[5300,FLOOR,'blue']]},tower:{ink:2350,secrets:[[1680,FLOOR,'shard'],[6150,FLOOR,'relic']]}};
     Object.keys(D).forEach(th=>{const s=S(th);if(s){s.ink=D[th].ink;s.secrets=D[th].secrets;}});
     const bands={prison:[[0,'监房','cells'],[2200,'钟井','well'],[4600,'祷堂','chapel']],sewers:[[0,'暗渠','drain'],[2500,'蓄水池','cistern'],[5200,'灯坟','nest']],ramparts:[[0,'城门','gate'],[2500,'城垛','wall'],[5300,'残塔','tower']],ossuary:[[0,'骨廊','oss'],[2800,'龛室','niche'],[5200,'夜殿','nave']],tower:[[0,'齿轮廊','gears'],[2500,'钟腹','belly'],[5200,'钟舌','tongue']]};
-    Object.keys(bands).forEach(th=>{const s=S(th);if(s)s.bands=bands[th];});}
+    Object.keys(bands).forEach(th=>{const s=S(th);if(s)s.bands=bands[th];});
+    const ground={
+      prison:{steps:[[1900,466,44],[1948,452,44],[1996,438,48],[2048,424,56]],trenches:[[2140,90,26]],slopes:[[1900,210,480,424]],broken:[[2124,70]]},
+      sewers:{steps:[[3000,466,48],[3052,452,48],[3104,438,56],[3160,438,64]],trenches:[[3260,100,22]],slopes:[[3000,220,480,438]],broken:[[3248,130]]},
+      ramparts:{steps:[[2500,466,50],[2554,450,50],[2608,434,60],[2668,434,70]],trenches:[[2760,90,24]],slopes:[[2500,238,480,434]],broken:[[2748,120]]},
+      ossuary:{steps:[[2400,468,40],[2444,454,40],[2488,440,46],[2534,440,60]],trenches:[[2620,100,20]],slopes:[[2400,194,480,440]],broken:[[2608,120]]},
+      tower:{steps:[[3480,466,44],[3528,452,44],[3572,438,50],[3622,438,64]],trenches:[[3720,96,24]],slopes:[[3480,206,480,438]],broken:[[3708,120]]}
+    };
+    Object.keys(ground).forEach(th=>{const s=S(th);if(!s)return;s.steps=ground[th].steps;s.trenches=ground[th].trenches;s.slopes=ground[th].slopes;s.broken=ground[th].broken;});}
   // ---- 教程：焚炉底层。石碑上画着按键（跟着设置里的改键变），走近时下方也会说明 ----
   THEMES.furnace={sky:[[0,'#0d0705'],[.5,'#1d0f09'],[.8,'#2a150b'],[1,'#120905']],farKind:'tunnel',far:'#1f120b',win:'255,150,70',mist:'50,22,10',mid:'arches',arch:'#22140d',shaft:['255,170,100','255,130,60'],banner:['#5b2a1c','#6b4a2f'],
     wall:['#2a1d17','#30211a','#261a14','#140d09'],stone:['#43322a','#3d2d25','#4a382e','#1f150f'],floor:['#3a2a22','#33251e','#3f2f26','#1a110c'],top:['#8a6a4a','#4d3a2a'],ledge:['#a07a54','#5a4232'],pil:'#3a2a20',moss:['#5a3a1c','#6a4a24'],fog:'230,140,80',light:'#ff9a4a',
@@ -516,9 +525,22 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function startTip(){return coarse()?'左边摇杆移动 · 推着摇杆攻击 = 上挑 / 下劈\n右边三个技能键花魂火 · 左边那位老人好像有话要说'+(tall?'\n横过手机，视野更开阔':''):K('jump')+' 跳 · '+K('attack')+' 攻击 · '+K('up')+' / '+K('down')+' + '+K('attack')+' 上挑 / 下劈 · '+K('roll')+' 翻滚 · '+K('heal')+' 治疗 · '+K('skill1')+' / '+K('skill2')+' / '+K('skill3')+' 技能\n左边那位老人好像有话要说 · 按 '+K('interact')+' 交谈 · '+K('bag')+' 打开行囊';}
   // 进入第 n 段（地图或驿站）：带着现在的属性进门，进门时的属性记下来，倒下后可以从这一层重来
   // n = -1 是教程（焚炉底层）。地图里还有：会动的平台（movers）、会塌的平台（crumbles）、各区域的机关（traps）
+  function layGround(){
+    for(const t of L.trenches||[]){
+      for(let i=platforms.length-1;i>=0;i--){
+        const a=platforms[i];if(a.solid||a.mv||a.cr||a.h<100)continue;
+        const x0=Math.max(a.x,t[0]),x1=Math.min(a.x+a.w,t[0]+t[1]);if(x1-x0<4)continue;
+        const left=x0-a.x,right=a.x+a.w-x1,y=a.y,h=a.h;platforms.splice(i,1);
+        if(left>2)platforms.push({x:a.x,y:y,w:left,h:h});
+        platforms.push({x:x0,y:y+t[2],w:x1-x0,h:h,trench:true});
+        if(right>2)platforms.push({x:x1,y:y,w:right,h:h});
+      }
+    }
+    for(const s of L.steps||[])platforms.push({x:s[0],y:s[1],w:s[2],h:Math.max(8,FLOOR-s[1]),solid:true,step:true});
+  }
   function loadStage(n,quiet){stage=n;L=n<0?TUTORIAL:STAGES[n];if(L.theme==='ossuary'&&!L.arena&&!visitedCrypt){visitedCrypt=true;try{localStorage.setItem('ember:visited-crypt','1');}catch(e){}}T=THEMES[L.theme];prep(T);WORLD=L.w;decor=makeDecor();PAL={guard:Object.assign({},GUARD,T.guard),archer:Object.assign({},ARCHER,T.archer)};PAL.elite=Object.assign({},PAL.guard,ELITE_TINT);{const F=FOE_THEME[L.theme]||{};PAL.flyer=Object.assign({},FLYER,F.flyer);PAL.shield=Object.assign({},PAL.guard,SHIELDP,F.shield);PAL.caster=Object.assign({},CASTER,F.caster);PAL.bomber=Object.assign({},BOMBER,F.bomber);PAL.crawler=Object.assign({},CRAWLER,F.crawler);PAL.hanger=Object.assign({},HANGER,F.hanger);}
     platforms=[];let x0=0;L.gaps.concat([[L.w,L.w]]).forEach(g=>{platforms.push({x:x0,y:FLOOR,w:g[0]-x0,h:160});x0=g[1];});
-    L.plats.forEach(a=>platforms.push({x:a[0],y:a[1],w:a[2],h:22}));(L.terrain||[]).forEach(a=>platforms.push({x:a[0],y:a[2],w:a[1],h:FLOOR-a[2],solid:true}));
+    L.plats.forEach(a=>platforms.push({x:a[0],y:a[1],w:a[2],h:22}));(L.terrain||[]).forEach(a=>platforms.push({x:a[0],y:a[2],w:a[1],h:FLOOR-a[2],solid:true}));layGround();
     (L.movers||[]).forEach(m=>platforms.push({x:m[0],y:m[1],w:m[2],h:16,ddx:0,ddy:0,mv:{x0:m[0],y0:m[1],dx:m[3],dy:m[4],per:m[5],ph:m[6]||0}}));(L.crumbles||[]).forEach(c=>platforms.push({x:c[0],y:c[1],w:c[2],h:18,cr:{st:0,t:0,y0:c[1]}}));
     const caches={prison:[360,1560,3330],sewers:[560,1750,3520],ramparts:[680,2240,3850],ossuary:[610,1720,3860],tower:[620,1820,3370]};breakables=(L.arena?[]:(L.caches||caches[L.theme]||[]).concat(L.moreCaches||[])).map((x,i)=>({x:x,y:FLOOR,kind:((i+stage)%3+3)%3,broken:false}));
     // 二周目起，每三个狱卒里有一个换成精英
@@ -1726,7 +1748,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       box(cx-262,92,524,388,'#121a22');for(const s of [-1,1]){const x0=cx+(s<0?-232:6);shape(()=>ctx.rect(x0,124,226,356),lg(x0,124,x0+226,480,'#2c3a46','#1b2530'),'#0a0e14',3);for(let j=0;j<4;j++)box(x0,168+j*84,226,6,'#3b4a56');for(let i=0;i<4;i++)for(let j=0;j<7;j++)circle(x0+28+i*57,146+j*48,3,'#5d6c78','#0a0e14',1);}
       ctx.strokeStyle='#4a5a66';ctx.lineWidth=22;ctx.beginPath();ctx.moveTo(cx-246,480);ctx.lineTo(cx-246,186);ctx.quadraticCurveTo(cx,30,cx+246,186);ctx.lineTo(cx+246,480);ctx.stroke();ctx.strokeStyle='#2c3a44';ctx.lineWidth=6;ctx.stroke();
       for(const s of [-1,1])for(let i=0;i<=46;i++){const u=i/46;link(cx-s*222+s*444*u,150+u*240+Math.sin(u*Math.PI)*34,(i%2?.48:2.05)*s,'#6a7680',5.6);}
-      ctx.save();ctx.translate(cx,236);padlock(LOCK,false,3.3);ctx.restore();
+      ctx.save();ctx.translate(cx,156);padlock(LOCK,false,.48);ctx.restore();
       for(const s of [-1,1]){const wx=cx+s*352;box(wx-18,118,36,76,'#0a1016');ctx.fillStyle='rgba(150,200,230,.32)';ctx.fillRect(wx-13,123,26,66);for(let i=-1;i<=1;i++)box(wx+i*9-1,123,2,66,'#2c3a44');addLight(wx-cam,160,100,'#9ac8e0',.25);}
       addLight(cx-cam,270,250,'#8fb0c0',.1);}
     else if(k==='brood'){   // 溺灯蓄水池：圆形池壁、三根往下淌绿水的出水管、远处漂着熄灭的灯
@@ -1753,13 +1775,16 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(y1>top+3){ctx.fillStyle='rgba(0,0,0,.3)';ctx.fillRect(x-27,top,54,y1-top);for(let j=top+20;j<y1-4;j+=34)box(x-27,j,54,3,'#3a434c');for(let i=0;i<5;i++){const bx=x-22+i*11;box(bx-1.6,top,3.2,y1-top,'#3a434c');poly([bx-3,y1,bx+3,y1,bx,y1+8],'#5a646c',OL,1);}}
     else for(let i=0;i<5;i++){const bx=x-22+i*11;poly([bx-3,top,bx+3,top,bx,top+8],'#5a646c',OL,1);}}
   function drawFloor(){const v0=cam-20,v1=cam+W+20,fade=vgrad('floorFade',FLOOR+8,FLOOR+160,[[0,'rgba(10,16,21,0)'],[1,'rgba(10,16,21,.95)']]);
-    for(const a of platforms){if(a.h<100||a.solid)continue;const x0=Math.max(a.x,v0),x1=Math.min(a.x+a.w,v1);if(x1<=x0)continue;
-      patRect(floorPat(),x0,FLOOR+8,x1-x0,152,0);box(x0,FLOOR,x1-x0,4,T.top[0]);box(x0,FLOOR+4,x1-x0,4,T.top[1]);ctx.fillStyle=fade;ctx.fillRect(x0,FLOOR+8,x1-x0,152);
+    for(const a of platforms){if(a.h<100||a.solid)continue;const x0=Math.max(a.x,v0),x1=Math.min(a.x+a.w,v1);if(x1<=x0)continue;const top=a.y;
+      if(a.trench){ctx.fillStyle='rgba(6,8,12,.9)';ctx.fillRect(x0,FLOOR,x1-x0,top-FLOOR+16);box(a.x,FLOOR,4,top-FLOOR,T.top[1]);box(a.x+a.w-4,FLOOR,4,top-FLOOR,T.top[1]);}
+      patRect(floorPat(),x0,top+8,x1-x0,152,0);box(x0,top,x1-x0,4,T.top[0]);box(x0,top+4,x1-x0,4,T.top[1]);ctx.fillStyle=fade;ctx.fillRect(x0,top+8,x1-x0,152);
       if(viewY+H>FLOOR+158)box(x0,FLOOR+158,x1-x0,viewY+H-FLOOR-156,'#0a1015');
       if(a.x>0){box(a.x,FLOOR,5,150,T.top[1]);poly([a.x,FLOOR+150,a.x+5,FLOOR+150,a.x-4,FLOOR+176],T.top[1]);}if(a.x+a.w<WORLD){box(a.x+a.w-5,FLOOR,5,150,T.top[1]);poly([a.x+a.w,FLOOR+150,a.x+a.w-5,FLOOR+150,a.x+a.w+4,FLOOR+176],T.top[1]);}}
     for(const g of L.gaps)if(g[1]>v0&&g[0]<v1){ctx.fillStyle=vgrad('pit',FLOOR-10,FLOOR+120,[[0,'rgba(8,5,12,.55)'],[.35,'rgba(8,5,12,.93)'],[1,'rgba(8,5,12,.98)']]);ctx.fillRect(g[0],FLOOR-10,g[1]-g[0],viewY+H-FLOOR+30);if(g[2]==='acid')acidLake(g[0],g[1]-g[0]);}
     for(const s of L.acid)if(s[0]+s[1]>v0&&s[0]<v1)acid(s[0],s[1]);
-    for(const d of decor.floor)if(d.x>v0&&d.x<v1)floorProp(d);}
+    for(const d of decor.floor)if(d.x>v0&&d.x<v1)floorProp(d);
+    for(const s of L.slopes||[]){if(s[0]+s[1]<v0||s[0]>v1)continue;ctx.beginPath();ctx.moveTo(s[0],FLOOR+6);ctx.lineTo(s[0],s[2]);ctx.lineTo(s[0]+s[1],s[3]);ctx.lineTo(s[0]+s[1],FLOOR+6);ctx.closePath();ctx.fillStyle=T.floor?T.floor[0]:T.top[1];ctx.fill();ctx.strokeStyle=T.top[0];ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(s[0],s[2]);ctx.lineTo(s[0]+s[1],s[3]);ctx.stroke();ctx.strokeStyle=T.top[1];ctx.lineWidth=2;ctx.stroke();}
+    for(const b of L.broken||[]){if(b[0]+b[1]<v0||b[0]>v1)continue;for(let x=b[0];x<b[0]+b[1];x+=18){const h=4+(x*7)%9;poly([x,FLOOR,x+10,FLOOR,x+6,FLOOR-h],T.top[0],OL,.8);if((x/18)%3===0)poly([x+4,FLOOR,x+14,FLOOR,x+12,FLOOR+7,x+2,FLOOR+6],'#1a1410');}}}
   function drawTerrain(){for(const a of platforms){if(!a.solid||a.x+a.w<cam-20||a.x>cam+W+20)continue;patRect(floorPat(),a.x,a.y,a.w,FLOOR-a.y,0);box(a.x,a.y,a.w,5,T.top[0]);box(a.x,a.y+5,a.w,4,T.top[1]);box(a.x,a.y,3,FLOOR-a.y,'rgba(8,12,16,.45)');box(a.x+a.w-3,a.y,3,FLOOR-a.y,'rgba(8,12,16,.45)');for(let i=14;i<a.w;i+=31)line([a.x+i,a.y+12,a.x+i-3,a.y+19,a.x+i+2,a.y+24],1,'rgba(6,12,15,.4)');}}
   // 下水道的毒水池：冒泡，发绿光
   function acid(x,w){const y=FLOOR;box(x-4,y-2,w+8,4,T.top[1]);box(x,y,w,16,'#163016');ctx.fillStyle='rgba(120,220,70,.85)';ctx.fillRect(x,y+1,w,10);ctx.fillStyle='rgba(205,255,160,.8)';for(let i=0;i<w-6;i+=14)ctx.fillRect(x+i,y+1.5+Math.sin(time*3+i*.4)*1.2,8,1.4);
@@ -1933,29 +1958,31 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   const SCENES={
     // 很久以前：夜空下的钟楼，钟声一圈圈荡开；小引灯人提着灯，领着魂火沿山路往钟下走
     bell(t){
-      // Wide night road. The tower sits deep on the right; the procession walks up toward it, larger in the foreground.
-      const s=tall?Math.min(W/700,H/620):Math.min(W/1100,H/620),push=1+Math.min(.035,t*.006);
-      ctx.translate(W/2+70,H/2+46);ctx.scale(s*push*.92,s*push*.92);ctx.translate(Math.sin(time*.12)*10,Math.cos(time*.1)*4);
-      stageFill([[0,'#04060f'],[.38,'#0a1428'],[.7,'#16304c'],[.86,'#2a4460'],[1,'#121820']]);stageStars(80,11,.85);
-      bloom(-460,-200,220,'#8eafd4',.1);
-      ctx.fillStyle='#0c1828';ctx.beginPath();ctx.moveTo(-980,40);for(let x=-980;x<=980;x+=28)ctx.lineTo(x,-10-46*Math.sin(x*.0028)-16*Math.sin(x*.01));ctx.lineTo(980,160);ctx.lineTo(-980,160);ctx.fill();
-      ctx.fillStyle='#13263a';ctx.beginPath();ctx.moveTo(-980,90);for(let x=-980;x<=980;x+=22)ctx.lineTo(x,36-26*Math.sin(x*.005+1)-8*Math.sin(x*.018));ctx.lineTo(980,210);ctx.lineTo(-980,210);ctx.fill();
-      towerSil(300,-250,1.45,'#070d16',1);rings(300,-70,.65,.4);
-      ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=.2;ctx.fillStyle='#ffd09a';ctx.beginPath();ctx.moveTo(262,-70);ctx.lineTo(338,-58);ctx.lineTo(150,200);ctx.lineTo(-80,220);ctx.closePath();ctx.fill();ctx.restore();
-      bloom(300,-55,200,'#ffcf86',.42);
-      ctx.fillStyle='#101820';ctx.beginPath();ctx.moveTo(-620,280);ctx.lineTo(20,78);ctx.lineTo(190,86);ctx.lineTo(120,300);ctx.closePath();ctx.fill();
-      ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=.16;ctx.fillStyle='#ffc48a';ctx.beginPath();ctx.ellipse(30,170,150,26,-.35,0,TAU);ctx.fill();ctx.restore();
-      ctx.strokeStyle='rgba(190,210,226,.28)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-620,280);ctx.lineTo(20,78);ctx.stroke();ctx.beginPath();ctx.moveTo(120,300);ctx.lineTo(190,86);ctx.stroke();
-      const seat=(x,y,sc,shade)=>{ctx.save();ctx.globalAlpha=.5*shade;ctx.fillStyle='#04070c';ctx.beginPath();ctx.ellipse(x,y+sc*6,sc*18,sc*4.2,0,0,TAU);ctx.fill();ctx.restore();};
-      seat(70,100,.72,.55);storySpirit('child',70,96,.72,1,t+2);
-      seat(-40,128,.95,.7);storySpirit('bearer',-40,124,.95,1,t+1.2);
-      seat(-160,162,1.2,.85);storySpirit('smith',-160,156,1.2,1,t+.4);
-      seat(-340,214,1.85,1);ghostAt(-340,208,1.85,1,GH,true);
-      bloom(-340+32,208-46,110,'#ffcf86',.62);
-      ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=.28;ctx.fillStyle='#ffb060';ctx.beginPath();ctx.ellipse(-290,228,78,16,0,0,TAU);ctx.fill();ctx.restore();
-      ctx.fillStyle='#070b12';ctx.beginPath();ctx.moveTo(-980,200);ctx.quadraticCurveTo(-520,250,-180,340);ctx.lineTo(-980,420);ctx.fill();
-      ctx.beginPath();ctx.moveTo(980,170);ctx.quadraticCurveTo(460,230,200,360);ctx.lineTo(980,420);ctx.fill();
-      ctx.fillStyle='#0b1118';ctx.fillRect(-700,150,16,180);ctx.fillRect(680,120,14,200);},
+      const s=(tall?Math.min(W/560,H/480):Math.min(W/760,H/480))*(1+Math.min(.02,t*.004));
+      ctx.translate(W*.5,H*.62);ctx.scale(s,s);
+      stageFill([[0,'#070c18'],[.3,'#14243c'],[.55,'#35506a'],[.74,'#c48958'],[1,'#24180f']]);stageStars(70,11,.8);
+      bloom(-250,-200,70,'#e7f0ff',.28);circle(-250,-200,9,'#f8fbff');
+      ctx.fillStyle='#10192a';ctx.beginPath();ctx.moveTo(-640,-30);for(let x=-640;x<=640;x+=22)ctx.lineTo(x,-55-22*Math.sin(x*.012));ctx.lineTo(640,30);ctx.lineTo(-640,30);ctx.fill();
+      towerSil(250,-230,.95,'#0c121a',1);rings(250,-90,.42,.4);bloom(250,-80,120,'#ffcf86',.4);
+      ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=.2;ctx.fillStyle='#ffd7a8';ctx.beginPath();ctx.moveTo(220,-80);ctx.lineTo(280,-64);ctx.lineTo(40,20);ctx.lineTo(-80,28);ctx.closePath();ctx.fill();ctx.restore();
+      [[-430,168,150],[-250,150,190],[-90,176,210],[-70,140,160],[90,190,230],[250,150,140]].forEach((h,i)=>{const x=h[0],w=h[1],ht=h[2];ctx.fillStyle=i%2?'#1c2838':'#28384c';ctx.fillRect(x,-ht+8,w,ht);ctx.fillStyle='#121820';ctx.beginPath();ctx.moveTo(x-6,-ht+8);ctx.lineTo(x+w/2,-ht-22);ctx.lineTo(x+w+6,-ht+8);ctx.fill();
+        for(let r=0;r<3;r++)for(let c=0;c<2;c++){const wx=x+16+c*(w*.38),wy=-ht+28+r*36,lit=(i+r+c)%2;ctx.fillStyle=lit?'#ffd09a':'#121820';ctx.fillRect(wx,wy,14,18);if(lit)bloom(wx+7,wy+9,16,'#ffb060',.22);}
+        ctx.fillStyle='#0c1016';ctx.fillRect(x+w*.42,-28,18,36);if(i%2===0){ctx.fillStyle=i%4?'#7a2c38':'#2c5a62';ctx.beginPath();ctx.moveTo(x+w-4,-ht+16);ctx.quadraticCurveTo(x+w+16,-ht+34+Math.sin(time*1.6+i)*5,x+w,-ht+52);ctx.lineTo(x+w-4,-ht+16);ctx.fill();}
+        if(i===2){ctx.fillStyle='#3a2a1c';ctx.fillRect(x+w*.55,-ht-8,8,16);for(let k=0;k<3;k++){const u=(time*.25+k*.3)%1;circle(x+w*.55+4,-ht-8-u*28,2,'rgba(220,220,220,'+(1-u)*.5+')');}}});
+      ghostAt(-4,-150,.42,1,GH,false);ghostAt(150,-168,.36,-1,{body:'#efe6d4',shade:'#c2ae90',scarf:'#a36b32',scarfDark:'#6a4420',eye:'#2a2018'},false);
+      ctx.fillStyle='#2a241c';ctx.beginPath();ctx.moveTo(-620,8);ctx.lineTo(-180,8);ctx.lineTo(-150,-16);ctx.lineTo(40,-16);ctx.lineTo(78,10);ctx.lineTo(620,22);ctx.lineTo(620,150);ctx.lineTo(-620,150);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#3a342c';[[-180,8,30,16],[-150,-16,30,16],[40,-16,38,26]].forEach(q=>ctx.fillRect(q[0],q[1],q[2],q[3]));
+      ctx.strokeStyle='rgba(210,196,170,.18)';ctx.lineWidth=1;for(let i=0;i<14;i++){ctx.beginPath();ctx.moveTo(-560+i*80,24+(i%3)*5);ctx.lineTo(-520+i*80,36);ctx.stroke();}
+      [[-340,8],[-120,-16],[70,10],[210,16]].forEach((p,i)=>{line([p[0],p[1],p[0],p[1]-78],3,'#4a3424',OL);fl(p[0],p[1]-80,.5,['#c4501c','#ffb060','#fff1c8']);bloom(p[0],p[1]-80,34,'#ffb060',.4);});
+      ctx.save();ctx.translate(-250,4);ctx.scale(1.15,1.15);keeperModel(t);ctx.restore();
+      const folk=[{body:'#d7e0ea',shade:'#8ea0b4',scarf:'#8d3d49',scarfDark:'#5c2834',eye:'#1a2430'},{body:'#e7efe6',shade:'#9bb5a4',scarf:'#3d6d86',scarfDark:'#24485c',eye:'#142028'},{body:'#efe6d4',shade:'#c2ae90',scarf:'#a36b32',scarfDark:'#6a4420',eye:'#2a2018'}];
+      [[-40,-14,.55,0],[30,-12,.5,1],[120,12,.48,2],[200,14,.42,0],[-160,6,.46,1]].forEach(q=>ghostAt(q[0],q[1],q[2],q[0]>80?-1:1,folk[q[3]],false));
+      storySpirit('child',-70,18,.85,1,t+1.4);storySpirit('bearer',10,28,1.05,1,t+.6);storySpirit('smith',100,36,1.15,1,t+.2);
+      ghostAt(-210,70,1.7,1,GH,true);bloom(-180,28,90,'#ffcf86',.55);
+      ghostAt(250,78,1.45,-1,folk[0],false);
+      for(let i=0;i<16;i++){const u=(time*.22+i*.06)%1;circle(-160+((i*70)%380),70-u*160,1.4,'rgba(255,210,150,'+(1-u)+')');}
+      ctx.fillStyle='#0c1016';ctx.beginPath();ctx.moveTo(-640,90);ctx.quadraticCurveTo(-300,130,40,170);ctx.lineTo(-640,220);ctx.fill();
+      ctx.beginPath();ctx.moveTo(640,70);ctx.quadraticCurveTo(300,130,120,180);ctx.lineTo(640,220);ctx.fill();},
     // 典狱长锁住钟舌：巨钟的钟舌被铁链和锁缠死；典狱长的黑影提着灯，魂火一盏盏被吸进灯里
     procession(t){
       stageIn();ctx.translate(40,70);ctx.scale(1.38,1.38);stageFill([[0,'#0c1723'],[.62,'#243c47'],[1,'#100f19']]);
@@ -2268,49 +2295,38 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   const WARDEN={bronze:'#a7803f',bronzeHi:'#ecc87e',bronzeDark:'#5f4321',iron:'#4b5059',ironHi:'#808894',ironDark:'#2a2d33',cape:'#3c1b20',capeDark:'#230e12',slit:'#0b0705',glow:'#ffb04a',soul:'#8be1ce',soulHi:'#effff9',chain:'#7c828a',leather:'#3b2a20',haft:'#4a3626',glass:'#203232'};
   const BOSS_PAL={lock:LOCK,brood:BROOD,standard:STD,warden:WARDEN};[LOCK,BROOD,STD,WARDEN].forEach(o=>Object.keys(o).forEach(k=>{FLASH[k]='#fff2df';}));
   const BOSS_CHUNKS={lock:[LOCK.shell,LOCK.brass,LOCK.iron,LOCK.hide],brood:[BROOD.frame,BROOD.glass,BROOD.tent,BROOD.flame],standard:[STD.bone,STD.armor,STD.flag,STD.cloak],warden:[WARDEN.bronze,WARDEN.iron,WARDEN.cape,WARDEN.soul]};
-  // 守锁兽：四足着地的铜壳巨兽，铁面罩上一道钥匙孔形的眼缝，胸前挂着巨锁、颈下吊着守钟人的旧钥匙
-  function drawLock(e,P){const t=time+e.seed,m=e.move,w=e.wind>0?1-e.wind/e.wt:0,run=m==='charge'&&e.act>0,ph=e.walk*(run?.9:1.1),br=Math.sin(t*2.2)*1.2,open=((m==='slam'||m==='charge')&&e.wind>0)||e.roar,lashing=m==='lash'&&(e.wind>0||e.act>0);
-    let rear=0,dip=0;
-    if(m==='slam'){if(e.wind>0)rear=-.46*(1-Math.pow(1-w,2));else if(e.rec>0&&e.rt)rear=.06*e.rec/e.rt;}
-    else if(m==='charge'){if(e.wind>0){rear=-.05*w+Math.sin(t*30)*.012;dip=.12*w;}else if(run)dip=.16;}
-    if(e.roar&&e.rt)rear=-.32*Math.min(1,(e.rt-e.rec)/.35);if(e.stun)dip=-.08+Math.sin(t*3)*.05;
-    ctx.save();ctx.translate(-36,-2);ctx.rotate(rear);ctx.translate(36,2);
-    {const ta=Math.sin(t*2)*.25+(run?.9:.2);ctx.save();ctx.translate(-56,-36);ctx.rotate(ta);for(let i=0;i<4;i++)link(-i*7,i*2,i%2?0:Math.PI/2,P.chain);circle(-30,8,6,P.ironDark,OL,2);circle(-31,6,1.6,P.ironHi);ctx.restore();}
-    const leg=(x,off,front,near)=>{const s=Math.sin(ph+off),lift=Math.max(0,Math.cos(ph+off))*(run?9:4),scr=front&&near&&m==='charge'&&e.wind>0?Math.sin(t*16)*8*w:0,J=joint(x,-30,s*.42,front?.32:-.36,17,15),fx=J[2]+scr,fy=J[3]-lift,c=near?P.hide:P.hideDark;
-      line([x,-30,J[0],J[1],fx,fy-2],near?16:14,c,OL);oval(fx+3,fy-2,10,5,c);ctx.strokeStyle=OL;ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(fx+3,fy-2,10,5,0,Math.PI,0);ctx.stroke();
-      for(let k=0;k<3;k++)poly([fx+6+k*3.6,fy-3,fx+11.5+k*3.6,fy-.5,fx+6+k*3.6,fy+.8],P.claw,OL,.9);
-      ctx.fillStyle=near?P.iron:P.ironDark;ctx.beginPath();ctx.ellipse(J[0],J[1]+1,9.5,6.4,0,0,TAU);ctx.fill();ctx.strokeStyle=OL;ctx.lineWidth=1.6;ctx.stroke();
-      if(near){circle(J[0]-3.5,J[1],1.5,P.ironHi);circle(J[0]+3.5,J[1]+2,1.5,P.ironHi);if(front){const sw2=Math.sin(t*3+x)*.4;for(let i=0;i<3;i++)link(J[0]-2+Math.sin(sw2)*i*5,J[1]+8+i*6,i%2?Math.PI/2:0,P.chain,3.4);}}};
-    leg(-36,Math.PI,false,false);leg(30,0,true,false);oval(-4,-28,50,13,P.hideDark);
-    const shell=()=>{ctx.moveTo(-58,-30);ctx.bezierCurveTo(-62,-70,-30,-92+br,4,-92+br);ctx.bezierCurveTo(36,-92+br,54,-66,52,-34);ctx.quadraticCurveTo(0,-18,-58,-30);ctx.closePath();};
-    shape(shell,lg(0,-94,0,-22,P.shellHi,P.shell,P.shellDark),OL,3);
-    ctx.save();ctx.beginPath();shell();ctx.clip();
-    [[-46,-64],[-27,-82],[-6,-90],[16,-87],[36,-72]].forEach(q=>{const b=()=>{ctx.moveTo(q[0]-4,-22);ctx.quadraticCurveTo(q[0]-9,(q[1]-22)/2-8,q[0],q[1]+br-2);};shape(b,null,P.band,4.4);shape(b,null,'rgba(255,230,180,.22)',1.2);for(let k=1;k<3;k++)circle(q[0]-6+k*2,-22+(q[1]-22+br)*k/3,1.8,P.brassHi,OL,.8);});
-    oval(-10,-72+br,36,7,'rgba(255,240,200,.2)');
-    if(e.rage){shape(()=>{ctx.moveTo(-30,-76);ctx.lineTo(-22,-62);ctx.lineTo(-28,-48);ctx.moveTo(10,-86);ctx.lineTo(16,-72);ctx.lineTo(8,-58);ctx.lineTo(14,-44);ctx.moveTo(34,-70);ctx.lineTo(28,-56);},null,P.core,2.4);}
+  // 守锁兽：四足的兽，锁只是项圈上的一小枚。砸地时人立，冲撞时伏低，甩链时身子不动、锁头沿弧线抡出去。
+  function drawLock(e,P){const t=time+e.seed,m=e.move,w=e.wind>0?1-e.wind/(e.wt||.5):0,run=m==='charge'&&e.act>0;
+    const tellSlam=m==='slam'&&e.wind>0,down=m==='slam'&&e.rec>0,tellCharge=m==='charge'&&e.wind>0;
+    const sink=tellCharge?11*w:(run?4:0),rear=tellSlam?-.78*w:(e.roar?-.2:0),pitch=down?.48:0,wag=Math.sin(t*(run?6:2.1))*9;
+    ctx.save();ctx.translate(0,sink);ctx.rotate(rear+pitch);
+    ribbon(-44,-32,-70,-14+wag,-96,-30+wag,8,2.4,P.hide,OL,7);
+    const leg=(x,ph,near,hip)=>{const lift=Math.max(0,Math.sin((e.walk||0)*(run?2:.75)+ph))*(run?15:5),reach=(down&&x>0?26:run?9:3),kx=x+5,ky=hip*.5-lift*.2,fx=x+reach,fy=-lift-sink;
+      line([x,hip,kx,ky],near?9:7,near?P.hide:P.hideDark,OL);line([kx,ky,fx,fy],near?7:5.5,P.hideDark,OL);
+      poly([fx-3,fy,fx+16,fy-1,fx+14,fy+5,fx-2,fy+5],P.claw,OL,1);for(let i=0;i<3;i++)poly([fx+1+i*4.2,fy,fx+4+i*4.2,fy-6,fx+8+i*4.2,fy],P.claw,OL,.6);};
+    leg(-36,.2,false,-28);leg(-12,2.5,false,-26);
+    shape(()=>{ctx.moveTo(-46,-22);ctx.quadraticCurveTo(-56,-50,-22,-58);ctx.quadraticCurveTo(10,-70,38,-52);ctx.quadraticCurveTo(50,-40,40,-18);ctx.quadraticCurveTo(12,-6,-18,-12);ctx.quadraticCurveTo(-38,-14,-46,-22);ctx.closePath();},lg(-30,-62,18,-10,P.shellHi,P.shell,P.shellDark),OL,2.5);
+    shape(()=>{ctx.moveTo(-26,-18);ctx.quadraticCurveTo(6,-6,32,-20);ctx.quadraticCurveTo(8,-4,-24,-14);ctx.closePath();},P.hide,OL,1.1);
+    for(let i=0;i<3;i++)line([-16+i*13,-50,-8+i*13,-22],1.7,P.ironDark);
+    for(let i=0;i<5;i++)poly([6+i*6,-50,14+i*5,-72-i*2,22+i*4,-48],P.hideDark,OL,.7);
+    line([18,-34,30,-18],2.6,P.chain);ctx.save();ctx.translate(28,-8);ctx.rotate(.15);ctx.scale(.34,.34);padlock(P,!!e.rage,1);ctx.restore();
+    const neck=tellSlam?-6:0;line([30,-46,48,-60+neck],11,P.hide,OL);
+    ctx.save();ctx.translate(52,-66+neck);ctx.rotate(run?.55:(tellCharge?.4*w:(tellSlam?-.5*w:(e.stun?.5:Math.sin(t*1.4)*.05))));
+    poly([0,-2,-16,-28,10,-8],P.hideDark,OL,1.2);
+    shape(()=>{ctx.moveTo(-16,-2);ctx.quadraticCurveTo(-8,-20,16,-14);ctx.quadraticCurveTo(30,-6,26,8);ctx.quadraticCurveTo(6,16,-14,10);ctx.closePath();},lg(-6,-16,14,10,P.hide,P.hideDark),OL,2.1);
+    shape(()=>{ctx.moveTo(8,0);ctx.lineTo(34,-2);ctx.lineTo(36,8);ctx.lineTo(6,9);ctx.closePath();},P.shell,OL,1.5);
+    circle(4,-2,3.3,'#140e0a');circle(5.1,-3.2,1.25,(e.rage||e.roar||w>.15)?P.glow:'#ffe7b8');
+    const open=!!(e.roar||e.stun||(tellSlam&&w>.3)||tellCharge||run);
+    if(open){shape(()=>{ctx.moveTo(12,4);ctx.lineTo(32,3);ctx.lineTo(30,13);ctx.lineTo(10,11);ctx.closePath();},'#24160f',OL,1.1);for(let i=0;i<4;i++)poly([15+i*4,4,16.4+i*4,9,19+i*4,4],'#f4efe6',OL,.5);}
+    else line([14,5,30,4],1.4,'#24160f');
     ctx.restore();
-    [[-36,-80],[-18,-89],[2,-91],[22,-88],[38,-76]].forEach(q=>circle(q[0],q[1]+br,4.2,lg(q[0],q[1]-4,q[0],q[1]+4,P.brassHi,P.brass),OL,1.4));
-    [[-24,-90],[-6,-93]].forEach(q=>{shape(()=>ctx.rect(q[0]-3.5,q[1]-12+br,7,12),P.ironDark,OL,1.6);shape(()=>ctx.rect(q[0]-5,q[1]-14+br,10,3),P.iron,OL,1.4);});
-    leg(-36,0,false,true);
-    if(e.rage){circle(58,-26,13,rg(58,-26,13,'#fff4c8',P.core,'rgba(255,120,40,0)'));circle(58,-26,5,'#fff4c8');}
-    // 头
-    ctx.save();ctx.translate(46,-40);ctx.rotate(dip);poly([-16,-14,6,-22,8,12,-14,14],P.hideDark,OL,2);
-    shape(()=>{ctx.moveTo(-2,-18);ctx.quadraticCurveTo(-12,-34,-25,-37);ctx.quadraticCurveTo(-14,-28,-8,-13);ctx.closePath();},lg(0,-37,0,-13,P.brassHi,P.brassDark),OL,1.8);
-    ctx.save();ctx.translate(10,12);ctx.rotate(open?.34:e.stun?.18:0);poly([-2,0,30,-2,27,11,4,10],P.ironDark,OL,2);if(open||e.stun)for(let k=0;k<4;k++)poly([4+k*6,0,7+k*6,5,10+k*6,0],P.claw,OL,.8);ctx.restore();
-    shape(()=>{ctx.moveTo(-4,-22);ctx.lineTo(18,-26);ctx.quadraticCurveTo(36,-20,38,-6);ctx.lineTo(39,8);ctx.quadraticCurveTo(30,18,12,18);ctx.lineTo(-4,14);ctx.closePath();},lg(0,-26,0,18,P.ironHi,P.iron,P.ironDark),OL,2.6);
-    line([2,-19,30,-17],3,P.ironDark);[[4,-12],[4,6],[34,-8],[33,4]].forEach(q=>circle(q[0],q[1],1.6,P.ironHi,OL,.8));
-    const g=e.rage||w>.3||e.roar?P.glowHot||'#ffe6a0':P.glow;circle(24,-8,5.4,P.ironDark);poly([21,-6,27,-6,29,7,19,7],P.ironDark);circle(24,-8,3.4,g);poly([22.4,-6,25.6,-6,26.6,4,21.4,4],g);
-    line([16,18,18,30],1.4,P.thread);ctx.save();ctx.translate(18,32);ctx.rotate(Math.sin(t*3)*.3);circle(0,0,3,null,'#9aa4ac',1.6);line([0,3,0,12],1.8,'#9aa4ac');line([0,9,3,9],1.6,'#9aa4ac');line([0,12,3,12],1.6,'#9aa4ac');ctx.restore();
+    leg(8,1.2,true,-24);leg(26,3.4,true,-22);
+    if(tellCharge){ctx.globalAlpha=.5;line([22,2,-6,7],2,'#e7eef2');line([10,4,-18,9],1.6,'#e7eef2');ctx.globalAlpha=1;}
+    if(e.stun)for(let i=0;i<3;i++)sparkle2(16+Math.cos(t*4+i)*14,-74,3.4,'#ffe08a');
     ctx.restore();
-    // 巨锁：平时挂在胸前；甩锁链时被叼着抡出去
-    if(lashing){const k=e.wind>0?0:e.at?1-e.act/e.at:1,th=e.wind>0?-2.5+Math.sin(t*14)*.22:-2.5+2.7*(1-Math.pow(1-k,2)),R=e.wind>0?100+40*w:190,hx=80+Math.cos(th)*R,hy=Math.min(-14,-30+Math.sin(th)*R),ang=Math.atan2(hy+30,hx-80);
-      for(let i=1;i<=13;i++){const u=i/13;link(80+(hx-80)*u,-30+(hy+30)*u+Math.sin(u*Math.PI)*8,ang+(i%2?Math.PI/2:0),P.chain);}
-      if(e.act>0&&k<.9){ctx.save();ctx.globalAlpha=.35*(1-k);ctx.strokeStyle='#fff6dc';ctx.lineWidth=10;ctx.beginPath();ctx.arc(80,-30,R,-2.5,th,false);ctx.stroke();ctx.restore();}
-      ctx.save();ctx.translate(hx,hy);ctx.rotate(ang-Math.PI/2);padlock(P,e.rage,1.15);ctx.restore();}
-    else{ctx.save();ctx.translate(72,-22);ctx.rotate(Math.sin(t*2.6)*.12+(run?-.4:0)+(m==='slam'&&e.wind>0?-.5*w:0));padlock(P,e.rage);ctx.restore();}
-    leg(30,Math.PI,true,true);
-    if(e.stun)for(let i=0;i<3;i++){const a=t*5+i*2.1;sparkle2(72+Math.cos(a)*20,-78+Math.sin(a)*6,4.5,'#ffe08a');}
-    ctx.restore();}
+    if(m==='lash'){const k=e.wind>0?0:(e.act>0&&e.at?1-e.act/e.at:1),th=-2.5+2.7*(1-Math.pow(1-k,2)),hx=80+Math.cos(th)*190,hy=Math.min(-14,-30+Math.sin(th)*190),sx=34,sy=-40;
+      for(let i=1;i<=11;i++){const u=i/11;link(sx+(hx-sx)*u,sy+(hy-sy)*u-Math.sin(u*Math.PI)*(e.wind>0?22:5),th+(i%2?0:1.15),P.chain,3.3);}
+      ctx.save();ctx.translate(hx,hy);ctx.rotate(th+.5);ctx.scale(.72,.72);padlock(P,false,1);ctx.restore();}}
   // 溺灯：从污水里浮起的巨灯。玻璃灯室里一团绿火，火里有一道竖瞳；灯身缠着锈链、空灯罩和水草，触须垂进水里
   function drawBrood(e,P){const t=time+e.seed,m=e.move,w=e.wind>0?1-e.wind/e.wt:0,a=e.act>0&&e.at?1-e.act/e.at:0,bob=Math.sin(t*1.7)*5,open=m==='spit'?(e.wind>0?w:e.rec>0&&e.rt?e.rec/e.rt:0):0,coil=m==='sweep'&&e.wind>0?w:0,lash=m==='sweep'&&e.act>0?Math.sin(a*Math.PI):0,swell=1+open*.45+(e.rage?.12:0)+(e.roar?.25:0),cy=-86+bob;
     const tent=(i,near)=>{const x0=-26+i*17,sw=Math.sin(t*2.1+i*1.7)*10,dir=x0>=0?1:-1;let tx=x0*1.9+sw-coil*16*dir,ty=-2-coil*40,cx=x0*1.2+sw*.6,cyy=cy+72-coil*24;
