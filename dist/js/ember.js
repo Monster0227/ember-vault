@@ -399,9 +399,9 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   let audioPool=null,verticalBase=0,hitNoise=null,bandId='';
   // 声音分两路：音乐和音效各有自己的音量（设置里调）
   let musicBus=null,sfxBus=null;
-  function buses(){if(!ac)return;try{if(!sfxBus){sfxBus=ac.createGain();sfxBus.connect(ac.destination);musicBus=ac.createGain();musicBus.connect(ac.destination);}sfxBus.gain.value=settings.sfx;musicBus.gain.value=settings.music;}catch(e){}}
+  function buses(){if(!ac)return;try{if(!sfxBus){sfxBus=ac.createGain();sfxBus.connect(ac.destination);musicBus=ac.createGain();musicBus.connect(ac.destination);synthBus=ac.createGain();synthBus.connect(musicBus);synthBus.gain.setValueAtTime(1,ac.currentTime);}sfxBus.gain.value=settings.sfx;musicBus.gain.value=settings.music;}catch(e){}}
   function audio(){if(muted)return null;try{if(!ac){ac=new(window.AudioContext||window.webkitAudioContext)();buses();}if(ac.state!=='running'){const r=ac.resume();if(r&&r.catch)r.catch(()=>{});}}catch(e){return null;}return ac;}
-  function unlockAudio(){if(ac&&ac.state==='running')return;const a=audio();if(!a)return;try{const s=a.createBufferSource();s.buffer=a.createBuffer(1,1,22050);s.connect(a.destination);s.start(0);}catch(e){}}
+  function unlockAudio(){if(ac&&ac.state==='running')return;const a=audio();if(!a)return;try{const s=a.createBufferSource();s.buffer=a.createBuffer(1,1,22050);s.connect(a.destination);s.start(0);}catch(e){}prefetchMusic();}
   function beep(freq,duration,type,vol){const a=audio();if(!a||settings.sfx<=0)return;try{if(!audioPool)audioPool=new EmberCore.AudioPool(a,sfxBus||a.destination,16);audioPool.play(freq,duration,type,vol);}catch(e){}}
   // 刀和命中不再走单音“哔”：一层沉下去的弦乐身体、一层布料破风、一层灯罩似的金属余响。
   function weighted(parts){const a=audio();if(!a||settings.sfx<=0)return;const t0=a.currentTime,bus=sfxBus||a.destination;
@@ -412,17 +412,112 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     }catch(e){}});}
   function swingSound(){const heavy=p.slash==='side'&&p.combo===0,down=p.slash==='down';weighted([{noise:true,filter:heavy?'lowpass':'bandpass',freq:heavy?150:down?110:460,q:.65,vol:heavy?.11:.05,dur:heavy?.16:.09},{f:heavy?112:down?78:164,to:heavy?42:down?36:54,wave:'sine',vol:heavy?.08:.04,dur:heavy?.18:.11},{f:heavy?520:down?380:860,to:150,wave:'triangle',vol:.016,dur:.05,at:.006}]);}
   function impactSound(heavy){weighted([{noise:true,filter:'lowpass',freq:heavy?170:320,q:1.1,vol:heavy?.14:.07,dur:heavy?.15:.08},{f:heavy?78:108,to:34,wave:'sine',vol:heavy?.12:.055,dur:heavy?.22:.12},{f:heavy?220:340,to:80,wave:'triangle',vol:.03,dur:.07},{f:heavy?680:1120,to:heavy?260:420,wave:'sine',vol:.015,dur:.1,at:.01}]);}
-  // 区域与前三位首领现场合成；典狱长使用 CC0 战曲，失败时回退合成曲。
-  let battleBuffer=null,battleLoading=false,battleFailed=false,battleSource=null,battleGain=null;
-  function stopBattleMusic(){if(!battleSource)return;const s=battleSource,g=battleGain;battleSource=battleGain=null;try{g.gain.cancelScheduledValues(ac.currentTime);g.gain.setTargetAtTime(.0001,ac.currentTime,.04);s.stop(ac.currentTime+.2);s.onended=()=>{s.disconnect();g.disconnect();};}catch(e){}}
-  function externalMusic(mode){
-    // 典狱长第一阶段用战曲；半血后停掉这条循环，交给更快的第二段程序曲，听得出来换了。
-    if(mode!=='warden'){stopBattleMusic();return false;}
-    if(!battleBuffer){if(!battleLoading&&!battleFailed&&typeof fetch==='function'){battleLoading=true;
-      fetch('assets/music/epic-boss.mp3').then(r=>{if(!r.ok)throw Error('music');return r.arrayBuffer();}).then(b=>new Promise((resolve,reject)=>ac.decodeAudioData(b,resolve,reject))).then(b=>{battleBuffer=b;battleLoading=false;}).catch(()=>{battleFailed=true;battleLoading=false;});}return false;}
-    try{if(!battleSource){const s=ac.createBufferSource(),g=ac.createGain();s.buffer=battleBuffer;s.loop=true;s.connect(g);g.connect(musicBus);g.gain.setValueAtTime(.0001,ac.currentTime);g.gain.linearRampToValueAtTime(.22,ac.currentTime+.65);s.start();battleSource=s;battleGain=g;}
+  // 各区域播放已核验的 CC0 循环，解码失败时回退 SONGS。典狱长一阶段仍用 epic-boss，半血后交给更快的第二段合成曲。
+  const MUSIC_TRACKS={
+    menu:{src:'assets/music/menu.mp3',vol:.16},
+    furnace:{src:'assets/music/furnace.mp3',vol:.17},
+    prison:{src:'assets/music/prison.mp3',vol:.18},
+    sewers:{src:'assets/music/sewers.mp3',vol:.18},
+    ramparts:{src:'assets/music/ramparts.mp3',vol:.17},
+    ossuary:{src:'assets/music/ossuary.mp3',vol:.17},
+    tower:{src:'assets/music/tower.mp3',vol:.18},
+    rest:{src:'assets/music/rest.mp3',vol:.16},
+    warden:{src:'assets/music/epic-boss.mp3',vol:.22}
+  };
+  const MUSIC_FADE=1.05,musicCache={};
+  let synthBus=null,musicDest=null,musicLayers=[],musicTrackId='',musicFadingOut=false;
+  function cueOut(){return musicBus||(ac&&ac.destination);}
+  function bedOut(){return synthBus||cueOut();}
+  function rampGain(node,value,fade){
+    if(!node||!ac)return;
+    const p=node.gain,now=ac.currentTime,target=Math.max(.0001,value);
+    try{if(p.cancelScheduledValues)p.cancelScheduledValues(now);}catch(e){}
+    let from=target;
+    try{from=typeof p.value==='number'&&isFinite(p.value)?Math.max(.0001,p.value):target;}catch(e){}
+    try{
+      if(fade>0&&p.linearRampToValueAtTime){p.setValueAtTime(from,now);p.linearRampToValueAtTime(target,now+fade);}
+      else if(fade>0&&p.setTargetAtTime){p.setValueAtTime(from,now);p.setTargetAtTime(target,now,Math.max(.04,fade/3));}
+      else if(p.setValueAtTime)p.setValueAtTime(target,now);
+      else p.value=target;
+    }catch(e){try{p.value=target;}catch(e2){}}
+  }
+  function fadeLayer(layer,fade){
+    if(!layer||!ac)return;
+    rampGain(layer.gain,.0001,fade);
+    try{layer.source.stop(ac.currentTime+Math.max(.08,fade)+.12);}catch(e){}
+    layer.source.onended=()=>{try{layer.source.disconnect();layer.gain.disconnect();}catch(e){}};
+  }
+  function stopBattleMusic(fade){
+    const f=fade==null?MUSIC_FADE:fade,layers=musicLayers;
+    musicLayers=[];musicTrackId='';musicFadingOut=false;
+    layers.forEach(layer=>fadeLayer(layer,f));
+  }
+  function setSynthAudible(on,fade){
+    if(!ac||!synthBus)return;
+    rampGain(synthBus,on?1:.0001,fade==null?MUSIC_FADE:fade);
+  }
+  function decodeBuffer(data){
+    return new Promise((resolve,reject)=>{
+      if(!ac||typeof ac.decodeAudioData!=='function'){reject(new Error('decode'));return;}
+      const ret=ac.decodeAudioData(data,resolve,reject);
+      if(ret&&typeof ret.then==='function')ret.then(resolve,reject);
+    });
+  }
+  function loadTrack(src){
+    let slot=musicCache[src];
+    if(!slot)slot=musicCache[src]={status:'idle',buffer:null};
+    if(slot.status==='ready'||slot.status==='failed'||slot.status==='loading')return slot;
+    if(typeof fetch!=='function'||!ac||typeof ac.decodeAudioData!=='function'){slot.status='failed';return slot;}
+    slot.status='loading';
+    fetch(src).then(r=>{if(!r.ok)throw Error('music');return r.arrayBuffer();}).then(decodeBuffer).then(buf=>{slot.buffer=buf;slot.status='ready';}).catch(()=>{slot.buffer=null;slot.status='failed';});
+    return slot;
+  }
+  function prefetchMusic(){
+    if(!ac||typeof fetch!=='function')return;
+    try{buses();}catch(e){}
+    Object.keys(MUSIC_TRACKS).forEach(mode=>loadTrack(MUSIC_TRACKS[mode].src));
+  }
+  function startRecorded(src,vol,fade){
+    const slot=musicCache[src];
+    if(!slot||!slot.buffer||!musicBus||!ac)return false;
+    try{
+      const s=ac.createBufferSource(),g=ac.createGain();
+      s.buffer=slot.buffer;s.loop=true;s.connect(g);g.connect(musicBus);
+      g.gain.setValueAtTime(.0001,ac.currentTime);
+      if(fade>0&&g.gain.linearRampToValueAtTime)g.gain.linearRampToValueAtTime(vol,ac.currentTime+fade);
+      else g.gain.setValueAtTime(vol,ac.currentTime);
+      s.start();
+      musicLayers.push({source:s,gain:g,src:src,vol:vol});
+      musicTrackId=src;musicFadingOut=false;
       return true;
-    }catch(e){stopBattleMusic();battleFailed=true;battleBuffer=null;return false;}}
+    }catch(e){return false;}
+  }
+  function externalMusic(mode){
+    const spec=MUSIC_TRACKS[mode];
+    if(!spec){
+      if(musicTrackId||musicLayers.length)stopBattleMusic(MUSIC_FADE);
+      setSynthAudible(true,MUSIC_FADE);
+      return false;
+    }
+    const slot=loadTrack(spec.src);
+    if(slot.status==='failed'){
+      if(musicTrackId||musicLayers.length)stopBattleMusic(MUSIC_FADE);
+      setSynthAudible(true,MUSIC_FADE);
+      return false;
+    }
+    if(slot.status!=='ready'){
+      if(musicTrackId===spec.src&&musicLayers.length){setSynthAudible(false,.2);return true;}
+      return false;
+    }
+    if(musicTrackId===spec.src&&musicLayers.length){setSynthAudible(false,MUSIC_FADE);return true;}
+    const prev=musicLayers.slice();musicLayers=[];
+    prev.forEach(layer=>fadeLayer(layer,MUSIC_FADE));
+    if(!startRecorded(spec.src,spec.vol,MUSIC_FADE)){
+      slot.status='failed';setSynthAudible(true,MUSIC_FADE);return false;
+    }
+    setSynthAudible(false,MUSIC_FADE);
+    return true;
+  }
   // 曲谱用音阶级数写：0 是主音，7 是高八度，-1 是休止；一步是八分音符。drum 里 k 底鼓、s 军鼓、h 镲、a 铁砧
   const SONGS={
     menu:{bpm:64,root:220,scale:[0,2,3,5,7,8,10],lead:[4,-1,-1,3,2,-1,0,-1,1,-1,2,-1,-1,-1,-1,-1,4,-1,-1,5,4,-1,2,-1,3,-1,1,-1,0,-1,-1,-1],bass:[0,-1,-1,-1,-1,-1,-1,-1,5,-1,-1,-1,-1,-1,-1,-1,3,-1,-1,-1,-1,-1,-1,-1,4,-1,-1,-1,-1,-1,-1,-1],lw:'triangle',lv:.011,ll:2.4,pad:true,bell:32},
@@ -449,12 +544,12 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     warden2:{bpm:150,key:1,root:165,scale:[0,2,3,5,7,8,10],lead:[7,6,5,4,3,4,5,-1,7,8,9,10,9,7,6,-1,10,-1,9,-1,8,-1,7,-1,6,5,4,3,4,-1,-1,-1],bass:[0,0,0,0,5,5,5,5,3,3,3,3,4,4,4,4],bw:'sawtooth',bc:640,bv:.03,bl:.8,lw:'triangle',lv:.014,ll:1.4,pad:true,pv:.007,drum:'kkh.s.hkk.hks.hs',kv:.11,bell:8}};
   let musicMode='',musicNext=0,musicStep=0,noiseBuf=null;
   // 乐器：普通音符（可加低通、慢起音）、噪声（镲 / 军鼓 / 风声）、底鼓、钟（几个不成整数倍的泛音）
-  function mnote(f,d,vol,wave,at,cut,att){if(!ac)return;try{const o=ac.createOscillator(),g=ac.createGain();o.type=wave||'sine';o.frequency.setValueAtTime(Math.max(20,f),at);g.gain.setValueAtTime(.0001,at);g.gain.exponentialRampToValueAtTime(vol,at+(att||Math.min(.03,d*.3)));g.gain.exponentialRampToValueAtTime(.0001,at+d);let src=o;if(cut&&ac.createBiquadFilter){const fl=ac.createBiquadFilter();fl.type='lowpass';fl.frequency.value=cut;o.connect(fl);src=fl;}src.connect(g);g.connect(musicBus||ac.destination);o.start(at);o.stop(at+d+.05);}catch(e){}}
+  function mnote(f,d,vol,wave,at,cut,att){if(!ac)return;try{const o=ac.createOscillator(),g=ac.createGain();o.type=wave||'sine';o.frequency.setValueAtTime(Math.max(20,f),at);g.gain.setValueAtTime(.0001,at);g.gain.exponentialRampToValueAtTime(vol,at+(att||Math.min(.03,d*.3)));g.gain.exponentialRampToValueAtTime(.0001,at+d);let src=o;if(cut&&ac.createBiquadFilter){const fl=ac.createBiquadFilter();fl.type='lowpass';fl.frequency.value=cut;o.connect(fl);src=fl;}src.connect(g);g.connect(musicDest||cueOut());o.start(at);o.stop(at+d+.05);}catch(e){}}
   function mnoise(d,vol,at,type,freq,swell){if(!ac)return;try{if(!noiseBuf){noiseBuf=ac.createBuffer(1,Math.floor(ac.sampleRate*.5),ac.sampleRate);const ch=noiseBuf.getChannelData(0);for(let i=0;i<ch.length;i++)ch[i]=Math.random()*2-1;}const s=ac.createBufferSource(),fl=ac.createBiquadFilter(),g=ac.createGain();s.buffer=noiseBuf;s.loop=d>.45;fl.type=type||'highpass';fl.frequency.value=freq||6000;
-      if(swell){g.gain.setValueAtTime(.0001,at);g.gain.exponentialRampToValueAtTime(vol,at+d*.45);}else g.gain.setValueAtTime(vol,at);g.gain.exponentialRampToValueAtTime(.0001,at+d);s.connect(fl);fl.connect(g);g.connect(musicBus||ac.destination);s.start(at);s.stop(at+d+.02);}catch(e){}}
-  function kick(at,vol){if(!ac)return;try{const o=ac.createOscillator(),g=ac.createGain();o.frequency.setValueAtTime(130,at);o.frequency.exponentialRampToValueAtTime(42,at+.14);g.gain.setValueAtTime(vol,at);g.gain.exponentialRampToValueAtTime(.0001,at+.24);o.connect(g);g.connect(musicBus||ac.destination);o.start(at);o.stop(at+.26);}catch(e){}}
+      if(swell){g.gain.setValueAtTime(.0001,at);g.gain.exponentialRampToValueAtTime(vol,at+d*.45);}else g.gain.setValueAtTime(vol,at);g.gain.exponentialRampToValueAtTime(.0001,at+d);s.connect(fl);fl.connect(g);g.connect(musicDest||cueOut());s.start(at);s.stop(at+d+.02);}catch(e){}}
+  function kick(at,vol){if(!ac)return;try{const o=ac.createOscillator(),g=ac.createGain();o.frequency.setValueAtTime(130,at);o.frequency.exponentialRampToValueAtTime(42,at+.14);g.gain.setValueAtTime(vol,at);g.gain.exponentialRampToValueAtTime(.0001,at+.24);o.connect(g);g.connect(musicDest||cueOut());o.start(at);o.stop(at+.26);}catch(e){}}
   function bellTone(f,at,vol,d){[1,2.76,5.4,8.93].forEach((m,i)=>mnote(f*m,d*(1-i*.18),vol/(1+i*1.7),'sine',at,0,.004));}
-  function playStep(S,i,at,sd){const n=S.scale.length,deg=d=>{const o=Math.floor(d/n),k=((d%n)+n)%n;return S.root*Math.pow(2,(S.scale[k]+12*o+(S.key||0))/12);};
+  function playStep(S,i,at,sd){const prevDest=musicDest;musicDest=bedOut();try{const n=S.scale.length,deg=d=>{const o=Math.floor(d/n),k=((d%n)+n)%n;return S.root*Math.pow(2,(S.scale[k]+12*o+(S.key||0))/12);};
     const b=S.bass[i%S.bass.length];if(b!==-1)mnote(deg(b)/(S.bd||4),sd*(S.bl||1.8),S.bv||.03,S.bw||'triangle',at,S.bc||800);
     const l=S.lead[i%S.lead.length];if(l>=0)mnote(deg(l),sd*(S.ll||1.6),S.lv||.012,S.lw||'triangle',at,S.lc);
     if(S.arp){const c=[0,2,4,7][i%4]+(S.arpHi?7:0);mnote(deg(c),sd*.9,S.av||.005,'sine',at);}
@@ -463,13 +558,13 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(S.bell&&i%S.bell===0)bellTone(deg(0)*(S.bellLow?.5:1),at,S.bellV||.02,2.8);
     if(S.fx==='drip'&&Math.random()<.18)mnote(1200+Math.random()*1400,.09,.006,'sine',at+Math.random()*sd);
     else if(S.fx==='tick')mnoise(.02,i%2?.008:.014,at,'highpass',9000);
-    else if(S.fx==='wind'&&i%32===0)mnoise(sd*28,.018,at,'bandpass',480,true);}
+    else if(S.fx==='wind'&&i%32===0)mnoise(sd*28,.018,at,'bandpass',480,true);}finally{musicDest=prevDest;}}
   // 换曲：开始界面 / 教程 / 各区域 / 驿站 / 首领房（开打前只有心跳一样的鼓）/ 首领战（半血换第二段）/ 结局
-  function musicTick(){if(!ac)return;if(paused||muted||settings.music<=0||state==='dead'){stopBattleMusic();return;}if(ac.state!=='running'||!L)return;let mode,heat=0;
-    if(state==='menu')mode='menu';else if(credits||state==='win')mode='ending';else if(state==='cine')mode=cine&&cine.k==='boss'?'':'ending';else if(L.tutorial)mode='furnace';
+  function musicTick(){if(!ac)return;if(paused||muted||settings.music<=0||state==='dead'){stopBattleMusic(.8);setSynthAudible(false,.5);return;}if(ac.state!=='running')return;prefetchMusic();let mode,heat=0;
+    if(state==='menu')mode='menu';else if(!L)return;else if(credits||state==='win')mode='ending';else if(state==='cine')mode=cine&&cine.k==='boss'?'':'ending';else if(L.tutorial)mode='furnace';
     else if(L.arena){const b=enemies.find(e=>e.type==='boss'&&!e.dead);heat=b?1-b.hp/Math.max(1,b.max):0;mode=!b?L.theme:flags.boss&&state==='play'?L.bossKind+(b.rage?'2':''):'arena';}else mode=L.rest?'rest':L.theme;
     const recorded=externalMusic(mode);if(mode!==musicMode){const phase=/2$/.test(mode)&&musicMode===mode.slice(0,-1);musicMode=mode;musicStep=0;musicNext=ac.currentTime+(phase?.78:.06);}const S=SONGS[mode];if(!S)return;const sd=60/S.bpm/2;if(musicNext<ac.currentTime-.25)musicNext=ac.currentTime+.05;
-    let guard=0;while(musicNext<ac.currentTime+.15&&guard++<8){if(!recorded)playStep(S,musicStep,musicNext,sd);if(heat>.2&&musicStep%4===2)kick(musicNext,.03+heat*.055);if(heat>.45&&musicStep%8===5)mnoise(.1,.012+heat*.02,musicNext,'bandpass',recorded?680:1500);musicStep++;musicNext+=sd;}}
+        let guard=0;while(musicNext<ac.currentTime+.15&&guard++<8){if(!recorded)playStep(S,musicStep,musicNext,sd);if(heat>.2&&musicStep%4===2)kick(musicNext,.03+heat*.055);if(heat>.45&&musicStep%8===5)mnoise(.1,.012+heat*.02,musicNext,'bandpass',recorded?680:1500);musicStep++;musicNext+=sd;}}
   function musicTone(f,d,vol,wave,when){if(!ac||muted||ac.state!=='running')return;mnote(f,d,vol,wave,ac.currentTime+(when||0));}
   function bossCue(which){if(!ac||muted||ac.state!=='running')return;const k=L&&L.bossKind||'warden',base={lock:92,brood:123,standard:146,warden:110}[k]||110;if(which==='enter'){musicTone(base,.7,.04,'sawtooth');musicTone(base*1.5,.8,.018,'triangle',.12);}else if(which==='rage'){musicTone(base*.8,.6,.045,'sawtooth');musicTone(base*2,.5,.025,'square',.12);musicTone(base*2.5,.6,.02,'triangle',.25);}else if(which==='attack')musicTone(base*3,.2,.025,'triangle');
     else if(which==='toll')bellTone(98,ac.currentTime,.07,4.5);else{[0,4,7,12].forEach((s,i)=>musicTone(base*2*Math.pow(2,s/12),1.2-i*.15,.03,'triangle',i*.12));bellTone(base*2,ac.currentTime+.5,.04,3);}}
@@ -555,7 +650,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function unlockChapter(n){if(n<=unlocked)return;unlocked=Math.min(4,n);try{localStorage.setItem('ember:unlocked',String(unlocked));}catch(e){}updateChapterButtons();}
   function startChapter(n){if(n>unlocked)return;const ch=lastChar(),C=CHARS[ch];if(n===1){reset(true,ch);run.chapter1=true;saveRun();startTalk(CHAPTERS[0].story);return;}reset(true,ch);p.damage=C.dmg+(n-1)*9;p.max=(C.hp+n-1)*LIFE;p.hp=p.max;p.potions=2;p.soul=3;gain('bomb',2,true);gain('knife',2,true);['key','glass','ribbon'].slice(0,n-1).forEach(id=>gain(id,1,true));sel='bomb';const idx=STAGES.findIndex(q=>q.chapterStart&&q.chapter===n);loadStage(idx);run['chapter'+n]=true;startTalk(CHAPTERS[n-1].story);}
   let passage=null;
-  function scenePass(fn){if(passage)return;keys={};clearHeld();stopBattleMusic();passage={t:0,changed:false,fn:fn};document.getElementById('scene-fade').hidden=false;}
+  function scenePass(fn){if(passage)return;keys={};clearHeld();passage={t:0,changed:false,fn:fn};document.getElementById('scene-fade').hidden=false;}
   function nextStage(){scenePass(enterNextStage);}
   function finishTutorial(){scenePass(completeTutorial);}
   function passageTick(dt){const q=passage;q.t+=dt;const a=q.t<.32?q.t/.32:q.t<.46?1:Math.max(0,1-(q.t-.46)/.42);document.getElementById('scene-fade').style.opacity=a;if(!q.changed&&q.t>=.32){q.changed=true;q.fn();keys={};clearHeld();}if(q.t>=.88){passage=null;document.getElementById('scene-fade').hidden=true;}}
@@ -1299,7 +1394,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       if(p.x+p.w>x-12&&p.x<x+18&&p.y<bot&&p.y+p.h>top+8){p.vy=D.u?-220:150;p.ground=false;p.jumps=1;p.on=null;p.x+=(x-8-p.x)*Math.min(1,dt*10);if(Math.random()<dt*8)ember(x,p.y+20,1,'#ffd7a4');break;}}}
   function currentBand(){if(!L||!L.bands)return null;const x=(p&&p.x)||cam;let b=L.bands[0];for(const q of L.bands)if(x>=q[0])b=q;return b;}
   function noteBand(){const b=currentBand();if(!b||state!=='play')return;if(!bandId){bandId=b[2];return;}if(b[2]!==bandId){bandId=b[2];say(b[1],2.2);}}
-  function step(dt){if(passage){if(!rotationBlocked)passageTick(dt);return;}if(rotationBlocked){stopBattleMusic();return;}const rdt=dt;if(cine&&cine.slow&&cine.t<cine.slow)dt*=.3;if(slowMo>0){slowMo-=rdt;dt*=.35;}time+=dt;if(messageT>0){messageT-=rdt;notice.style.opacity=messageT>0?1:0;}if(gainT>0){gainT-=rdt;if(gainT<=0){gainBox.hidden=true;if(toastQ.length)toastNow(toastQ.shift());}}if(flashT>0)flashT=Math.max(0,flashT-rdt);if(state==='dead'&&deathT<9)deathT+=rdt;
+  function step(dt){if(passage){if(!rotationBlocked){passageTick(dt);musicTick();}return;}if(rotationBlocked){stopBattleMusic(.8);return;}const rdt=dt;if(cine&&cine.slow&&cine.t<cine.slow)dt*=.3;if(slowMo>0){slowMo-=rdt;dt*=.35;}time+=dt;if(messageT>0){messageT-=rdt;notice.style.opacity=messageT>0?1:0;}if(gainT>0){gainT-=rdt;if(gainT<=0){gainBox.hidden=true;if(toastQ.length)toastNow(toastQ.shift());}}if(flashT>0)flashT=Math.max(0,flashT-rdt);if(state==='dead'&&deathT<9)deathT+=rdt;
     musicTick(rdt);
     if(credits){credits.t+=rdt;if(credits.t>credits.dur)endCredits();return;}
     if(paused||state==='upgrade'||state==='shop'||state==='bag'||state==='map')return;

@@ -392,17 +392,17 @@ h1{font:700 clamp(42px,6vw,78px)/1.2 Georgia,"SimSun",serif;letter-spacing:9px;m
 @media(prefers-reduced-motion:reduce){button{animation:none!important}}
 
 /* ===== v5.0 对话框：开合有动画；换人时名牌滑入、头像弹出；正文用楷体 / 宋体；每个字从上方落下；{g}{w}{s}{b} 特效字 ===== */
-#talk{max-width:800px;min-height:110px;padding:24px 28px 22px;border:1px solid rgba(214,190,140,.42);border-radius:12px;background:radial-gradient(130% 150% at 0% 0%,rgba(38,46,56,.96),rgba(10,13,19,.97) 62%);box-shadow:0 14px 44px #000d,inset 0 0 0 1px rgba(255,240,210,.05),inset 0 1px 0 rgba(255,226,170,.14);transform-origin:50% 100%;transition:opacity .22s ease-out,transform .4s cubic-bezier(.18,1.35,.4,1),visibility 0s}
+#talk{max-width:800px;min-height:110px;padding:26px 30px 26px;border:1px solid rgba(232,200,138,.58);border-radius:12px;background-color:#120e0c;background-image:linear-gradient(180deg,rgba(255,186,96,.16),transparent 30%),linear-gradient(90deg,transparent 16px,rgba(214,168,92,.5) 16px,rgba(214,168,92,.5) 17px,transparent 17px,transparent calc(100% - 17px),rgba(214,168,92,.5) calc(100% - 17px),rgba(214,168,92,.5) calc(100% - 16px),transparent calc(100% - 16px)),repeating-linear-gradient(0deg,rgba(255,230,190,.04) 0 1px,transparent 1px 3px),repeating-linear-gradient(90deg,rgba(16,8,0,.05) 0 1px,transparent 1px 4px),radial-gradient(130% 150% at 8% 0%,rgba(72,46,24,.97),rgba(16,13,14,.98) 58%,rgba(8,8,11,.99));box-shadow:0 16px 48px #000d,0 0 0 1px rgba(40,28,14,.85),inset 0 0 0 1px rgba(255,232,190,.08),inset 0 1px 0 rgba(255,220,160,.3),inset 0 -32px 42px rgba(0,0,0,.3);transform-origin:50% 100%;transition:opacity .22s ease-out,transform .4s cubic-bezier(.18,1.35,.4,1),visibility 0s}
 #talk[hidden]{display:block;visibility:hidden;opacity:0;transform:translateY(18px) scale(.96);transition:opacity .16s ease-in,transform .2s ease-in,visibility 0s .2s}
 #talk::before,#talk::after{content:'';position:absolute;width:22px;height:22px;border:1.5px solid rgba(226,196,140,.7);pointer-events:none}
 #talk::before{left:7px;top:7px;border-right:0;border-bottom:0;border-radius:7px 0 0 0}
 #talk::after{right:7px;bottom:7px;border-left:0;border-top:0;border-radius:0 0 7px 0}
-#talk b{position:absolute;left:24px;top:-16px;margin:0;padding:5px 18px 5px 13px;border-radius:4px 16px 16px 4px;background:linear-gradient(90deg,#2c2419,#16120d);border:1px solid rgba(226,196,140,.55);box-shadow:0 5px 14px #0009;font:700 14px/1.2 "Songti SC","STSong","Noto Serif SC","Source Han Serif SC","SimSun",serif;letter-spacing:.34em;text-shadow:0 0 12px currentColor}
+#talk b{position:absolute;left:24px;top:-16px;margin:0;padding:6px 18px 6px 14px;border-radius:4px 16px 16px 4px;background:linear-gradient(90deg,#4a3418,#1c140c);border:1px solid rgba(240,210,150,.8);box-shadow:0 5px 14px #0009,inset 0 1px 0 rgba(255,230,180,.25);font:700 14px/1.2 "Songti SC","STSong","Noto Serif SC","Source Han Serif SC","SimSun",serif;letter-spacing:.28em;color:#f6e6bc;text-shadow:0 1px 0 #000,0 0 10px rgba(255,196,110,.4)}
 #talk.has-face{padding-left:118px;min-height:118px}
 #talk.has-face b{left:112px}
-#talk p{font-family:"Kaiti SC","STKaiti","KaiTi","楷体","BiauKai","Noto Serif SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;font-size:19px;line-height:1.8;letter-spacing:.05em;color:#f1e7d1;text-shadow:0 1px 0 #000,0 0 16px rgba(255,214,150,.1);padding-right:58px;min-height:34px}
-#talk.narrate{padding-top:20px}
-#talk.narrate p{font-family:"Songti SC","STSong","Noto Serif SC","Source Han Serif SC","SimSun",serif;font-size:18px;letter-spacing:.14em;color:#e4d8be;padding:0 34px}
+#talk p{font-family:"Kaiti SC","STKaiti","KaiTi","楷体","BiauKai","Noto Serif SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;font-size:19px;line-height:1.85;letter-spacing:.05em;color:#f8f1e0;text-shadow:0 1px 0 #1a1208,0 0 10px rgba(0,0,0,.45);padding-right:58px;padding-top:2px;min-height:34px}
+#talk.narrate{padding:18px 42px 20px;min-height:78px;max-width:680px;background-color:#16110c;background-image:linear-gradient(180deg,rgba(255,224,176,.12),transparent 28%,rgba(0,0,0,.22) 100%),repeating-linear-gradient(0deg,rgba(255,230,190,.045) 0 1px,transparent 1px 3px),radial-gradient(120% 100% at 50% 0%,rgba(74,52,28,.92),rgba(16,12,10,.95) 72%);border-color:rgba(210,180,120,.42);box-shadow:0 10px 28px #000a,inset 0 1px 0 rgba(255,230,190,.18),inset 0 -1px 0 rgba(255,230,190,.1)}
+#talk.narrate p{font-family:"Songti SC","STSong","Noto Serif SC","Source Han Serif SC","SimSun",serif;font-size:18px;line-height:1.95;letter-spacing:.12em;color:#f2ead6;padding:0 12px;text-shadow:0 1px 0 #000,0 0 12px rgba(0,0,0,.4)}
 #talk p .ch{position:relative;animation:chin .36s cubic-bezier(.2,1.25,.4,1) both}
 #talk p .ch.done{animation:none}
 @keyframes chin{0%{opacity:0;top:-.55em;filter:blur(3px)}55%{opacity:1;top:.07em;filter:blur(0)}100%{opacity:1;top:0}}
@@ -428,10 +428,11 @@ h1{font:700 clamp(42px,6vw,78px)/1.2 Georgia,"SimSun",serif;letter-spacing:9px;m
 #talk small.auto-tag{right:40px;bottom:9px}
 #talk-bar{position:absolute;left:20px;right:20px;bottom:5px;height:2px;border-radius:1px;background:linear-gradient(90deg,rgba(230,200,140,0),rgba(230,200,140,.75));transform-origin:0 50%;transform:scaleX(0);pointer-events:none}
 #talk:not(.auto) #talk-bar{display:none}
-#talk-skip{right:14px;top:9px;color:#c9b28a8c;font-family:"Songti SC","STSong","SimSun",serif;letter-spacing:.2em}
-#talk.over-art{background:radial-gradient(130% 150% at 0% 0%,rgba(26,22,18,.86),rgba(6,7,10,.9) 62%);border-color:rgba(214,190,140,.36)}
-@media(max-width:600px){#talk{padding:22px 16px 18px}#talk p{font-size:16px;padding-right:44px}#talk.has-face{padding-left:80px;min-height:92px}#talk.has-face b{left:76px}#talk-face{width:58px;height:58px;margin-top:-29px;left:10px}#talk b{font-size:12px;left:14px}}
-@media(max-height:500px){#talk{min-height:82px;padding:18px 22px 14px;bottom:10px}#talk p{font-size:15px;line-height:1.6}#talk.has-face{min-height:86px;padding-left:92px}#talk-face{width:62px;height:62px;margin-top:-31px}#talk.has-face b{left:86px}#talk b{font-size:12px;top:-13px}}
+#talk-skip{right:14px;top:9px;color:#e8d5a8d6;font-family:"Songti SC","STSong","SimSun",serif;letter-spacing:.2em}
+#talk.over-art{max-width:720px;min-height:86px;padding-top:16px;padding-bottom:16px;background-color:transparent;background-image:linear-gradient(180deg,rgba(8,6,5,.2),rgba(12,9,8,.78) 36%,rgba(8,7,8,.9) 100%),repeating-linear-gradient(0deg,rgba(255,230,190,.03) 0 1px,transparent 1px 3px);border-color:rgba(214,190,140,.32);box-shadow:0 10px 28px #0008,inset 0 1px 0 rgba(255,220,160,.12)}
+#talk.over-art p{color:#f8f1e0;text-shadow:0 1px 2px #000,0 0 12px #000c,0 0 2px #000}
+@media(max-width:600px){#talk{padding:22px 16px 18px}#talk p{font-size:16px;padding-right:44px}#talk.has-face{padding-left:80px;min-height:92px}#talk.has-face b{left:76px}#talk-face{width:58px;height:58px;margin-top:-29px;left:10px}#talk b{font-size:12px;left:14px}#talk.narrate{padding:16px 18px 16px;max-width:none}#talk.over-art{padding:14px 16px 14px;max-width:none}}
+@media(max-height:500px){#talk{min-height:82px;padding:18px 22px 14px;bottom:10px}#talk p{font-size:15px;line-height:1.65}#talk.has-face{min-height:86px;padding-left:92px}#talk-face{width:62px;height:62px;margin-top:-31px}#talk.has-face b{left:86px}#talk b{font-size:12px;top:-13px}#talk.narrate{padding:12px 20px 12px;min-height:64px}#talk.over-art{min-height:72px;padding:12px 18px 12px}}
 
 /* ===== v5.0 地图：羊皮纸大地图（这一层 / 来时的路）、右上角小地图、地图按钮 ===== */
 #map-btn{color:#f4d69f;border-color:#8a7a5a}
