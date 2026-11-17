@@ -26,7 +26,7 @@ class HeroFSM extends HierarchicalFSM {
   constructor(event){super(HERO_NODES,'idle');this.parent='ground';this.frame=0;this.elapsed=0;this.duration=0;this.hitbox=false;this.fired=false;this.event=event;}
   enter(state,parent,duration=0){if(this.state===state&&state!=='attack')return;this.transition(state);this.parent=parent;this.elapsed=0;this.duration=duration;this.frame=0;this.hitbox=false;this.fired=false;}
   tick(dt,p){if(p.hurtT>0){this.enter('hurt','control');return;}if(p.dash>0){this.enter('dash','control');return;}if(p.roll>0){this.enter('roll','control');return;}
-    if(this.state==='attack'&&p.attack>0){this.elapsed=Math.max(this.elapsed+dt,this.duration-p.attack);this.frame=Math.floor(this.elapsed*60);if(!this.fired&&this.frame>=2){this.fired=true;this.event();}this.hitbox=this.fired&&p.attack>.1;return;}
+    if(this.state==='attack'&&p.attack>0){this.elapsed=Math.max(this.elapsed+dt,this.duration-p.attack);this.frame=Math.floor(this.elapsed*60);if(!this.fired&&this.frame>=4){this.fired=true;this.event();}this.hitbox=this.frame>=4&&this.frame<7;return;}
     this.enter(p.ground?(Math.abs(p.vx)>10?'run':'idle'):(p.vy<0?'rise':'fall'),p.ground?'ground':'air');this.elapsed+=dt;this.frame=Math.floor(this.elapsed*12)%8;
   }
   canCancel(){return this.state!=='attack'||this.elapsed>=this.duration*.65;}
@@ -67,12 +67,15 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   const pad=document.getElementById('pad'),chestBtn=document.getElementById('chest-btn'),healBtn=document.getElementById('heal-btn'),muteBtn=document.getElementById('mute');
   const talkBox=document.getElementById('talk'),talkWho=document.getElementById('talk-who'),talkText=document.getElementById('talk-text'),talkFace=document.getElementById('talk-face'),itemBtn=document.getElementById('item-btn');
   const gainBox=document.getElementById('gain'),gainArt=document.getElementById('gain-art'),gainName=document.getElementById('gain-name'),gainInfo=document.getElementById('gain-info');
-  const LIFE=20,FLOOR=480,CHECKPOINT=3560,ROLL=.27,TAU=Math.PI*2,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const LIFE=20,FLOOR=480,CHECKPOINT=3560,ROLL=.22,TAU=Math.PI*2,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  // 手感起步值，实机可调。攻击 4 帧前摇 / 3 帧判定 / 7 帧后摇，按 60fps。
+  const FEEL={coyote:.1,buffer:.12,grav:1420,fall:1.5,accel:.08,brake:.06,hitStop:3/60,hurtStop:6/60,shakeHit:2,shakeHurt:4,kb:200,kbTime:.15,kbBoss:.35,hurtInv:1,dodge:.2,dodgeCd:.8,dead:.1};
   let WORLD=4400,stage=0,L=null,T=null,PAL=null,decor=null,embers=0,entry=null,titleT=0,nearKind='';
   let W=1100,H=620,scale=1,viewY=0,tall=false,cam=0,time=0,last=0,state='menu',paused=false,lowFx=false,slowT=0;
   let p,enemies=[],shots=[],waves=[],breakables=[],particles=[],floats=[],orbs=[],fx=[],chunks=[],platforms=[],chests=[],kills=0,shake=0,hitstop=0,checkpoint=false,nearChest=false,bellRing=0;
   let hazards=[],loot=[],gateK=0,sealK=0,bossCardT=0,gainT=0,revealC=null,sceneA='',sceneB='',sceneT=0,traps=[],signs={},panelView='menu',saveData=null,secrets=[];   // 首领的落石 / 腐水 / 灵枪；飞向主角的道具图；铁闸；首领名号卡；获得提示；开箱时浮起的奖励；插画
-  let keys={},held={},score=0,messageT=0,ac=null,best=0,muted=false,hudKey='',unlocked=1;
+  let keys={},held={},score=0,messageT=0,ac=null,best=0,muted=false,hudKey='',unlocked=1,deathWhy='受到了攻击',shakeT=0,coachDone=false;
+  try{coachDone=localStorage.getItem('ember:coach')==='1';}catch(e){}
   let bag={bomb:0,knife:0,frost:0},relics={},keepsakes={},sel='bomb',thrown=[],offers=[],chestC=null,talk=null,flags={},run={},runSeed=1,shopRelic='',bagTab='bag',introSeen=false;
   let codex={seen:{},kills:{},items:{},lore:{},blue:{}};   // 图鉴跨局保存
   const stick={x:0,y:0};   // 触屏摇杆，-1~1
@@ -80,7 +83,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   const DEFAULT_KEYS={left:['KeyA','ArrowLeft'],right:['KeyD','ArrowRight'],up:['KeyW','ArrowUp'],down:['KeyS','ArrowDown'],jump:['Space'],attack:['KeyJ'],roll:['KeyK','ShiftLeft'],skill1:['Digit1','Numpad1'],skill2:['Digit2','Numpad2'],skill3:['Digit3','Numpad3'],heal:['KeyL'],use:['KeyU'],cycle:['KeyQ'],interact:['KeyE'],bag:['KeyB'],map:['KeyM','Tab']};
   const KEY_ORDER=['left','right','up','down','jump','attack','roll','skill1','skill2','skill3','heal','use','cycle','interact','bag','map'];
   const KEY_LABEL={left:'向左走',right:'向右走',up:'向上（上挑）',down:'向下（下劈 / 下落）',jump:'跳跃',attack:'攻击',roll:'翻滚',skill1:'技能一',skill2:'技能二',skill3:'技能三',heal:'治疗',use:'使用道具',cycle:'切换道具',interact:'交谈 / 开箱 / 查看',bag:'行囊',map:'地图'};
-  let settings={music:.7,sfx:.8,fx:'auto',shake:true,nums:true,textSpeed:1,autoTalk:false,touch:'auto',minimap:true},BIND=JSON.parse(JSON.stringify(DEFAULT_KEYS)),codeAct={},rebinding=null;
+  let settings={vol:1,music:.7,sfx:.8,fx:'auto',shake:true,nums:true,textSpeed:1,autoTalk:false,touch:'auto',minimap:true,buzz:true,touchA:1,touchX:0,touchY:0},BIND=JSON.parse(JSON.stringify(DEFAULT_KEYS)),codeAct={},rebinding=null;
   function rebuildKeys(){codeAct={};KEY_ORDER.forEach(a=>(BIND[a]||[]).forEach(c=>{if(c&&!codeAct[c])codeAct[c]=a;}));}
   try{const s=JSON.parse(localStorage.getItem('ember:settings')||'null');if(s){Object.keys(settings).forEach(k=>{if(s[k]!=null)settings[k]=s[k];});if(s.keys)KEY_ORDER.forEach(a=>{if(Array.isArray(s.keys[a])&&s.keys[a].length)BIND[a]=s.keys[a].slice(0,2);});}}catch(e){}
   rebuildKeys();
@@ -311,6 +314,15 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       traps:[{k:'piston',x:1900,w:80,per:3.4,ph:0},{k:'piston',x:5200,w:80,per:3.2,ph:0},{k:'piston',x:5380,w:80,per:3.2,ph:.33},{k:'piston',x:5560,w:80,per:3.2,ph:.66},{k:'pendulum',x:6250,top:40,len:375,amp:.5,per:2.8,ph:0},{k:'pendulum',x:6600,top:40,len:375,amp:.5,per:2.8,ph:.5},{k:'vent',x:6880,w:64,per:3,ph:0,h:210}],
       ens:[[4700,480,'flyer'],[5820,320,'caster'],[5900,480,'crawler'],[5950,480,'shield'],[6450,300,'bomber'],[6620,480,'hanger'],[6700,480,'flyer'],[6800,480,'shield'],[7040,480,'crawler'],[7120,480,'caster']],
       chests:[[7030,220]],moreCaches:[5080,6060,7000]});}
+  // 每张图入口先单独放一个新机关，钟火大约每 35 秒路程一处。第三张图（城墙）通到后段会打开入口捷径。
+  {const S=th=>STAGES.find(s=>s.theme===th&&!s.arena&&!s.rest);
+    const teach=(th,trap,hint,checks)=>{const s=S(th);if(!s)return;s.traps=s.traps||[];s.traps.unshift(trap);s.hints=(s.hints||[]).concat([hint]);s.checks=checks;};
+    teach('prison',{k:'tspike',x:250,n:3,per:2.4,ph:0,teach:1},{x:150,t:'地刺会先发抖、变色，停半秒再刺出来。看完一轮再走过去。'},[1680,3400,5200]);
+    teach('sewers',{k:'spout',x:280,per:2.8,ph:0,h:160,teach:1},{x:150,t:'喷口会先冒泡变色，再喷出来。等它歇下再走。'},[1700,3600,5400]);
+    teach('ramparts',{k:'ballista',x:520,y:FLOOR,dir:-1,per:3.2,ph:.2,teach:1},{x:160,t:'弩炮拉满之前会后坐。站在箭路外面看它射一发。'},[1800,3600,5400]);
+    teach('ossuary',{k:'jet',x:340,y:FLOOR-24,dir:1,len:120,per:2.8,ph:0,teach:1},{x:160,t:'骷髅眼里先聚起紫火，再喷出火舌。'},[1800,3600,5600]);
+    teach('tower',{k:'piston',x:460,w:70,per:3.2,ph:0,teach:1},{x:180,t:'落锤停在顶上发抖，然后才砸下来。'},[1700,3500,5400]);
+    const wall=S('ramparts');if(wall)wall.shortcut={open:5400,door:390,dest:5280};}
   // ---- v5.0：每张地图有一位制图人墨翁（卖这一层的地图）和两处暗格（假墙，砍三下就塌） ----
   {const S=th=>STAGES.find(s=>s.theme===th&&!s.arena&&!s.rest),D={prison:{ink:2600,secrets:[[3080,FLOOR,'shard'],[4420,255,'embers']]},sewers:{ink:980,secrets:[[2180,FLOOR,'blue'],[6215,320,'shard']]},ramparts:{ink:1720,secrets:[[2560,FLOOR,'relic'],[6420,FLOOR,'shard']]},ossuary:{ink:3150,secrets:[[3620,FLOOR,'shard'],[5300,FLOOR,'blue']]},tower:{ink:2350,secrets:[[1680,FLOOR,'shard'],[6150,FLOOR,'relic']]}};
     Object.keys(D).forEach(th=>{const s=S(th);if(s){s.ink=D[th].ink;s.secrets=D[th].secrets;}});
@@ -391,6 +403,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   window.mapTouchToCanvas=function(clientX,clientY){const r=canvas.getBoundingClientRect();if(r.width<=0||r.height<=0)return null;return{x:(clientX-r.left)*W/r.width,y:(clientY-r.top)*H/r.height};};
 
   const particlesPool=new EmberCore.ObjectPool(512,()=>({x:undefined,y:undefined,vx:undefined,vy:undefined,life:undefined,max:undefined,color:undefined,size:undefined,g:undefined,glow:undefined,streak:undefined,drag:undefined,soft:undefined}),o=>{});
+  const floatsPool=new EmberCore.ObjectPool(128,()=>({x:0,y:0,t:'',c:'#efe2c8',life:0,big:false,art:undefined}),o=>{o.art=undefined;o.t='';o.big=false;});
   function emit_particles(x,y,vx,vy,life,max,color,size,g,glow,streak,drag,soft){const o=particlesPool.acquire();if(!o)return;o.x=x;o.y=y;o.vx=vx;o.vy=vy;o.life=life;o.max=max;o.color=color;o.size=size;o.g=g;o.glow=glow;o.streak=streak;o.drag=drag;o.soft=soft;particles.push(o);}
 
   const shotsPool=new EmberCore.ObjectPool(256,()=>({k:undefined,x:undefined,y:undefined,vx:undefined,vy:undefined,g:undefined,life:undefined,d:undefined,pool:undefined,home:undefined,sp:undefined,flame:undefined,color:undefined,t:undefined,fire:undefined}),o=>{});
@@ -399,7 +412,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   let audioPool=null,verticalBase=0,hitNoise=null,bandId='';
   // 声音分两路：音乐和音效各有自己的音量（设置里调）
   let musicBus=null,sfxBus=null;
-  function buses(){if(!ac)return;try{if(!sfxBus){sfxBus=ac.createGain();sfxBus.connect(ac.destination);musicBus=ac.createGain();musicBus.connect(ac.destination);synthBus=ac.createGain();synthBus.connect(musicBus);synthBus.gain.setValueAtTime(1,ac.currentTime);}sfxBus.gain.value=settings.sfx;musicBus.gain.value=settings.music;}catch(e){}}
+  function buses(){if(!ac)return;try{if(!sfxBus){sfxBus=ac.createGain();sfxBus.connect(ac.destination);musicBus=ac.createGain();musicBus.connect(ac.destination);synthBus=ac.createGain();synthBus.connect(musicBus);synthBus.gain.setValueAtTime(1,ac.currentTime);}const master=settings.vol==null?1:settings.vol;sfxBus.gain.value=settings.sfx*master;musicBus.gain.value=settings.music*master;}catch(e){}}
   function audio(){if(muted)return null;try{if(!ac){ac=new(window.AudioContext||window.webkitAudioContext)();buses();}if(ac.state!=='running'){const r=ac.resume();if(r&&r.catch)r.catch(()=>{});}}catch(e){return null;}return ac;}
   function unlockAudio(){if(ac&&ac.state==='running')return;const a=audio();if(!a)return;try{const s=a.createBufferSource();s.buffer=a.createBuffer(1,1,22050);s.connect(a.destination);s.start(0);}catch(e){}prefetchMusic();}
   function beep(freq,duration,type,vol){const a=audio();if(!a||settings.sfx<=0)return;try{if(!audioPool)audioPool=new EmberCore.AudioPool(a,sfxBus||a.destination,16);audioPool.play(freq,duration,type,vol);}catch(e){}}
@@ -575,7 +588,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   // ch：角色（不给就沿用当前角色，默认小引灯人）。第一次玩：开场旁白 → 焚炉底层的教程 → 监牢
   function reset(boot,ch){if(passage&&!passage.changed){passage=null;document.getElementById('scene-fade').hidden=true;}const C=CHARS[ch||(p&&p.char)||'lamp']||CHARS.lamp;
     p={x:120,y:FLOOR-52,w:26,h:52,vx:0,vy:0,face:1,hp:C.hp*LIFE,max:C.hp*LIFE,char:C.id,jumps:0,ground:true,coyote:.1,buffer:0,roll:0,rollCd:0,attack:0,atkCd:0,combo:0,comboT:0,plateHits:0,leechKills:0,slash:'side',atkFace:1,pogo:false,inv:0,damage:C.dmg,hit:new Set(),potions:1,soul:0,castCd:0,drop:null,skills:{swift:0,reach:0,dash:0,vigor:0,spring:0,flame:0},walk:0,hurtT:0,landT:0,trail:[],trailT:0,cape:null,safeX:120,safeY:FLOOR-52,dash:0,dashHit:null,ringT:0,domeT:0,on:null};
-    kills=0;score=0;embers=0;bag={bomb:0,knife:0,frost:0};relics={};keepsakes={};sel='bomb';run={};runSeed=1+Math.floor(Math.random()*1e6);loadStage(0,boot===true);
+    kills=0;score=0;embers=0;bag={bomb:0,knife:0,frost:0};relics={};keepsakes={};sel='bomb';run={time:0,deaths:0};runSeed=1+Math.floor(Math.random()*1e6);loadStage(0,boot===true);applyBoons();
     if(boot===true)return;try{localStorage.setItem('ember:char',C.id);}catch(e){}
     if(!introSeen){introSeen=true;try{localStorage.setItem('ember:intro-v3','1');}catch(e){}startTalk(TALK.prologue,()=>{note('lore','prologue');enterAfterPrologue();});}
     else say(startTip(),5);
@@ -639,9 +652,9 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     (L.movers||[]).forEach(m=>platforms.push({x:m[0],y:m[1],w:m[2],h:16,ddx:0,ddy:0,mv:{x0:m[0],y0:m[1],dx:m[3],dy:m[4],per:m[5],ph:m[6]||0}}));(L.crumbles||[]).forEach(c=>platforms.push({x:c[0],y:c[1],w:c[2],h:18,cr:{st:0,t:0,y0:c[1]}}));
     const caches={prison:[360,1560,3330],sewers:[560,1750,3520],ramparts:[680,2240,3850],ossuary:[610,1720,3860],tower:[620,1820,3370]};breakables=(L.arena?[]:(L.caches||caches[L.theme]||[]).concat(L.moreCaches||[])).map((x,i)=>({x:x,y:FLOOR,kind:((i+stage)%3+3)%3,broken:false}));
     // 二周目起，每三个狱卒里有一个换成精英
-    enemies=L.ens.map((a,i)=>enemy(a[0],a[1],a[2],cycle&&a[2]==='guard'&&i%3===1?Object.assign({},a[3],{elite:true}):a[3]));chests=L.chests.map(c=>({x:c[0],y:c[1],open:false}));traps=(L.traps||[]).map(t=>Object.assign({},t,{t:(t.ph||0)*(t.per||3)}));lamps=(L.lamps||[]).map(x=>({x:x,lit:false}));signAt=-1;secrets=(L.secrets||[]).map((a,i)=>({x:a[0],y:a[1]||FLOOR,reward:a[2],hp:3,open:!!(run.found&&run.found['s'+n+':'+i]),t:1,shake:0}));
-    Object.assign(p,{x:120,y:FLOOR-p.h,vx:0,vy:0,face:1,jumps:0,ground:true,coyote:.1,buffer:0,roll:0,rollCd:0,attack:0,atkCd:0,combo:0,comboT:0,castCd:0,drop:null,inv:0,hit:new Set(),hurtT:0,landT:0,trail:[],cape:null,safeX:120,safeY:FLOOR-p.h,dash:0,ringT:0,domeT:0,on:null});
-    shots=[];shotsPool.clear();waves=[];particles=[];particlesPool.clear();floats=[];orbs=[];fx=[];chunks=[];hazards=[];loot=[];gateK=0;sealK=L.arena?1:0;bossCardT=0;revealC=null;keys={};clearHeld();cam=0;shake=0;hitstop=0;paused=false;checkpoint=false;nearChest=false;nearKind='';hudKey='';bellRing=0;
+    enemies=L.ens.map((a,i)=>enemy(a[0],a[1],a[2],cycle&&a[2]==='guard'&&i%3===1?Object.assign({},a[3],{elite:true}):a[3]));chests=L.chests.map(c=>({x:c[0],y:c[1],open:false}));traps=(L.traps||[]).map(t=>{const o=Object.assign({},t,{t:((t.ph||0)+(cycle?cycle*.37%1:0))*(t.per||3)});if(cycle>0&&!L.arena){const shift=(cycle%3)*28;if(o.x!=null&&!o.teach)o.x+=shift;if(o.x0!=null){o.x0+=shift;o.x1+=shift;}}return o;});lamps=(L.lamps||[]).map(x=>({x:x,lit:false}));signAt=-1;secrets=(L.secrets||[]).map((a,i)=>({x:a[0],y:a[1]||FLOOR,reward:a[2],hp:3,open:!!(run.found&&run.found['s'+n+':'+i]),t:1,shake:0}));
+    Object.assign(p,{x:120,y:FLOOR-p.h,vx:0,vy:0,face:1,jumps:0,ground:true,coyote:FEEL.coyote,buffer:0,roll:0,rollCd:0,attack:0,atkCd:0,combo:0,comboT:0,castCd:0,drop:null,inv:0,hit:new Set(),hurtT:0,landT:0,trail:[],cape:null,safeX:120,safeY:FLOOR-p.h,dash:0,ringT:0,domeT:0,on:null,checkX:null,charge:0,kbT:0});
+    shots=[];shotsPool.clear();waves=[];particles=[];particlesPool.clear();floats=[];floatsPool.clear();orbs=[];fx=[];chunks=[];hazards=[];loot=[];gateK=0;sealK=L.arena?1:0;bossCardT=0;revealC=null;keys={};clearHeld();cam=0;shake=0;hitstop=0;paused=false;checkpoint=false;nearChest=false;nearKind='';hudKey='';bellRing=0;
     flags={};p.windUsed=false;thrown=[];offers=[];chestC=null;talk=null;talkBox.hidden=true;cine=null;credits=null;flashT=0;bandId='';
     if(L.rest){const free=relicPool().filter(id=>!relics[id]),r=rng(runSeed+n*131);shopRelic=free.length?free[Math.floor(r()*free.length)]:'';}
     entry={hp:p.hp,max:p.max,damage:p.damage,potions:p.potions,embers:embers,score:score,kills:kills,bag:Object.assign({},bag),relics:Object.assign({},relics),keep:Object.assign({},keepsakes),skills:Object.assign({},p.skills),soul:p.soul,plateHits:p.plateHits,leechKills:p.leechKills,shards:p.shards||0,found:Object.assign({},run.found||{}),maps:Object.assign({},run.maps||{})};
@@ -690,18 +703,21 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   const BOSS_SIZE={lock:[104,76],brood:[92,118],standard:[46,104],warden:[56,120]};
   // 新的小怪：游魂蝠（飞着俯冲）、持盾狱卒（正面挡刀，重击破防）、骨巫（远处施法、靠近就闪走）、投弹手（抛罐子）；教程里的稻草人打不坏
   const FOE_SIZE={flyer:[30,24],shield:[32,48],caster:[28,52],bomber:[30,44],dummy:[28,50],crawler:[36,22],hanger:[26,34]},FOE_HP={flyer:.55,shield:1.35,caster:.8,bomber:.9,dummy:50,crawler:.72,hanger:.66};
-  function enemy(x,floor,type,o){const b=type==='boss',el=!!(o&&o.elite),kind=b?(L.bossKind||'warden'):'',S=b?BOSS_SIZE[kind]:el?[38,62]:FOE_SIZE[type]||[28,46],hp=Math.round((b?330:el?260:72*(FOE_HP[type]||1))*L.hpK*(type==='dummy'?1:1+.4*cycle));
+  function enemy(x,floor,type,o){const b=type==='boss',el=!!(o&&o.elite),kind=b?(L.bossKind||'warden'):'',S=b?BOSS_SIZE[kind]:el?[38,62]:FOE_SIZE[type]||[28,46],hp=Math.round((b?330:el?260:72*(FOE_HP[type]||1))*L.hpK*(type==='dummy'?1:1+.35*cycle));
     const e={x:x,y:floor-S[1],w:S[0],h:S[1],floor:floor,type:type,kind:kind,elite:el,hp:hp,max:hp,face:-1,cd:.6,wind:0,flash:0,dead:false,dieT:0,rage:false,spell:false,spellCd:3.5,origin:x,walk:0,swing:0,kb:0,hitT:0,seed:Math.random()*TAU};
     if(type==='flyer')Object.assign(e,{y:floor-150-S[1]/2,fly:'hover',hx:x,dvx:0,dvy:0,ft:0,cd:1});
     if(type==='hanger')Object.assign(e,{y:Math.max(90,floor-206),homeY:Math.max(90,floor-206),hang:'wait',vy:0,wait:0});
     if(type==='crawler')e.cd=.35;
     if(b)Object.assign(e,{move:'',act:0,at:0,rec:0,rt:0,vx:0,lift:0,under:0,combo:0,tollCd:3,mothCd:2,struck:false,stun:false,roar:false,surfacing:false});return e;}
   function down(a){return Object.keys(held).some(k=>held[k]===a);}
-  function action(a){if(state!=='play'||paused||rotationBlocked||passage)return;if(a==='jump')p.buffer=.2;if(a==='attack'){inputQueue.push(1);if(p.atkCd<=0&&p.roll<=0&&p.dash<=0){inputQueue.take(1);attack();}}if(a==='roll'){inputQueue.push(2);if(p.rollCd<=0&&(p.attack<=0||heroFSM.canCancel())){inputQueue.take(2);roll();}}if(a==='interact')interact();if(a==='use')useItem();if(a==='cast')castSoul();if(a==='skill1')useSkill(1);if(a==='skill2')useSkill(2);if(a==='skill3')useSkill(3);if(a==='cycle')cycleItem();if(a==='map')openMap();if(a==='bag')openBag();if(a==='heal'&&p.potions&&p.hp<p.max){const h=Math.min(p.max-p.hp,(3+p.skills.vigor)*LIFE);if(!L.tutorial)p.potions--;p.hp+=h;burst(p.x,p.y,'#91d6bd',22);pop(p.x+13,p.y-6,'+'+(h/LIFE),'#9be3c8');say('余火回温 · 恢复 '+(h/LIFE)+' 个小幽灵');beep(550,.25);syncHud();}}
-  function dirs(){return{l:!!(isKey('left')||stick.x<-.28||down('left')),r:!!(isKey('right')||stick.x>.28||down('right')),u:!!(isKey('up')||stick.y<-.5),d:!!(isKey('down')||stick.y>.5)};}
+  function action(a){if(state!=='play'||paused||rotationBlocked||passage)return;if(a==='jump')p.buffer=FEEL.buffer;if(a==='attack'){inputQueue.push(1);if(p.atkCd<=0&&p.roll<=0&&p.dash<=0){inputQueue.take(1);attack();}}if(a==='roll'){inputQueue.push(2);if(p.rollCd<=0&&(p.attack<=0||heroFSM.canCancel())){inputQueue.take(2);roll();}}if(a==='interact')interact();if(a==='use')useItem();if(a==='cast')castSoul();if(a==='skill1')useSkill(1);if(a==='skill2')useSkill(2);if(a==='skill3')useSkill(3);if(a==='cycle')cycleItem();if(a==='map')openMap();if(a==='bag')openBag();if(a==='heal'&&p.potions&&p.hp<p.max){const h=Math.min(p.max-p.hp,(3+p.skills.vigor)*LIFE);if(!L.tutorial)p.potions--;p.hp+=h;burst(p.x,p.y,'#91d6bd',22);pop(p.x+13,p.y-6,'+'+(h/LIFE),'#9be3c8');say('余火回温 · 恢复 '+(h/LIFE)+' 个小幽灵');beep(550,.25);syncHud();}}
+  function dirs(){return{l:!!(isKey('left')||stick.x<-FEEL.dead||down('left')),r:!!(isKey('right')||stick.x>FEEL.dead||down('right')),u:!!(isKey('up')||stick.y<-FEEL.dead),d:!!(isKey('down')||stick.y>FEEL.dead)};}
   // 挥刀（参考空洞骑士）：按住上 = 上挑；空中按住下 = 下劈，打中会弹起来；否则朝面向或按住的左右侧劈，侧劈第三下是重劈
   // 钟锤学徒出手慢、判定大，第三锤震出一道地波；拾灯弓手横着 / 向上是射箭，空中向下是下踢（和下劈一样能弹起来）
-  function attack(){if(p.atkCd>0||p.roll>0||p.dash>0)return;const C=CHARS[p.char],d=dirs();if(d.l!==d.r)p.face=d.r?1:-1;p.atkFace=p.face;p.slash=d.u?'up':d.d&&!p.ground?'down':'side';if(p.slash==='side'){if(p.comboT<=0)p.combo=0;p.combo=(p.combo+1)%3;p.comboT=1.2;}p.attack=C.swing;p.atkCd=C.atkCd*(1-p.skills.swift*.12);p.hit.clear();p.pogo=false;heroFSM.enter('attack','combat',C.swing);}
+  function attack(){if(p.atkCd>0||p.roll>0||p.dash>0||p.charge>0)return;const C=CHARS[p.char],d=dirs();if(d.l!==d.r)p.face=d.r?1:-1;p.atkFace=p.face;p.slash=d.u?'up':d.d&&!p.ground?'down':'side';if(p.char==='bow'&&p.slash!=='down'){p.charge=.001;p.chargeMax=.45;return;}if(p.slash==='side'){if(p.comboT<=0)p.combo=0;p.combo=(p.combo+1)%3;p.comboT=1.2;}p.attack=C.swing;p.atkCd=C.atkCd*(1-p.skills.swift*.12);p.hit.clear();p.pogo=false;heroFSM.enter('attack','combat',C.swing);}
+  function fireCharge(full){if(!(p.charge>0))return;const f=p.atkFace||p.face,powered=!!full||p.charge>=(p.chargeMax||.45)-.02,up=p.slash==='up',dmg=Math.round(p.damage*(powered?2.4:1)*(relics.hunter&&p.hp/p.max>.7?1.3:1));
+    thrown.push({k:'arrow',x:p.x+p.w/2+(up?f*4:f*14),y:up?p.y+2:p.y+22,vx:up?0:f*(powered?1040:900),vy:up?(powered?-1040:-900):0,t:0,r:0,dmg:dmg,soul:true,heavy:powered,pierce:powered?6:0,hits:powered?new Set():null});
+    p.charge=0;p.atkCd=CHARS.bow.atkCd*(1-(p.skills.swift||0)*.12);beep(powered?480:720,.07,'triangle');}
   function attackEvent(){
     if(p.char==='bow'&&p.slash!=='down'){shootArrow();return;}
     if(p.char==='bell'&&p.slash==='side'&&p.combo===0&&p.ground)thrown.push({k:'pwave',x:p.x+p.w/2+p.face*34,y:p.y+p.h,vx:0,vy:0,dir:p.face,t:0,r:0,life:.5,hits:new Set(),dmg:p.damage*.5});
@@ -710,7 +726,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function slashArea(){const cx=p.x+p.w/2,cy=p.y+p.h/2,f=p.atkFace,k=(1+p.skills.reach*.12)*(p.char==='bell'?1.25:p.char==='bow'?.8:1);if(p.slash==='up')return{x:cx+f*4,y:cy-46,rx:32*k,ry:40*k};if(p.slash==='down')return{x:cx,y:cy+46,rx:30*k,ry:38*k};const big=p.combo===0?1.15:1;return{x:cx+f*(42+(big-1)*30),y:cy-6,rx:44*big*k,ry:30*big*k};}
   function inArea(A,x0,y0,x1,y1){const dx=(clamp(A.x,x0,x1)-A.x)/A.rx,dy=(clamp(A.y,y0,y1)-A.y)/A.ry;return dx*dx+dy*dy<=1;}
   // 翻滚：朝按住的方向滚（没按就朝面向），先快后慢，全程无敌；画面上缩成一团正好转一圈
-  function roll(){if(p.rollCd>0)return;p.perfect=false;const d=dirs();if(d.l!==d.r)p.face=d.r?1:-1;p.roll=ROLL;p.rollCd=(relics.feather?.48:.8)*(1-p.skills.dash*.13);p.inv=.35;p.attack=0;p.trail=[];p.trailT=0;dust(p.x+13,p.y+p.h,6,-p.face);beep(190,.1);}
+  function roll(){if(p.rollCd>0)return;p.perfect=false;const d=dirs();if(p.char!=='bow'&&d.l!==d.r)p.face=d.r?1:-1;p.roll=ROLL;p.rollDir=p.char==='bow'?-p.face:(d.r?1:d.l?-1:p.face);p.rollCd=(relics.feather?.48:FEEL.dodgeCd)*(1-p.skills.dash*.13);p.inv=Math.max(p.inv,FEEL.dodge);p.attack=0;p.trail=[];p.trailT=0;dust(p.x+13,p.y+p.h,6,-(p.rollDir||p.face));beep(190,.1);}
   const picks={Digit1:0,Digit2:1,Digit3:2,Numpad1:0,Numpad2:1,Numpad3:2},buys=Object.assign({Digit4:3,Numpad4:3,Digit5:4,Numpad5:4,Digit6:5,Numpad6:5,Digit7:6,Numpad7:6},picks);
   // 按键都查 BIND（设置里可以改）；改键时下一个按下的键直接记下来
   addEventListener('keydown',e=>{unlockAudio();const act=codeAct[e.code];
@@ -739,7 +755,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   document.querySelectorAll('[data-action]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();try{b.setPointerCapture(e.pointerId);}catch(err){}held[e.pointerId]=b.dataset.action;b.classList.add('held');action(b.dataset.action);});const release=e=>{if(held[e.pointerId]==='jump')jumpRelease();delete held[e.pointerId];b.classList.remove('held');};b.addEventListener('pointerup',release);b.addEventListener('pointercancel',release);b.addEventListener('lostpointercapture',release);});
   // 摇杆：左右移动；往上 / 往下推着挥刀 = 上挑 / 下劈。手指滑出摇杆也继续跟手
   const knob=document.getElementById('knob');let stickId=null;
-  function stickMove(e){const r=pad.getBoundingClientRect();if(r.width<=0||r.height<=0||rotationBlocked){stickEnd();return;}const rx=r.width/2,ry=r.height/2;let x=(e.clientX-r.left-rx)/rx,y=(e.clientY-r.top-ry)/ry;const d=Math.hypot(x,y);if(d>1){x/=d;y/=d;}stick.x=x;stick.y=y;knob.style.transform='translate('+(x*(pad.clientWidth||r.width)*.25).toFixed(1)+'px,'+(y*(pad.clientHeight||r.height)*.25).toFixed(1)+'px)';}
+  function stickMove(e){const r=pad.getBoundingClientRect();if(r.width<=0||r.height<=0||rotationBlocked){stickEnd();return;}const rx=r.width/2,ry=r.height/2;let x=(e.clientX-r.left-rx)/rx,y=(e.clientY-r.top-ry)/ry;const d=Math.hypot(x,y);if(d>1){x/=d;y/=d;}if(d<FEEL.dead){x=0;y=0;}stick.x=x;stick.y=y;knob.style.transform='translate('+(x*(pad.clientWidth||r.width)*.25).toFixed(1)+'px,'+(y*(pad.clientHeight||r.height)*.25).toFixed(1)+'px)';}
   function stickEnd(){stickId=null;stick.x=0;stick.y=0;knob.style.transform='';}
   pad.addEventListener('pointerdown',e=>{e.preventDefault();try{pad.setPointerCapture(e.pointerId);}catch(err){}stickId=e.pointerId;stickMove(e);});
   pad.addEventListener('pointermove',e=>{if(e.pointerId===stickId)stickMove(e);});
@@ -749,13 +765,15 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   document.getElementById('bag-btn').onclick=()=>{if(state==='bag')closeBag();else openBag();};
   {const mb=document.getElementById('map-btn');if(mb)mb.onclick=()=>{if(state==='map')closeMap();else openMap();};}
   document.getElementById('pause').onclick=togglePause;muteBtn.onclick=()=>setMuted(!muted);
+  {const skip=document.getElementById('coach-skip');if(skip)skip.onclick=()=>{run.coachSkip=true;coachDone=true;skip.hidden=true;try{localStorage.setItem('ember:coach','1');}catch(e){}say('引导已跳过',1.4);};}
   function togglePause(){if(state!=='play')return;paused=!paused;keys={};clearHeld();if(paused)showPause();else{panel.hidden=true;panelView='';rebinding=null;}}
   function showPause(){panel.classList.remove('late');panelView='pause';const alts=[{label:'设置',fn:()=>renderSettings('pause')},{label:'回到开始界面',fn:()=>{saveRun();showMenu();}}];if(L.tutorial)alts.unshift({label:'进入第一关',fn:()=>{paused=false;finishTutorial();}});
     showPanel('余火未熄',L.tutorial?'这里是焚炉底层的教程，随时可以跳过。':'歇一会儿，再继续前行。','继续探索',()=>{paused=false;panel.hidden=true;panelView='';},alts);focusFirst();}
   // ---- 开始界面：继续旅程 / 新的旅程（选角色和周目）/ 教程 / 章节挑战 / 图鉴与传说 / 设置 ----
   const EMBLEM='<svg viewBox="0 0 96 96"><circle cx="48" cy="48" r="43"/><path d="M31 59h34l-5-8V37a12 12 0 0 0-24 0v14zM43 64a5 5 0 0 0 10 0M48 19v6M21 48h-7m68 0h-7"/><path class="ember" d="M48 37c-7 8-5 16 0 19 6-3 7-11 0-19z"/></svg>';
   function loadSave(){try{saveData=JSON.parse(localStorage.getItem('ember:save')||'null');}catch(e){saveData=null;}if(saveData&&!STAGES[saveData.stage])saveData=null;return saveData;}
-  function saveRun(){if(!L||!p||L.tutorial||state==='menu'||!entry)return;try{localStorage.setItem('ember:save',JSON.stringify({v:1,stage:stage,char:p.char,cycle:cycle,e:entry,run:{guided:!!run.guided,awakened:run.awakened||0,lessonMask:run.lessonMask||0,keeper:!!run.keeper,c2:!!run.chapter2,c3:!!run.chapter3,c4:!!run.chapter4,seen:run.seen||{},maps:run.maps||{},found:run.found||{},visited:run.visited||{},inkMet:!!run.inkMet,firstElite:!!run.firstElite}}));}catch(e){}}
+  function bossSnap(){const b=enemies.find(e=>e.type==='boss'&&!e.dead);return b?{hp:b.hp,max:b.max,phase:b.phase||0,rage:!!b.rage,phase3:!!b.phase3}:null;}
+  function saveRun(){if(!L||!p||L.tutorial||state==='menu'||!entry)return;try{localStorage.setItem('ember:save',JSON.stringify({v:2,stage:stage,char:p.char,cycle:cycle,checkX:p.checkX,boss:bossSnap(),e:entry,run:{guided:!!run.guided,awakened:run.awakened||0,lessonMask:run.lessonMask||0,keeper:!!run.keeper,c2:!!run.chapter2,c3:!!run.chapter3,c4:!!run.chapter4,seen:run.seen||{},maps:run.maps||{},found:run.found||{},visited:run.visited||{},inkMet:!!run.inkMet,firstElite:!!run.firstElite,time:run.time||0,deaths:run.deaths||0,shortcut:!!run.shortcut,coach:!!run.coachSkip}}));}catch(e){}}
   function clearSave(){saveData=null;try{localStorage.removeItem('ember:save');}catch(e){}}
   function showMenu(){panel.classList.remove('late');state='menu';paused=false;talk=null;talkBox.hidden=true;credits=null;cine=null;rebinding=null;hud.hidden=true;touch.hidden=true;hint.hidden=true;gainBox.hidden=true;notice.style.opacity=0;messageT=0;titleT=0;sceneA=sceneB='';keys={};clearHeld();renderMenu();}
   function focusFirst(){try{const b=panel.querySelector('button:not([disabled])');if(b&&!coarse())b.focus();}catch(e){}}
@@ -766,10 +784,13 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     items.push(['new','新的旅程',clears?'选角色、选周目':'从灰烬里醒来'],['tutorial','教程','把操作再练一遍'],['chapters','关卡挑战','重玩已经解锁的关卡'],['codex','图鉴与传说','见过的敌人、得到的东西、读到的往事'],['settings','设置','声音、画面、对话速度、按键']);
     panel.innerHTML='<div class="sheet title-screen menu"><div class="title-emblem" aria-hidden="true">'+EMBLEM+'</div><span class="chapter">一场为归途而响的钟声</span><h1>余烬地牢</h1><p class="english">EMBER VAULT</p><div class="menu-list">'+items.map(it=>'<button class="menu-item" data-menu="'+it[0]+'"><b>'+it[1]+'</b><small>'+it[2]+'</small></button>').join('')+'</div><p class="footnote">'+(clears?'已通关 '+clears+' 次 · ':'')+'最高 '+best+' 分 · 原创横版动作游戏 · v'+VERSION+'</p></div>';
     panel.hidden=false;panel.querySelectorAll('[data-menu]').forEach(b=>b.onclick=()=>menuPick(b.dataset.menu));focusFirst();}
-  function menuPick(id){unlockAudio();beep(620,.05,'sine');if(id==='continue')continueRun();else if(id==='new'){if(clears>0)renderChars();else startJourney('lamp',0);}else if(id==='tutorial')startTutorial(true);else if(id==='chapters')renderChapters();else if(id==='codex'){panelView='codex';bagTab='dex';renderBag(true);}else if(id==='settings')renderSettings('menu');}
+  function menuPick(id){unlockAudio();beep(620,.05,'sine');if(id==='continue')continueRun();else if(id==='new')renderChars();else if(id==='tutorial')startTutorial(true);else if(id==='chapters')renderChapters();else if(id==='codex'){panelView='codex';bagTab='dex';renderBag(true);}else if(id==='settings')renderSettings('menu');}
   function continueRun(){const s=loadSave();if(!s)return;cycle=s.cycle||0;reset(true,s.char);const e=s.e;Object.assign(p,{max:e.max,hp:e.hp,damage:e.damage,potions:e.potions,soul:e.soul||0,shards:e.shards||0,plateHits:e.plateHits||0,leechKills:e.leechKills||0,skills:Object.assign({},p.skills,e.skills)});embers=e.embers;score=e.score;kills=e.kills;bag=Object.assign({bomb:0,knife:0,frost:0},e.bag);relics=Object.assign({},e.relics);keepsakes=Object.assign({},e.keep);
-    if(s.run){run.guided=!!s.run.guided;run.awakened=s.run.awakened||0;run.lessonMask=s.run.lessonMask||0;['seen','maps','found','visited'].forEach(k=>{if(s.run[k])run[k]=s.run[k];});run.inkMet=!!s.run.inkMet;run.firstElite=!!s.run.firstElite;run.keeper=s.run.keeper;['2','3','4'].forEach(n=>{if(s.run['c'+n])run['chapter'+n]=true;});}introSeen=true;loadStage(s.stage);say('继续上次的旅程 · '+(L.rest?L.name:L.n+' · '+L.name),3);}
-  function startJourney(ch,cyc){if(!clears){ch='lamp';cyc=0;}cycle=cyc||0;clearSave();reset(true,ch);try{localStorage.setItem('ember:char',p.char);}catch(e){}introSeen=true;startTalk(TALK.prologue,()=>{note('lore','prologue');scenePass(enterAfterPrologue);});}
+    if(s.run){run.guided=!!s.run.guided;run.awakened=s.run.awakened||0;run.lessonMask=s.run.lessonMask||0;['seen','maps','found','visited'].forEach(k=>{if(s.run[k])run[k]=s.run[k];});run.inkMet=!!s.run.inkMet;run.firstElite=!!s.run.firstElite;run.keeper=s.run.keeper;run.time=s.run.time||0;run.deaths=s.run.deaths||0;run.shortcut=!!s.run.shortcut;run.coachSkip=!!s.run.coach;['2','3','4'].forEach(n=>{if(s.run['c'+n])run['chapter'+n]=true;});}introSeen=true;loadStage(s.stage);
+    if(s.checkX!=null){p.checkX=s.checkX;checkpoint=true;L.checkpoint=s.checkX;p.x=s.checkX+20;p.y=FLOOR-p.h;p.safeX=p.x;cam=clamp(p.x-W*.35,0,Math.max(0,WORLD-W));}
+    if(s.boss){const b=enemies.find(e=>e.type==='boss'&&!e.dead);if(b){b.hp=Math.min(b.max,s.boss.hp);b.phase=s.boss.phase||0;b.rage=!!s.boss.rage;b.phase3=!!s.boss.phase3;}}
+    saveRun();say('继续上次的旅程 · '+(checkpoint?'从钟火':'')+(L.rest?L.name:L.n+' · '+L.name),3);}
+  function startJourney(ch,cyc){if(!clears)cyc=0;if(!CHARS[ch])ch='lamp';cycle=cyc||0;clearSave();reset(true,ch);try{localStorage.setItem('ember:char',p.char);}catch(e){}introSeen=true;startTalk(TALK.prologue,()=>{note('lore','prologue');scenePass(enterAfterPrologue);});}
   function renderChapters(){
     panelView='chapters';
     const maps=STAGES.filter(room=>!room.arena&&!room.rest);
@@ -796,13 +817,14 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   // 设置：音量滑条、画面 / 对话选项、按键（每个动作两个键位，点一下再按新键）
   function renderSettings(from){panelView='settings';if(from)menuFrom=from;const opt=(k,label,vals)=>'<div class="opt"><span>'+label+'</span>'+vals.map(v=>'<button data-opt="'+k+'" data-v="'+v[0]+'"'+(String(settings[k])===String(v[0])?' class="on"':'')+'>'+v[1]+'</button>').join('')+'</div>',sl=(k,label)=>'<label class="slider"><span>'+label+'</span><input type="range" min="0" max="100" step="5" value="'+Math.round(settings[k]*100)+'" data-slider="'+k+'"><b>'+Math.round(settings[k]*100)+'</b></label>';
     const rows=KEY_ORDER.map(a=>'<div class="keyrow"><span>'+KEY_LABEL[a]+'</span>'+[0,1].map(i=>{const w=rebinding&&rebinding.a===a&&rebinding.i===i;return'<button data-bind="'+a+'" data-slot="'+i+'"'+(w?' class="wait"':'')+'>'+(w?'按下新按键…':keyName(BIND[a][i]))+'</button>';}).join('')+'</div>').join('');
-    panel.innerHTML='<div class="sheet wide settings"><span class="chapter">设置</span><h1>设置</h1><h3>声音</h3>'+sl('music','音乐')+sl('sfx','音效')+'<h3>画面</h3>'+opt('fx','特效',[['auto','自动'],['high','全开'],['low','省电']])+opt('shake','屏幕震动',[[true,'开'],[false,'关']])+opt('nums','伤害数字',[[true,'显示'],[false,'隐藏']])+opt('minimap','小地图',[[true,'显示'],[false,'隐藏']])+'<h3>对话</h3>'+opt('textSpeed','文字速度',[[.6,'慢'],[1,'中'],[1.7,'快']])+opt('autoTalk','自动翻页',[[false,'关'],[true,'开']])+'<h3>操作</h3>'+opt('touch','屏幕按键',[['auto','自动'],['show','显示'],['hide','隐藏']])+'<h3>按键 <small>'+(coarse()?'接上键盘时生效 · ':'')+'点一下，再按想用的键；Esc 取消</small></h3><div class="keymap">'+rows+'</div><button class="secondary" id="keys-reset">恢复默认按键</button><button class="primary" data-back>返回 <span>↩</span></button></div>';
+    panel.innerHTML='<div class="sheet wide settings"><span class="chapter">设置</span><h1>设置</h1><h3>声音</h3>'+sl('vol','总音量')+sl('music','音乐')+sl('sfx','音效')+'<h3>画面</h3>'+opt('fx','特效',[['auto','自动'],['high','全开'],['low','省电']])+opt('shake','屏幕震动',[[true,'开'],[false,'关']])+opt('buzz','震动',[[true,'开'],[false,'关']])+opt('nums','伤害数字',[[true,'显示'],[false,'隐藏']])+opt('minimap','小地图',[[true,'显示'],[false,'隐藏']])+'<h3>对话</h3>'+opt('textSpeed','文字速度',[[.6,'慢'],[1,'中'],[1.7,'快']])+opt('autoTalk','自动翻页',[[false,'关'],[true,'开']])+'<h3>操作</h3>'+opt('touch','屏幕按键',[['auto','自动'],['show','显示'],['hide','隐藏']])+sl('touchA','按键透明度')+'<label class="slider"><span>按键左右</span><input type="range" min="-80" max="80" step="4" value="'+(settings.touchX||0)+'" data-px="touchX"><b>'+(settings.touchX||0)+'</b></label><label class="slider"><span>按键上下</span><input type="range" min="-60" max="40" step="4" value="'+(settings.touchY||0)+'" data-px="touchY"><b>'+(settings.touchY||0)+'</b></label><h3>按键 <small>'+(coarse()?'接上键盘时生效 · ':'')+'点一下，再按想用的键；Esc 取消</small></h3><div class="keymap">'+rows+'</div><button class="secondary" id="keys-reset">恢复默认按键</button><button class="primary" data-back>返回 <span>↩</span></button></div>';
     panel.hidden=false;
     panel.querySelectorAll('[data-opt]').forEach(b=>b.onclick=()=>{const k=b.dataset.opt,v=b.dataset.v;settings[k]=v==='true'?true:v==='false'?false:isNaN(+v)?v:+v;applySettings();saveSettings();beep(600,.04,'sine');renderSettings();});
     panel.querySelectorAll('[data-slider]').forEach(r=>{r.oninput=()=>{settings[r.dataset.slider]=r.value/100;r.nextElementSibling.textContent=r.value;applySettings();saveSettings();};r.onchange=()=>beep(660,.06,'sine');});
+    panel.querySelectorAll('[data-px]').forEach(r=>{r.oninput=()=>{settings[r.dataset.px]=+r.value;r.nextElementSibling.textContent=r.value;applySettings();saveSettings();};});
     panel.querySelectorAll('[data-bind]').forEach(b=>b.onclick=()=>{rebinding={a:b.dataset.bind,i:+b.dataset.slot};renderSettings();});
     document.getElementById('keys-reset').onclick=()=>{BIND=JSON.parse(JSON.stringify(DEFAULT_KEYS));rebuildKeys();saveSettings();renderSettings();};bindBack();if(!rebinding)focusFirst();}
-  function applySettings(){buses();resize();touch.hidden=!coarse()||state!=='play';if(settings.fx==='low')lowFx=true;else if(settings.fx==='high')lowFx=false;}
+  function applySettings(){buses();resize();touch.hidden=!coarse()||state!=='play';if(settings.fx==='low')lowFx=true;else if(settings.fx==='high')lowFx=false;const root=document.documentElement;if(root&&root.style){root.style.setProperty('--touch-a',String(settings.touchA==null?1:settings.touchA));root.style.setProperty('--touch-x',(settings.touchX||0)+'px');root.style.setProperty('--touch-y',(settings.touchY||0)+'px');}}
   // 改键：同一个键原来属于别的动作就互换，免得两个动作抢一个键
   function finishRebind(code){const r=rebinding;rebinding=null;if(r&&code!=='Escape'){const old=BIND[r.a][r.i];KEY_ORDER.forEach(a=>{if(a===r.a)return;const j=BIND[a].indexOf(code);if(j>=0){if(old)BIND[a][j]=old;else BIND[a].splice(j,1);}});const j2=BIND[r.a].indexOf(code);if(j2>=0&&j2!==r.i)BIND[r.a].splice(j2,1);BIND[r.a][r.i]=code;BIND[r.a]=BIND[r.a].filter(Boolean);rebuildKeys();saveSettings();beep(700,.06,'sine');}renderSettings();}
   // 菜单里用方向键 / Tab 选，空格或回车确定，Esc 返回
@@ -865,9 +887,9 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     for(let i=0;i<26;i++){const a=Math.random()*TAU,v=60+Math.random()*170;emit_particles(x,y,Math.cos(a)*v,Math.sin(a)*v,.5+Math.random()*.5,1,'#d8f2ff',1.5+Math.random()*2,-.05,true,undefined,undefined,undefined);}beep(1320,.25,'sine');beep(1760,.35,'sine');}
   // ---- 角色：小引灯人（短刀）/ 钟锤学徒（钟锤，通关一次解锁）/ 拾灯弓手（弓，通关两次解锁）。每个角色三个技能，按 1 / 2 / 3，花 1 / 2 / 3 格魂火 ----
   const CHARS={
-    lamp:{id:'lamp',name:'小引灯人',title:'提灯为亡魂引路的孩子',info:'短刀快攻，攻守平衡；空中下劈能踩着敌人和尖刺弹起来。',hp:5,dmg:24,atkCd:.31,swing:.25,power:.5,speedK:.65,skills:['shade','ring','bolt']},
-    bell:{id:'bell',name:'钟锤学徒',title:'守钟人收下的最后一个学徒',info:'抡着小钟锤：出手慢，但一锤很重，第三锤还会震出地波；生命更多。',hp:6,dmg:36,atkCd:.46,swing:.32,power:.85,speedK:.45,skills:['quake','dome','toll'],need:1,unlockText:'通关一次后解锁'},
-    bow:{id:'bow',name:'拾灯弓手',title:'在城墙上捡灯的流浪弓手',info:'远远放箭，箭射中也能积攒魂火；空中按下是一记下踢，照样能弹起来。生命较少。',hp:4,dmg:17,atkCd:.34,swing:.2,power:.35,speedK:.85,skills:['fan','trap','pierce'],need:2,unlockText:'通关两次后解锁'}};
+    lamp:{id:'lamp',name:'小引灯人',title:'敏捷 · 二段跳，刀轻，翻滚是短突进',info:'只有她能二段跳。刀快但单下不重，翻滚向前突进一小段。',hp:5,dmg:24,atkCd:.31,swing:14/60,power:.48,speedK:.9,skills:['shade','ring','bolt']},
+    bell:{id:'bell',name:'钟锤学徒',title:'近战 · 三连，第三击击退，血厚步慢',info:'连砍三下，第三锤把敌人推开，并震出一道地波。生命多，走得慢，没有二段跳。',hp:6,dmg:36,atkCd:.46,swing:.32,power:.86,speedK:.42,skills:['quake','dome','toll']},
+    bow:{id:'bow',name:'拾灯弓手',title:'远程 · 蓄力穿透，血薄，闪避后撤',info:'按住攻击蓄力，蓄满的箭能穿透一排敌人。生命少，闪避向后撤。',hp:4,dmg:17,atkCd:.34,swing:.2,power:.4,speedK:.78,skills:['fan','trap','pierce']}};
   const SKILLS={
     shade:{name:'影步斩',cost:1,info:'化作影子向前冲斩一段，冲刺中不会受伤。'},
     ring:{name:'魂灯环',cost:2,info:'三团魂火绕身旋转 5 秒：烧伤碰到的敌人，挡下飞来的东西。'},
@@ -878,7 +900,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     fan:{name:'散射',cost:1,info:'一次射出五支扇形的箭。'},
     trap:{name:'灯雷',cost:2,info:'在脚下放一盏灯雷，敌人靠近就炸开。'},
     pierce:{name:'穿云箭',cost:3,info:'射出一支贯穿整个画面的巨箭。'}};
-  const charOpen=id=>!!CHARS[id]&&(!CHARS[id].need||clears>=CHARS[id].need);
+  const charOpen=id=>!!CHARS[id];
   function lastChar(){let c='lamp';try{c=localStorage.getItem('ember:char')||'lamp';}catch(e){}return charOpen(c)?c:'lamp';}
   function useSkill(i){if(state!=='play'||paused||!p)return;if(run.guided&&i>run.awakened)return;const id=CHARS[p.char].skills[i-1],S=SKILLS[id];if(id==='bolt'){castSoul();return;}if(p.castCd>0||p.roll>0||p.dash>0)return;if(p.soul<S.cost){say('魂火不够（还差 '+(S.cost-p.soul)+' 格）· 攻击命中敌人来积攒',1.4);beep(140,.08,'square');return;}
     if(!L.tutorial)p.soul-=S.cost;p.castCd=L.tutorial?0:.35;hudKey='';if(relics.echo){p.echoN=(p.echoN||0)+1;if(p.echoN%3===0){p.soul=Math.min(3,p.soul+S.cost);pop(p.x+13,p.y-14,'回音','#9ff3e0');beep(990,.2,'sine');}}const f=p.face,cx=p.x+p.w/2,cy=p.y+p.h/2,gy=p.y+p.h;
@@ -903,7 +925,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(o.k==='mine'){o.life-=dt;if(o.t>.45&&(o.life<=0||enemies.some(e=>!e.dead&&Math.abs(e.x+e.w/2-o.x)<52&&Math.abs(e.y+e.h-o.y)<70)))mineBoom(o);return true;}
     if(o.k==='pwave'){o.x+=o.dir*430*dt;o.life-=dt;if(Math.random()<dt*30)dust(o.x,o.y,1,o.dir);enemies.forEach(e=>{if(e.dead||o.hits.has(e))return;if(o.x>e.x-14&&o.x<e.x+e.w+14&&e.y+e.h>o.y-50&&e.y<o.y+4){o.hits.add(e);hitEnemy(e,o.dmg,o.dir,true,clamp(o.x,e.x,e.x+e.w),e.y+e.h-10,o.dir>0?0:Math.PI);}});if(o.life<=0||o.x<0||o.x>WORLD)o.dead=true;return true;}
     if(o.k==='bigarrow'){enemies.forEach(e=>{if(e.dead||o.hits.has(e))return;if(o.x>e.x-20&&o.x<e.x+e.w+20&&o.y>e.y-14&&o.y<e.y+e.h+14){o.hits.add(e);hitEnemy(e,o.dmg,o.vx>0?1:-1,true,clamp(o.x,e.x,e.x+e.w),o.y,o.vx>0?0:Math.PI);}});if(o.t>1.2||o.x<0||o.x>WORLD)o.dead=true;return true;}
-    if(o.k==='arrow'){const e=enemies.find(q=>!q.dead&&o.x>q.x-8&&o.x<q.x+q.w+8&&o.y>q.y-8&&o.y<q.y+q.h+8);if(e){o.dead=true;if(blocks(e,o.vx>0?1:-1,o.vy)){clang(o.x,o.y);return true;}const off=e.type==='boss'&&((L.arena&&!flags.boss)||e.under>.5);hitEnemy(e,o.dmg,o.vx?(o.vx>0?1:-1):0,!!o.heavy,clamp(o.x,e.x,e.x+e.w),o.y,Math.atan2(o.vy,o.vx));if(o.soul&&!off){p.soul=Math.min(3,p.soul+1);hudKey='';}return true;}
+    if(o.k==='arrow'){const e=enemies.find(q=>!q.dead&&(!o.hits||!o.hits.has(q))&&o.x>q.x-8&&o.x<q.x+q.w+8&&o.y>q.y-8&&o.y<q.y+q.h+8);if(e){if(blocks(e,o.vx>0?1:-1,o.vy)){if(!o.pierce)o.dead=true;clang(o.x,o.y);return true;}const off=e.type==='boss'&&((L.arena&&!flags.boss)||e.under>.5||e.phaseInv>0);hitEnemy(e,o.dmg,o.vx?(o.vx>0?1:-1):0,!!o.heavy,clamp(o.x,e.x,e.x+e.w),o.y,Math.atan2(o.vy,o.vx));if(o.soul&&!off){p.soul=Math.min(3,p.soul+1);hudKey='';}if(o.pierce){(o.hits=o.hits||new Set()).add(e);if(o.hits.size>=o.pierce)o.dead=true;}else o.dead=true;return true;}
       breakables.forEach(b=>{if(!o.dead&&!b.broken&&o.x>b.x-13&&o.x<b.x+13&&o.y>b.y-31&&o.y<b.y){o.dead=true;breakCache(b);}});secrets.forEach((sc,i)=>{if(!o.dead&&!sc.open&&o.x>sc.x-30&&o.x<sc.x+30&&o.y>sc.y-84&&o.y<sc.y){o.dead=true;hitSecret(sc,i);}});if(o.t>.75||o.x<0||o.x>WORLD||o.y<0)o.dead=true;return true;}
     return false;}
   // 火油罐：抛物线，碰到敌人或落地就炸；飞刀：直线，扎中第一个敌人
@@ -1112,38 +1134,44 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function burst(x,y,c,n){for(let i=0;i<n;i++)emit_particles(x,y,(Math.random()-.5)*330,(Math.random()-.7)*230,.3+Math.random()*.35,.65,c,2+Math.random()*4,1,undefined,undefined,undefined,undefined);}
   function ember(x,y,n,c){for(let i=0;i<n;i++)emit_particles(x+(Math.random()-.5)*10,y+(Math.random()-.5)*10,(Math.random()-.5)*50,-30-Math.random()*60,.6+Math.random()*.8,1.4,c||'#ffa04a',1+Math.random()*1.6,-.15,true,undefined,undefined,undefined);}
   function dust(x,y,n,dir){for(let i=0;i<n;i++){const d=dir||(Math.random()<.5?-1:1);emit_particles(x+(Math.random()-.5)*14,y-2,d*(30+Math.random()*90),-10-Math.random()*40,.35+Math.random()*.3,.65,'#8a9196',2+Math.random()*3,.2,undefined,undefined,.06,true);}}
-  function pop(x,y,t,c,big){floats.push({x:x+(Math.random()-.5)*10,y:y,t:t,c:c,life:.75,big:!!big});}
+  function pop(x,y,t,c,big){const o=floatsPool.acquire();if(!o)return;o.x=x+(Math.random()-.5)*10;o.y=y;o.t=String(t);o.c=c||'#efe2c8';o.life=.75;o.big=!!big;floats.push(o);}
+  function punchShake(px){if(settings.shake===false)return;shake=Math.max(shake,px);shakeT=Math.max(shakeT||0,FEEL.shakeDur||.1);}
   // 生命以整格结算：每格对应一个小幽灵，普通命中 1 格，明确的首领重击 2 格。
-  function hurt(d,from,heavy){if(p.inv>0||state!=='play')return;let lost=heavy?2:1;
+  function hurt(d,from,heavy,why){if(p.inv>0||state!=='play')return;let lost=heavy?2:1;if(cycle>0)lost=Math.max(1,Math.min(4,Math.round(lost*Math.min(2,1+.2*cycle))));
     if(relics.veil&&!flags.veil){flags.veil=true;p.inv=.8;fx.push({k:'ring',x:p.x+13,y:p.y+26,life:.4,max:.4,r:60});pop(p.x+13,p.y-8,'铃声挡下了','#ffe2a8');beep(1320,.3,'sine');beep(1760,.45,'sine');return;}   // 护身铃：每层挡一次
     if(relics.plate){p.plateHits++;if(p.plateHits%3===0){lost--;fx.push({k:'ring',x:p.x+13,y:p.y+26,life:.3,max:.3,r:45});if(!lost){p.inv=.6;pop(p.x+13,p.y-8,'挡住了','#bce3db');beep(500,.15,'triangle');return;}}}
     let points=lost*LIFE;if(points>=p.hp&&relics.wind&&!p.windUsed){p.windUsed=true;points=Math.max(0,p.hp-LIFE);fx.push({k:'ring',x:p.x+13,y:p.y+26,life:.4,max:.4,r:70});say('第二口气！',2);}
     if(L.tutorial)points=Math.min(points,Math.max(0,p.hp-LIFE));   // 教程里不会倒下
-    p.hp=Math.max(0,p.hp-points);p.inv=.85;p.hurtT=.3;p.vx=(p.x<from?-1:1)*270;p.vy=-170;shake=heavy?11:7;burst(p.x+13,p.y+22,'#cf706a',15);if(points)pop(p.x+13,p.y-6,'−'+(points/LIFE),'#ff9a8a');beep(85,.2,'sawtooth');hudKey='';if(points&&p.hp){hitstop=Math.max(hitstop,.07);flashT=Math.max(flashT,.08);}if(!p.hp)finish(false);}
-  function finish(win){if(!win){deathT=0;deathX=p.x+p.w/2;deathY=p.y+p.h/2;for(let i=0;i<34;i++){const a=Math.random()*TAU,v=60+Math.random()*260;emit_particles(deathX,deathY,Math.cos(a)*v,Math.sin(a)*v-90,.8+Math.random()*1.2,2,i%3?'#eef6fa':'#9ff3e0',2+Math.random()*3,i%3?.6:-.3,i%3===0,undefined,undefined,undefined);}shake=12;flashT=.3;beep(220,.5,'sine',.04);beep(110,.9,'triangle',.04);panel.classList.add('late');}state=win?'win':'dead';paused=false;touch.hidden=true;chestBtn.hidden=true;score+=win?200:0;best=Math.max(best,score);try{localStorage.setItem('ember:best',String(best));}catch(e){}
+    p.hp=Math.max(0,p.hp-points);p.inv=FEEL.hurtInv;p.hurtT=.3;p.kbX=(p.x<from?-1:1)*FEEL.kb;p.kbT=FEEL.kbTime;p.vx=p.kbX;p.vy=-170;punchShake(FEEL.shakeHurt);burst(p.x+13,p.y+22,'#cf706a',15);if(points)pop(p.x+13,p.y-6,'−'+(points/LIFE),'#ff9a8a');beep(85,.2,'sawtooth');if(settings.buzz&&typeof navigator!=='undefined'&&navigator.vibrate)navigator.vibrate(16);hudKey='';if(points&&p.hp){hitstop=Math.max(hitstop,FEEL.hurtStop);flashT=Math.max(flashT,.08);}if(!p.hp){deathWhy=why||deathWhy||'受到了攻击';finish(false);}}
+  function finish(win){if(!win){run.deaths=(run.deaths||0)+1;deathT=0;deathX=p.x+p.w/2;deathY=p.y+p.h/2;for(let i=0;i<(lowFx?12:34);i++){const a=Math.random()*TAU,v=60+Math.random()*260;emit_particles(deathX,deathY,Math.cos(a)*v,Math.sin(a)*v-90,.8+Math.random()*1.2,2,i%3?'#eef6fa':'#9ff3e0',2+Math.random()*3,i%3?.6:-.3,i%3===0,undefined,undefined,undefined);}punchShake(FEEL.shakeHurt);flashT=.3;beep(220,.5,'sine',.04);beep(110,.9,'triangle',.04);panel.classList.add('late');saveRun();}state=win?'win':'dead';paused=false;touch.hidden=true;chestBtn.hidden=true;score+=win?200:0;best=Math.max(best,score);try{localStorage.setItem('ember:best',String(best));}catch(e){}
     // 通关：三声钟响、满城魂火升起 → 插画上自动播完结局旁白 → 片尾字幕 → 结算（解锁角色、开启下一周目）
     if(win){note('lore','ending');gain('chain',1,true);hud.hidden=true;keys={};clearHeld();cine={k:'bell',t:0,n:0,dur:3.8,dawn:0,after:()=>startTalk(TALK.ending,startCredits,true,{auto:true,delay:.4})};state='cine';}
-    else{const menu={label:'回到开始界面',fn:showMenu},first={label:'从第一层重新开始',fn:()=>reset(false)};
-      if(checkpoint)showPanel('余火将息','钟火还亮着。<br>回到篝火旁，再与'+(BOSSES[L.bossKind]?BOSSES[L.bossKind].name:'首领')+'一战。','从钟火再战',respawn,[{label:'从本层开头再来',fn:retryStage},first,menu]);
-      else if(stage>0)showPanel('余火将息','倒在了'+L.name+'。<br>带着进门时的状态，从这一层重新来过？','从本层再来',retryStage,[first,menu]);
-      else showPanel('余火将息','这次旅途暂时结束。<br>翻滚能穿过攻击，宝箱能让下一场战斗轻松一些。','重新出发',()=>reset(false),[menu]);focusFirst();}
+    else{const menu={label:'回到开始界面',fn:showMenu},first={label:'从第一层重新开始',fn:()=>reset(false)},why=deathWhy||'受到了攻击';
+      if(checkpoint)showPanel('余火将息',why+'。<br>'+(L.arena?'钟火还亮着。已打下的阶段还在，回到篝火再战 '+(BOSSES[L.bossKind]?BOSSES[L.bossKind].name:'首领')+'。':'钟火还亮着。回到上一处钟火。'),'从钟火再战',respawn,[{label:'从本层开头再来',fn:retryStage},first,menu]);
+      else if(stage>0)showPanel('余火将息',why+'。<br>倒在了'+L.name+'。带着进门时的状态，从这一层重新来过？','从本层再来',retryStage,[first,menu]);
+      else showPanel('余火将息',why+'。<br>这次旅途暂时结束。翻滚能穿过攻击，宝箱能让下一场战斗轻松一些。','重新出发',()=>reset(false),[menu]);focusFirst();}
     beep(win?650:110,.5);}
   // 片尾字幕：黎明的插画上，名字一行行往上走；按任意键 / 点一下跳过
   const CREDITS=[['余烬地牢','title'],['EMBER VAULT','en'],['',''],['— 引灯的人 —','h'],['小引灯人　钟锤学徒　拾灯弓手',''],['',''],['— 路上遇见的 —','h'],['守钟人　烛叟　阿苓',''],['',''],['— 守着门的 —','h'],['守锁兽 · 铜壳',''],['溺灯 · 腐潮母巢',''],['无名旗手 · 归骨',''],['沉钟典狱长',''],['',''],['— 走过的路 —','h'],['焚炉底层　沉钟监牢　腐水下水道',''],['落日城墙　骸骨墓窟　沉钟之巅',''],['',''],['画面、关卡与对白','h'],['原创绘制与编写',''],['— 音乐 —','h'],['区域旋律与音效 · 程序合成',''],['最终战 · Epic Boss Battle',''],['Juhani Junkala / SubspaceAudio · CC0',''],['',''],['',''],['谢谢你，把每一盏火都送回了家。','end']];
   function startCredits(){credits={t:0,dur:26};talkBox.hidden=true;hud.hidden=true;touch.hidden=true;sceneA=sceneB='';}
   function endCredits(){if(!credits)return;credits=null;showWinPanel();}
   // 结算：通关次数 +1，解锁新角色；可以带着同一个角色开启下一周目
+  const BOONS=[{id:'flask',name:'起始药瓶',info:'下一周目开局多一瓶药'},{id:'skin',name:'余烬刀穗',info:'下一周目刀光换成暖色'},{id:'hunter',name:'寻火词条',info:'下一周目开局带着寻火者徽记'}];
+  function ownedBoons(){try{return JSON.parse(localStorage.getItem('ember:boons')||'[]')||[];}catch(e){return [];}}
+  function grantBoon(){const gift=BOONS[Math.min(BOONS.length,clears)-1];if(!gift)return null;const have=ownedBoons();if(have.indexOf(gift.id)<0){have.push(gift.id);try{localStorage.setItem('ember:boons',JSON.stringify(have));}catch(e){}}return gift;}
+  function applyBoons(){if(!cycle||!p)return;const have=ownedBoons();if(have.indexOf('flask')>=0)p.potions+=1;if(have.indexOf('hunter')>=0)relics.hunter=true;if(have.indexOf('skin')>=0)p.skin=true;}
+  function clockText(t){t=Math.floor(t||0);return Math.floor(t/60)+' 分 '+(t%60)+' 秒';}
   function showWinPanel(){state='win';clears++;try{localStorage.setItem('ember:clears',String(clears));}catch(e){}clearSave();hud.hidden=true;
-    const fresh=Object.keys(CHARS).filter(id=>CHARS[id].need===clears),next=Math.min(cycle+1,4);
+    const gift=grantBoon(),next=Math.min(cycle+1,4);
     panel.innerHTML='<div class="sheet win"><span class="chapter">第 '+(cycle+1)+' 周目 · 通关</span><h1>钟声</h1><p class="intro">你把每一盏火都送回了家。<br>沉钟又一次响彻地牢；驿站里，烛叟的灯上停着一点绿色的火。</p>'
-      +(fresh.length?'<div class="unlock">'+fresh.map(id=>'<div class="unlock-card"><img alt="" src="'+charPortrait(id)+'"><span><em>解锁新角色</em><b>'+CHARS[id].name+'</b><small>'+CHARS[id].title+'</small></span></div>').join('')+'</div>':'')
-      +'<p class="keys">击败 '+kills+'　·　得分 '+score+'　·　最高 '+best+'　·　已通关 '+clears+' 次</p><button class="primary" id="ng">开启第 '+(next+1)+' 周目 <span>↗</span></button><button class="secondary" id="ng-pick">换个角色再出发</button><button class="secondary" id="to-menu">回到开始界面</button><p class="footnote">周目越高，敌人越硬、出手越快，掉的余烬也越多。</p></div>';
+      +(gift?'<div class="unlock"><div class="unlock-card"><span><em>带入下一周目</em><b>'+gift.name+'</b><small>'+gift.info+'</small></span></div></div>':'')
+      +'<p class="keys">用时 '+clockText(run.time)+'　·　死亡 '+(run.deaths||0)+' 次<br>击败 '+kills+'　·　得分 '+score+'　·　最高 '+best+'　·　已通关 '+clears+' 次</p><button class="primary" id="ng">开启第 '+(next+1)+' 周目 <span>↗</span></button><button class="secondary" id="ng-pick">换个角色再出发</button><button class="secondary" id="to-menu">回到开始界面</button><p class="footnote">周目越高，敌人血更厚、伤害更高（伤害最多到两倍），机关和招式也会变。</p></div>';
     panel.hidden=false;const ch=p.char;document.getElementById('ng').onclick=()=>{unlockAudio();startJourney(ch,next);};document.getElementById('ng-pick').onclick=()=>{showMenu();pickChar=ch;pickCycle=next;renderChars();};document.getElementById('to-menu').onclick=showMenu;focusFirst();beep(660,.3,'sine');beep(990,.5,'sine');}
-  function respawn(){panel.classList.remove('late');
-    Object.assign(p,{x:(L.checkpoint||CHECKPOINT)+20,y:FLOOR-p.h,vx:0,vy:0,face:1,hp:p.max,jumps:0,ground:true,coyote:.1,buffer:0,roll:0,rollCd:0,attack:0,atkCd:0,inv:1.2,hit:new Set(),hurtT:0,trail:[],cape:null,dash:0,ringT:0,domeT:0,on:null});p.potions=Math.max(p.potions,1);p.soul=3;p.castCd=0;
-    enemies.forEach(e=>{if(e.type==='boss'&&!e.dead)Object.assign(e,{x:e.origin,y:e.floor-e.h,hp:e.max,face:-1,cd:1.2,wind:0,wt:0,flash:0,rage:false,spell:false,spellCd:3.5,swing:0,kb:0,hitT:0,frozen:0,daze:0,move:'',act:0,at:0,rec:0,rt:0,vx:0,lift:0,under:0,combo:0,tollCd:3,mothCd:2,struck:false,stun:false,roar:false,surfacing:false});});
-    shots=[];shotsPool.clear();waves=[];floats=[];orbs=[];fx=[];chunks=[];thrown=[];hazards=[];loot=[];gateK=0;bossCardT=0;flags.boss=false;keys={};clearHeld();hitstop=0;shake=0;paused=false;hudKey='';state='play';panel.hidden=true;hud.hidden=false;touch.hidden=!coarse();
-    cam=clamp(p.x-W*.35,0,Math.max(0,WORLD-W));say('余火重燃 · 再次迎战 '+(BOSSES[L.bossKind]?BOSSES[L.bossKind].name:'典狱长'),2.5);syncHud();
+  function respawn(){panel.classList.remove('late');const spot=(p.checkX!=null?p.checkX:(L.checkpoint!=null?L.checkpoint:120))+20,kept=enemies.filter(e=>e.type==='boss'&&!e.dead).map(e=>({hp:e.hp,phase:e.phase||0,rage:!!e.rage,phase3:!!e.phase3}));
+    Object.assign(p,{x:spot,y:FLOOR-p.h,vx:0,vy:0,face:1,hp:p.max,jumps:0,ground:true,coyote:FEEL.coyote,buffer:0,roll:0,rollCd:0,attack:0,atkCd:0,inv:1.2,hit:new Set(),hurtT:0,trail:[],cape:null,dash:0,charge:0,kbT:0,ringT:0,domeT:0,on:null});p.potions=Math.max(p.potions,1);p.soul=3;p.castCd=0;
+    enemies.forEach(e=>{if(e.type!=='boss'||e.dead)return;const k=kept[0];Object.assign(e,{x:e.origin,y:e.floor-e.h,hp:k?k.hp:e.max,phase:k?k.phase:0,rage:k?k.rage:false,phase3:k?k.phase3:false,face:-1,cd:1.2,wind:0,wt:0,flash:0,spell:false,spellCd:3.5,swing:0,kb:0,kbT:0,hitT:0,frozen:0,daze:0,move:'',act:0,at:0,rec:0,rt:0,vx:0,lift:0,under:0,combo:0,tollCd:3,mothCd:2,struck:false,stun:false,roar:false,surfacing:false,phaseInv:0});});
+    shots=[];shotsPool.clear();waves=[];floats=[];floatsPool.clear();orbs=[];fx=[];chunks=[];thrown=[];hazards=[];loot=[];gateK=0;bossCardT=0;flags.boss=false;keys={};clearHeld();hitstop=0;shake=0;shakeT=0;paused=false;hudKey='';state='play';panel.hidden=true;hud.hidden=false;touch.hidden=!coarse();checkpoint=p.checkX!=null||!!L.checkpoint;
+    cam=clamp(p.x-W*.35,0,Math.max(0,WORLD-W));say(L.arena?'余火重燃 · 已打下的阶段还在':'余火重燃 · 从钟火继续',2.2);syncHud();saveRun();
   }
   // 每帧都会调用：只有数值变了才写 DOM
   // HUD：生命只写数字，药瓶、余烬、道具都用画 + 数量
@@ -1169,9 +1197,9 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   // 打击感：命中点一道斩痕 + 白色星芒 + 顺着刀势飞出去的火花，重劈多一圈冲击波；顿帧和震屏按轻重区分
   // 刀、火油罐、飞刀都走这里：扣血、击退、打击特效；打死了交给 killEnemy
   // soft：魂灯环这类持续伤害，不顿帧不震屏
-  function hitEnemy(e,dmg,dir,heavy,hx,hy,ang,soft){const boss=e.type==='boss';if(boss&&((L.arena&&!flags.boss)||e.under>.5))return;dmg=Math.max(1,Math.round(dmg));e.hp=Math.max(0,e.hp-dmg);e.flash=.1;e.hitT=.2;e.hitDir=dir;if(dir)e.kb=dir*(boss?60:e.elite?120:e.type==='shield'?90:heavy?280:180);
+  function hitEnemy(e,dmg,dir,heavy,hx,hy,ang,soft){const boss=e.type==='boss';if(boss&&((L.arena&&!flags.boss)||e.under>.5||e.phaseInv>0))return;let num='#efe2c8';if(e.weak>0&&hy<e.y+e.h*.45){dmg=Math.round(dmg*2.2);num='#7ec8ff';}else if(heavy)num='#ffd08a';dmg=Math.max(1,Math.round(dmg));e.hp=Math.max(0,e.hp-dmg);e.flash=.1;e.hitT=.2;e.hitDir=dir;if(dir){e.kb=dir*(boss?FEEL.kb*FEEL.kbBoss:heavy?FEEL.kb:90);e.kbT=heavy?FEEL.kbTime:.08;}
     if(e.type==='flyer'){if(e.fly==='dive'){e.fly='rise';e.cd=1.2;}e.wind=0;}if(e.type==='caster'&&e.wind>0&&heavy)e.wind=0;if(e.type==='dummy')e.hp=Math.max(1,e.hp);
-    hitFx(hx,hy,e,heavy,ang,soft);if(settings.nums)pop(e.x+e.w/2,e.y-8,String(Math.round(dmg)),heavy?'#ffd08a':'#efe2c8',heavy);if(e.hp<=0&&!e.dead)killEnemy(e);}
+    hitFx(hx,hy,e,heavy,ang,soft);if(settings.nums)pop(e.x+e.w/2,e.y-8,String(Math.round(dmg)),num,heavy||num!=='#efe2c8');if(e.hp<=0&&!e.dead)killEnemy(e);}
   function killEnemy(e){const boss=e.type==='boss',el=e.elite,g=boss?120:el?80:e.type==='shield'||e.type==='caster'?35:25;e.dead=true;e.dieT=.45;e.frozen=0;e.daze=0;kills++;score+=g;embers+=Math.round(g*L.hpK*(relics.magnet?1.3:1)*(1+.25*cycle));note('kills',boss?(L.bossKind||'warden'):el?'elite':e.type);
     if(relics.salvager&&kills%4===0){gain('bomb',1,true);popArt('bomb','+1',p.x+13,p.y-34);}
     if(!boss&&relics.hunt){p.soul=Math.min(3,p.soul+1);hudKey='';}if(!boss&&(el||e.type==='shield'||e.type==='caster'||e.type==='bomber'))maybeBlueprint(e);
@@ -1184,7 +1212,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(soft){fx.push({k:'star',x:x,y:y,a:Math.random()*TAU,life:.1,max:.1,r:16});burst(x,y,'#9ff3e0',4);beep(700,.04,'triangle',.02);return;}
     fx.push({k:'cut',x:x,y:y,a:a+tilt,life:.17,max:.17,len:heavy?130:92});fx.push({k:'star',x:x,y:y,a:Math.random()*TAU,life:.11,max:.11,r:heavy?34:22});if(heavy)fx.push({k:'ring',x:x,y:y,life:.22,max:.22,r:44});
     for(let i=0;i<(heavy?16:10);i++){const s=a+(Math.random()-.5)*1.1,v=220+Math.random()*(heavy?420:300);emit_particles(x,y,Math.cos(s)*v,Math.sin(s)*v-40,.16+Math.random()*.22,.38,bone?'#e6dcc4':i%3?'#fff1d0':'#ffc46a',1.2+Math.random()*1.4,.7,undefined,true,.03,undefined);}
-    burst(x,y,bone?'#cfc5ad':'#f4c98a',heavy?10:6);hitstop=heavy?.085:.055;shake=heavy?7:4;impactSound(heavy);}
+    burst(x,y,bone?'#cfc5ad':'#f4c98a',heavy?10:6);if(!soft){hitstop=Math.max(hitstop,FEEL.hitStop);punchShake(FEEL.shakeHit);}impactSound(heavy);}
   // 击杀：身体碎成几块（颜色取自它的盔甲 / 斗篷），在地上弹两下再淡出
   function killFx(e){const boss=e.type==='boss',arch=e.type==='archer',P=PAL[e.type]||PAL.guard,home=platforms.find(a=>a.y===e.floor&&e.x+e.w/2>=a.x&&e.x+e.w/2<a.x+a.w);
     const cols=e.type==='crawler'?[P.shell,P.body,P.claw,P.soul]:e.type==='hanger'?[P.cloth,P.chain,P.cage,P.soul]:arch?[P.cloak,P.cloakDark,P.skull,P.bow]:boss?BOSS_CHUNKS[e.kind]:e.type==='flyer'?[P.wing,P.body,P.bone]:e.type==='caster'?[P.robe,P.hood,P.skull,P.staff]:e.type==='bomber'?[P.cloak,P.pack,P.flask]:e.type==='shield'?[P.shield,P.armor,P.helm,P.shieldDark]:e.type==='dummy'?['#c8a860','#6a4a2f']:[P.armor,P.tabard,P.helm,P.armorDark,P.blade];
@@ -1194,9 +1222,9 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function breakCache(b){b.broken=true;burst(b.x,b.y-15,b.kind===0?'#ffd18a':b.kind===1?'#9be3c8':'#a8dce8',12);dust(b.x,b.y,5,0);beep(540,.1);if(b.kind===0){embers+=20;popArt('ember','+20',b.x,b.y-38);for(let i=0;i<5;i++)orbs.push({x:b.x,y:b.y-15,vx:(Math.random()-.5)*220,vy:-80-Math.random()*180,t:0});}else if(b.kind===1){const amount=Math.min(LIFE,p.max-p.hp);p.hp+=amount;popArt('heart',amount?'+'+(amount/LIFE):'',b.x,b.y-38);}else{gain('knife',2,true);popArt('knife','×2',b.x,b.y-38);loot.push({id:'knife',x:b.x,y:b.y-20,vx:(Math.random()-.5)*80,vy:-260,t:0});}hudKey='';}
   // ---- 首领招式：每位首领一张招式表。出手前只靠动作预兆（刨地喷汽、灯门打开、高举旗帜、举锤过顶……），不画警示框 ----
   // e.move 当前招式；e.wind 蓄力剩余，归零时 release 出手；e.act / e.at 出手持续；e.rec 收招硬直（趁机砍）；e.cd 下一招前的间隔
-  function begin(e,m,wind){e.move=m;e.wind=e.wt=wind;e.act=e.at=0;e.rec=0;e.struck=false;e.slapped=false;e.spell=m==='lantern';bossCue('attack');}
+  function begin(e,m,wind){e.move=m;e.wind=e.wt=clamp(wind,.5,.8);e.act=e.at=0;e.rec=0;e.struck=false;e.slapped=false;e.spell=m==='lantern';bossCue('attack');}
   function startAct(e,t){e.act=e.at=t;e.struck=false;}
-  function recover(e,r,cd){e.rec=e.rt=r;e.cd=cd;}
+  function recover(e,r,cd){e.rec=e.rt=r;e.cd=Math.max(1.2,cd==null?1.2:cd);}
   function overlapP(x0,y0,x1,y1){return p.x+p.w>Math.min(x0,x1)&&p.x<Math.max(x0,x1)&&p.y+p.h>y0&&p.y<y1;}
   // 极限闪避（参考死亡细胞）：翻滚刚开始的 0.15 秒里被攻击擦过——时间放慢、白圈一闪、补一格魂火（每次翻滚一次）
   let slowMo=0;
@@ -1214,10 +1242,11 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     // 守锁兽：冲撞（撞墙会晕、震落碎石）、人立砸地、甩锁链；二阶段连撞两次，砸地带冲击波
     lock:{roar:1.1,
       idle(e,dt,dist){if(dist>190)bossWalk(e,e.face,e.rage?112:84,dt);},
-      choose(e,dist){if(dist<160)begin(e,'slam',e.rage?.42:.55);else if(dist<340&&Math.random()<.62)begin(e,'lash',e.rage?.48:.62);else{begin(e,'charge',e.rage?.5:.72);e.combo=e.rage?2:1;}},
+      choose(e,dist){if((e.phase>=1||cycle>=3)&&(e.summonCd||0)<=0){begin(e,'summon',.65);e.summonCd=7;return;}if(dist<160)begin(e,'slam',e.rage?.42:.55);else if(dist<340&&Math.random()<.62)begin(e,'lash',e.rage?.48:.62);else{begin(e,'charge',e.rage?.5:.72);e.combo=e.rage?2:1;}},
       tick(e,dt){const ec=e.x+e.w/2;if(e.move==='charge'&&Math.random()<dt*22){emit_particles(ec-e.face*(18+Math.random()*16),e.y-4,(Math.random()-.5)*30,-70-Math.random()*50,.7,.7,'#e4ebee',3+Math.random()*4,-.12,undefined,undefined,undefined,true);if(Math.random()<.35)dust(ec+e.face*44,FLOOR,2,-e.face);}},
       release(e){const f=e.face,ec=e.x+e.w/2;
-        if(e.move==='slam'){strike(e,ec,FLOOR-110,ec+f*156,FLOOR,28);dust(ec+f*70,FLOOR,14,0);burst(ec+f*80,FLOOR-6,'#c9a865',10);shake=Math.max(shake,9);beep(66,.32,'sawtooth');if(e.rage){waves.push({x:ec-20,dir:-1,life:1.8},{x:ec+20,dir:1,life:1.8});bellRing=Math.max(bellRing,.6);}recover(e,.62,e.rage?.65:.95);}
+        if(e.move==='summon'){for(let i=0;i<2;i++)enemies.push(enemy(clamp(ec+(i?100:-120),L.gate+20,L.seal-70),FLOOR,'crawler'));say('守锁兽召来了爬虫',1.4);recover(e,.55,1.4);return;}
+        if(e.move==='slam'){strike(e,ec,FLOOR-110,ec+f*156,FLOOR,28);dust(ec+f*70,FLOOR,14,0);burst(ec+f*80,FLOOR-6,'#c9a865',10);punchShake(4);beep(66,.32,'sawtooth');if(e.rage){waves.push({x:ec-20,dir:-1,life:1.8},{x:ec+20,dir:1,life:1.8});bellRing=Math.max(bellRing,.6);}recover(e,.62,e.rage?.65:.95);}
         else if(e.move==='lash'){startAct(e,.38);beep(240,.18,'sawtooth');}
         else{startAct(e,1.9);e.vx=f*(e.rage?650:560);beep(90,.4,'sawtooth');}},
       active(e,dt){const f=e.face;
@@ -1230,9 +1259,10 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     brood:{roar:1,
       idle(e,dt,dist){const pc=p.x+p.w/2,ec=e.x+e.w/2,want=pc+(ec>pc?1:-1)*230;if(Math.abs(want-ec)>24)bossWalk(e,want>ec?1:-1,e.rage?96:70,dt);
         if(e.spellCd<=0){begin(e,'dive',.5);e.spellCd=e.rage?3.8:5.4;}else if(e.rage&&(e.mothCd-=dt)<=0){begin(e,'moths',.5);e.mothCd=6.2;}},
-      choose(e,dist){if(dist<180)begin(e,'sweep',e.rage?.42:.52);else begin(e,'spit',e.rage?.52:.7);},
+      choose(e,dist){if((e.phase>=1||cycle>=3)&&(e.zoneCd||0)<=0){begin(e,'zones',.7);e.zoneCd=7.5;return;}if(dist<180)begin(e,'sweep',e.rage?.42:.52);else begin(e,'spit',e.rage?.52:.7);},
       tick(e,dt){if(e.move==='dive')e.under=Math.min(1,e.under+dt/e.wt);else if(e.move==='spit'&&Math.random()<dt*20)emit_particles(e.x+e.w/2+e.face*20+(Math.random()-.5)*20,e.y+40,(Math.random()-.5)*30,-30-Math.random()*40,.5,.5,'#cfffb0',1.5+Math.random()*2,-.2,true,undefined,undefined,undefined);},
       release(e){const f=e.face,ec=e.x+e.w/2,pc=p.x+p.w/2;
+        if(e.move==='zones'){hazards.push({k:'pool',x:L.gate+180,w:240,life:3.4,max:3.4,d:Math.round(10*L.dmgK)},{k:'pool',x:L.seal-180,w:240,life:3.4,max:3.4,d:Math.round(10*L.dmgK)});say('左右是腐水，站到中间',1.6);recover(e,.6,1.5);return;}
         if(e.move==='spit'){const n=e.rage?5:3;for(let i=0;i<n;i++){const o=i-(n-1)/2,sx=ec+f*24,sy=e.y+44,tx=clamp(pc+o*74,L.gate+20,L.seal-20),T=.8+Math.abs(o)*.07,g=780;emit_shots('glob',sx,sy,(tx-sx)/T,(FLOOR-8-sy)/T-.5*g*T,g,3,Math.round(13*L.dmgK),e.rage?3:2.2,undefined,undefined,undefined,undefined,undefined,undefined);}burst(ec+f*24,e.y+44,'#b8f08a',12);beep(170,.3,'sawtooth');recover(e,.55,e.rage?.85:1.2);}
         else if(e.move==='sweep'){startAct(e,.32);beep(130,.2,'sawtooth');}
         else if(e.move==='moths'){for(let i=0;i<3;i++)emit_shots('moth',ec+(i-1)*30,e.y+30,(i-1)*70,-90,undefined,7,Math.round(10*L.dmgK),undefined,1,100,undefined,undefined,undefined,undefined);beep(900,.2,'sine');recover(e,.45,.6);}
@@ -1248,9 +1278,10 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     standard:{roar:1,
       idle(e,dt,dist){if(dist>190)bossWalk(e,e.face,e.rage?124:96,dt);else if(dist<70)bossWalk(e,-e.face,80,dt);
         if(e.spellCd<=0&&dist<580){begin(e,'plant',e.rage?.5:.68);e.spellCd=e.rage?4.4:5.8;}},
-      choose(e,dist){if(e.rage&&dist>120&&Math.random()<.5)begin(e,'leap',.36);else if(dist<140)begin(e,'sweep',e.rage?.32:.4);else if(dist<460&&Math.random()<.7)begin(e,'thrust',e.rage?.38:.48);else begin(e,'gust',e.rage?.42:.55);},
+      choose(e,dist){if((e.phase>=1||cycle>=3)&&(e.weakCd||0)<=0){begin(e,'expose',.6);e.weakCd=6.5;return;}if(e.rage&&dist>120&&Math.random()<.5)begin(e,'leap',.36);else if(dist<140)begin(e,'sweep',e.rage?.32:.4);else if(dist<460&&Math.random()<.7)begin(e,'thrust',e.rage?.38:.48);else begin(e,'gust',e.rage?.42:.55);},
       tick(e,dt){if(e.move==='plant'&&Math.random()<dt*24)emit_particles(e.x+e.w/2+(Math.random()-.5)*30,e.y-40+Math.random()*30,(Math.random()-.5)*20,-40-Math.random()*30,.6,.6,'#d8b3ff',1.5+Math.random()*2,-.15,true,undefined,undefined,undefined);},
       release(e){const f=e.face,ec=e.x+e.w/2;
+        if(e.move==='expose'){e.weak=1.5;say('旗帜露出破绽，打高处那一点',1.6);fx.push({k:'ring',x:ec,y:e.y+16,life:.4,max:.4,r:40});recover(e,.4,1.3);return;}
         if(e.move==='sweep'){startAct(e,.24);beep(260,.12,'sawtooth');}
         else if(e.move==='thrust'){startAct(e,.34);e.vx=f*860;beep(300,.18,'sawtooth');}
         else if(e.move==='gust'){waves.push({x:ec+f*40,dir:f,life:1.8,k:'gust',h:46,v:300,d:16,push:300});beep(180,.35,'triangle');recover(e,.5,e.rage?.7:1);}
@@ -1271,14 +1302,15 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       idle(e,dt,dist){if(dist>150)bossWalk(e,e.face,e.rage?110:82,dt);
         if(e.spellCd<=0&&dist>130&&dist<600){begin(e,'lantern',.72);e.spellCd=e.rage?2.8:4;}
         else if(e.rage&&(e.tollCd-=dt)<=0&&dist<680){begin(e,'toll',.5);e.tollCd=5.2;}},
-      choose(e,dist){if(dist<155)begin(e,'slam',e.rage?.42:.55);else if(dist<280)begin(e,'sweep',.48);else begin(e,'slam',.78);},
+      choose(e,dist){if((e.phase>=2||cycle>=3)&&(e.chaseCd||0)<=0){begin(e,'chase',.62);e.chaseCd=6;return;}if(dist<155)begin(e,'slam',e.rage?.42:.55);else if(dist<280)begin(e,'sweep',.48);else begin(e,'slam',.78);},
       tick(e,dt){if(e.move==='lantern'&&Math.random()<dt*26)emit_particles(e.x+e.w/2-e.face*14+(Math.random()-.5)*26,e.y+4+Math.random()*20,(Math.random()-.5)*30,-30-Math.random()*40,.5,.5,'#bff5ea',1.4+Math.random()*2,-.2,true,undefined,undefined,undefined);},
       release(e){const f=e.face,ec=e.x+e.w/2,pc=p.x+p.w/2;
-        if(e.move==='slam'){strike(e,ec,FLOOR-120,ec+f*152,FLOOR,28);dust(ec+f*80,FLOOR,12,0);burst(ec+f*90,FLOOR-8,'#e6a575',12);shake=Math.max(shake,8);beep(120,.35,'square');if(e.rage){waves.push({x:ec-12,dir:-1,life:1.8},{x:ec+12,dir:1,life:1.8});bellRing=Math.max(bellRing,.8);}recover(e,.5,e.rage?.8:.95);}
+        if(e.move==='chase'){startAct(e,1.15);say('他贴上来了，往旁边走',1.2);beep(90,.2,'sawtooth');return;}
+        if(e.move==='slam'){strike(e,ec,FLOOR-120,ec+f*152,FLOOR,28);dust(ec+f*80,FLOOR,12,0);burst(ec+f*90,FLOOR-8,'#e6a575',12);punchShake(4);beep(120,.35,'square');if(e.rage){waves.push({x:ec-12,dir:-1,life:1.8},{x:ec+12,dir:1,life:1.8});bellRing=Math.max(bellRing,.8);}recover(e,.5,e.rage?.8:.95);}
         else if(e.move==='sweep'){startAct(e,.3);beep(220,.15,'sawtooth');}
         else if(e.move==='lantern'){e.spell=false;const bx=ec+f*10,by=e.y+40,ang=Math.atan2(p.y+22-by,pc-bx);(e.rage?[-.2,0,.2]:[0]).forEach(v=>emit_shots('flame',bx,by,Math.cos(ang+v)*260,Math.sin(ang+v)*260,undefined,3,Math.round(13*L.dmgK),undefined,e.rage?.5:0,260,true,'#8be1ce',undefined,undefined));burst(bx,by,'#bff5ea',12);beep(180,.25,'sawtooth');recover(e,.45,1.1);}
         else{waves.push({x:ec-24,dir:-1,life:2,k:'toll',h:150,v:330,d:20},{x:ec+24,dir:1,life:2,k:'toll',h:150,v:330,d:20});bellRing=1.6;shake=Math.max(shake,9);beep(98,.9,'triangle');beep(196,.7,'sine');recover(e,.7,.8);}},
-      active(e,dt){const f=e.face,ec=e.x+e.w/2;strike(e,ec+f*20,FLOOR-112,ec+f*175,FLOOR-36,22);},
+      active(e,dt){if(e.move==='chase'){const pc=p.x+p.w/2,ec=e.x+e.w/2;e.face=pc<ec?-1:1;bossWalk(e,e.face,280,dt);strike(e,e.x-6,e.y,e.x+e.w+6,e.y+e.h,20);return;}const f=e.face,ec=e.x+e.w/2;strike(e,ec+f*20,FLOOR-112,ec+f*175,FLOOR-36,22);},
       finish(e){recover(e,.5,.9);}}};
   // 二阶段的身上特效：守锁兽冒蒸汽和火星、溺灯漏出绿火、旗手的旗燃起灵火、典狱长的魂灯漏光
   function rageFx(e){const ec=e.x+e.w/2,f=e.face,k=e.kind;
@@ -1286,18 +1318,22 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     else if(k==='brood')ember(ec+(Math.random()-.5)*60,e.y+30+Math.random()*40,1,'#b8f08a');
     else if(k==='standard')ember(ec-f*(20+Math.random()*40),e.y-30-Math.random()*50,1,'#d8b3ff');
     else ember(ec-f*20+(Math.random()-.5)*20,e.y+60+Math.random()*20,1,Math.random()<.5?'#8be1ce':'#ff9a50');}
+  const PHASE_LINE={lock:['','锁链崩开 · 它会召来爬虫','铜壳裂开，碎石不停往下落'],brood:['','水面分成左右两区，站到中间','灯蛾成群扑出来'],standard:['','旗帜露出破绽，打高处那一点','他跃起来，从头顶砸下'],warden:['','魂灯烧得更旺','他贴上来追，逼你走位']};
   function bossAI(e,dt){const A=BOSS_AI[e.kind],pc=p.x+p.w/2,ec=e.x+e.w/2,dist=Math.abs(pc-ec);
     if(e.surfacing){e.under=Math.max(0,e.under-dt/.3);if(!e.under)e.surfacing=false;}
+    if(e.phaseInv>0)e.phaseInv=Math.max(0,e.phaseInv-dt);
+    if(e.weak>0)e.weak=Math.max(0,e.weak-dt);
+    if(e.summonCd>0)e.summonCd-=dt;if(e.zoneCd>0)e.zoneCd-=dt;if(e.weakCd>0)e.weakCd-=dt;if(e.chaseCd>0)e.chaseCd-=dt;
     if(e.rage&&Math.random()<dt*(lowFx?6:14))rageFx(e);
-    // 半血进入二阶段：先打断当前招式，吼一声（这段时间可以砍它）
-    if(!e.rage&&e.hp<=e.max/2){e.rage=true;e.move='';e.wind=e.act=0;e.vx=0;e.spell=false;e.stun=false;if(e.lift){e.lift=0;e.y=e.floor-e.h;}if(e.under)e.surfacing=true;e.roar=true;recover(e,A.roar,.25);shake=Math.max(shake,10);bellRing=Math.max(bellRing,1.4);burst(ec,e.y+30,BOSSES[e.kind].color,26);bossCue('rage');say(BOSSES[e.kind].rage,3);return;}
+    const ph=e.hp<=e.max*.33?2:e.hp<=e.max*.66?1:0;
+    if((e.phase||0)<ph){if(p.attack>0||p.charge>0)return;e.phase=ph;e.rage=ph>=1;e.phase3=ph>=2;e.phaseInv=1.5;e.move='';e.wind=e.act=0;e.vx=0;e.spell=false;e.stun=false;if(e.lift){e.lift=0;e.y=e.floor-e.h;}if(e.under)e.surfacing=true;e.roar=true;recover(e,1.5,1.2);punchShake(6);flashT=Math.max(flashT,.22);bellRing=Math.max(bellRing,1.4);burst(ec,e.y+30,BOSSES[e.kind].color,26);bossCue('rage');say((PHASE_LINE[e.kind]||[])[ph]||BOSSES[e.kind].rage,2.6);saveRun();return;}
     e.spellCd-=dt;
     if(e.wind>0){e.wind-=dt;if(A.tick)A.tick(e,dt);if(e.wind<=0){e.wind=0;A.release(e);}return;}
     if(e.act>0){e.act-=dt;A.active(e,dt);if(e.act<=0&&e.wind<=0&&e.rec<=0){e.act=0;A.finish(e);}return;}
     if(e.rec>0){e.rec-=dt;if(e.rec<=0){e.stun=false;e.roar=false;}return;}
     e.move='';e.face=pc<ec?-1:1;A.idle(e,dt,dist);if(e.move)return;if(e.cd<=0)A.choose(e,dist);}
   // ---- 新敌人的行动：飞蝠俯冲、骨巫施法和闪现、投弹手抛罐。出手前只有动作预兆（扬翅后仰、举杖聚光、手臂后摆），不画警示 ----
-  const bossShielded=e=>e.type==='boss'&&((L.arena&&!flags.boss)||e.under>.5);
+  const bossShielded=e=>e.type==='boss'&&((L.arena&&!flags.boss)||e.under>.5||e.phaseInv>0);
   const onScreen=e=>e.x+e.w>cam&&e.x<cam+W;
   function castFoe(e){const ex=e.x+e.w/2+e.face*14,ey=e.y+2;
     if(e.cast===1){for(let i=0;i<3;i++)emit_shots('wisp',ex,ey,e.face*(60+i*40),-150+i*75,undefined,3.4,12,undefined,.9,150,undefined,undefined,0,undefined);beep(660,.15,'sine');beep(990,.2,'sine');}
@@ -1345,15 +1381,15 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function pistonY(t){const u=t.t/(t.per||3),top=230;if(u<.12)return FLOOR;if(u<.7){const k=(u-.12)/.58;return FLOOR-(FLOOR-top)*(1-Math.pow(1-k,2));}if(u<.86)return top;if(u<.9){const k=(u-.86)/.04;return top+(FLOOR-top)*k*k;}return FLOOR;}
   function updateTraps(dt){const pc=p.x+p.w/2,feet=p.y+p.h,vis=t=>(t.x0!=null?t.x1>cam-100&&t.x0<cam+W+100:t.x>cam-160&&t.x<cam+W+160);
     for(const t of traps){const per=t.per||3,prev=t.t;t.t=(t.t+dt)%per;const u=t.t/per;
-      if(t.k==='tspike'){const up=u>=.55&&u<.9;t.warn=u>=.4&&u<.55;if(up&&!t.up&&vis(t)){beep(300,.05,'square',.02);dust(t.x+t.n*10,FLOOR,3,0);}t.up=up;if(up&&pc>t.x-2&&pc<t.x+t.n*20+2&&feet>FLOOR-16)hurt(14,t.x+t.n*10);}
+      if(t.k==='tspike'){const up=u>=.55&&u<.9,lead=.5/per;t.warn=u>=.55-lead&&u<.55;if(t.warn&&!t.warned){t.warned=true;if(vis(t))beep(640,.08,'square',.04);}if(!t.warn)t.warned=false;if(up&&!t.up&&vis(t)){beep(300,.05,'square',.02);dust(t.x+t.n*10,FLOOR,3,0);}t.up=up;if(up&&pc>t.x-2&&pc<t.x+t.n*20+2&&feet>FLOOR-16)hurt(14,t.x+t.n*10,'踩中了地刺');}
       else if(t.k==='pendulum'){t.a=t.amp*Math.sin(TAU*u);t.bx=t.x+Math.sin(t.a)*t.len;t.by=t.top+Math.cos(t.a)*t.len;if(nearP(t.bx,t.by,24))hurt(14,t.bx);if(Math.abs(t.a)<.05&&!t.swoosh){t.swoosh=true;if(vis(t))beep(130,.2,'sine',.02);}if(Math.abs(t.a)>.2)t.swoosh=false;}
-      else if(t.k==='spout'){const h=t.h||200,on=u>=.62&&u<.9;t.warn=u>=.45&&u<.62;if(on&&!t.on&&vis(t)){if(t.fire)ember(t.x,FLOOR-10,10,'#ffb347');else splash(t.x,FLOOR-6);beep(t.fire?120:180,.25,'sawtooth',.025);}t.on=on;
+      else if(t.k==='spout'){const h=t.h||200,on=u>=.62&&u<.9,lead=.5/per;t.warn=u>=.62-lead&&u<.62;if(t.warn&&!t.warned&&vis(t)){t.warned=true;beep(520,.1,'square',.035);}if(!t.warn)t.warned=false;if(on&&!t.on&&vis(t)){if(t.fire)ember(t.x,FLOOR-10,10,'#ffb347');else splash(t.x,FLOOR-6);beep(t.fire?120:180,.25,'sawtooth',.025);}t.on=on;
         if(t.warn&&Math.random()<dt*20)emit_particles(t.x+(Math.random()-.5)*20,FLOOR-3,(Math.random()-.5)*14,-40-Math.random()*50,.45,.45,t.fire?'#ffb347':'#b8f08a',1.6+Math.random()*2,-.1,!!t.fire,undefined,undefined,!t.fire);
-        if(on&&Math.abs(pc-t.x)<22&&feet>FLOOR-h&&p.y<FLOOR)hurt(14,t.x);}
+        if(on&&Math.abs(pc-t.x)<22&&feet>FLOOR-h&&p.y<FLOOR)hurt(14,t.x,false,t.fire?'被炉火喷到':'被腐水喷到');}
       else if(t.k==='vent'){const h=t.h||200,base=t.y||FLOOR;t.on=u>=.45;if(t.on&&Math.abs(pc-t.x)<(t.w||64)/2&&feet>base-h&&p.y<base&&p.dash<=0){p.vy=Math.max(-470,p.vy-3300*dt);if(p.vy<0){p.ground=false;p.jumps=Math.min(p.jumps,1);p.drop=null;}}}
       else if(t.k==='wind'){const on=u>=.5&&u<.95;t.warn=u>=.38&&u<.5;if(on&&!t.on&&vis(t))beep(160,.6,'sine',.02);t.on=on;if(on&&pc>t.x0&&pc<t.x1&&p.roll<=0&&p.dash<=0)p.x=clamp(p.x+t.dir*(p.ground?115:165)*dt,12,WORLD-45);}
       else if(t.k==='ballista'){if(t.broken)continue;if(t.t<prev&&vis(t)){emit_shots('bolt',t.x+t.dir*30,t.y-24,t.dir*560,0,undefined,3.2,14,undefined,undefined,undefined,undefined,undefined,0,undefined);beep(150,.12,'square');beep(900,.05,'triangle');t.kick=.2;}if(t.kick>0)t.kick-=dt;}
-      else if(t.k==='jet'){const on=u>=.62&&u<.9,x0=Math.min(t.x,t.x+t.dir*t.len),x1=Math.max(t.x,t.x+t.dir*t.len);t.warn=u>=.45&&u<.62;if(on&&!t.on&&vis(t))beep(110,.4,'sawtooth',.02);t.on=on;if(on&&p.x+p.w>x0+4&&p.x<x1&&p.y<t.y+12&&feet>t.y-12)hurt(14,t.x);if(t.warn&&Math.random()<dt*14)ember(t.x+t.dir*8,t.y,1,'#c58bff');}
+      else if(t.k==='jet'){const on=u>=.62&&u<.9,x0=Math.min(t.x,t.x+t.dir*t.len),x1=Math.max(t.x,t.x+t.dir*t.len),lead=.5/per;t.warn=u>=.62-lead&&u<.62;if(t.warn&&!t.warned&&vis(t)){t.warned=true;beep(700,.08,'triangle',.03);}if(!t.warn)t.warned=false;if(on&&!t.on&&vis(t))beep(110,.4,'sawtooth',.02);t.on=on;if(on&&p.x+p.w>x0+4&&p.x<x1&&p.y<t.y+12&&feet>t.y-12)hurt(14,t.x,false,'被喷火击中');if(t.warn&&Math.random()<dt*14)ember(t.x+t.dir*8,t.y,1,'#c58bff');}
       else if(t.k==='piston'){const w=t.w||80,hb=pistonY(t),slam=u>=.86&&u<.92;t.hb=hb;if(u>=.9&&!t.hit0){t.hit0=true;if(vis(t)){shake=Math.max(shake,5);dust(t.x+w/2,FLOOR,10,0);beep(70,.25,'square');}}if(u<.86)t.hit0=false;
         if(p.x+p.w>t.x+2&&p.x<t.x+w-2&&hb>p.y+4){if(slam)hurt(14,t.x+w/2);if(pc<t.x+w/2)p.x=t.x-p.w;else p.x=t.x+w;p.vx=0;}}}}
   // 墓窟的灵灯：走到旁边就点亮，照亮一大片黑暗
@@ -1386,7 +1422,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       c.dawn=Math.min(1,c.t/3.4);if(c.t>=c.dur){cine=null;state='win';c.after();}}}
   function touchEnemies(){if(p.inv>0||p.roll>0||p.dash>0||p.domeT>0)return;
     for(const e of enemies){if(e.dead||e.type==='dummy'||bossShielded(e))continue;
-      if(p.x+p.w-5>e.x+5&&p.x+5<e.x+e.w-5&&p.y+p.h-4>e.y+6&&p.y+8<e.y+e.h-2){hurt(Math.round(12*(L.dmgK||1)),e.x+e.w/2);return;}}}
+      if(p.x+p.w-5>e.x+5&&p.x+5<e.x+e.w-5&&p.y+p.h-4>e.y+6&&p.y+8<e.y+e.h-2){hurt(Math.round(12*(L.dmgK||1)),e.x+e.w/2,false,'撞上了'+(e.type==='boss'?(BOSSES[e.kind]&&BOSSES[e.kind].name)||'首领':'敌人'));return;}}}
   function springPad(){if(!L.springs)return;const feet=p.y+p.h;
     for(const s of L.springs){if(feet>s[1]-8&&feet<s[1]+12&&p.x+p.w>s[0]&&p.x<s[0]+s[2]){p.vy=-780-p.skills.spring*24;p.ground=false;p.jumps=1;p.on=null;dust(p.x+13,feet,6,0);burst(p.x+13,feet-6,'#ffe2a8',8);beep(196,.1,'sine');beep(392,.16,'triangle');break;}}}
   function climbRope(dt){if(!L.climbs||p.dash>0||p.roll>0)return;const D=dirs();if(!D.u&&!D.d)return;
@@ -1403,7 +1439,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     particles.forEach(f=>{f.life-=dt;f.x+=f.vx*dt;f.y+=f.vy*dt;f.vy+=250*dt*f.g;if(f.drag){const k=Math.pow(f.drag,dt);f.vx*=k;f.vy*=k;}});{let n=0;for(let i=0;i<particles.length;i++){const o=particles[i];if(o.life>0)particles[n++]=o;else particlesPool.release(o);}particles.length=n;}
     fx.forEach(f=>f.life-=dt);fx=fx.filter(f=>f.life>0);
     chunks.forEach(c=>{c.life-=dt;c.vy+=900*dt;c.x+=c.vx*dt;c.y+=c.vy*dt;c.r+=c.vr*dt;const fl=c.x>c.x0&&c.x<c.x1?c.floor:inGap(c.x)?9999:FLOOR;if(c.y>fl-c.s*.5&&c.vy>0&&c.y<fl+20){c.y=fl-c.s*.5;c.vy*=-.35;c.vx*=.6;c.vr*=.6;}});chunks=chunks.filter(c=>c.life>0&&c.y<900);
-    floats.forEach(f=>{f.life-=dt;f.y-=38*dt;});floats=floats.filter(f=>f.life>0);shake=Math.max(0,shake-35*dt);bellRing=Math.max(0,bellRing-dt*.6);
+    {let n=0;for(let i=0;i<floats.length;i++){const o=floats[i];o.life-=dt;o.y-=38*dt;if(o.life>0)floats[n++]=o;else if(o._used)floatsPool.release(o);}floats.length=n;}if(shakeT>0){shakeT-=dt;if(shakeT<=0){shakeT=0;shake=0;}}else shake=Math.max(0,shake-35*dt);bellRing=Math.max(0,bellRing-dt*.6);
     // 开箱动画：盖子慢慢掀开，开到一半时金光和火星冒出来，开完弹出三选一
     if(state==='chest'){if(chestC){chestC.openT=Math.min(1,chestC.openT+dt/.85);if(chestC.openT>.42&&!chestC.burst){chestC.burst=true;burst(chestC.x,chestC.y-26,'#ffe2a0',18);ember(chestC.x,chestC.y-22,14,'#ffd38a');shake=3;beep(880,.25,'sine');beep(1320,.3,'sine');}if(chestC.openT>=1)showOffers();}else showOffers();return;}
     if(state==='cine'){updateCine(rdt);return;}
@@ -1411,25 +1447,30 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(state==='menu'){cam=200+Math.max(0,WORLD-W-400)*(1-Math.cos(time*.03))/2;if(Math.random()<rdt*5)ember(cam+Math.random()*W,FLOOR-10-Math.random()*60,1,'#ffb35c');return;}
     if(state!=='play')return;if(hitstop>0){hitstop-=dt;syncHud();return;}
     inputQueue.tick(dt);p.inv=Math.max(0,p.inv-dt);p.rollCd=Math.max(0,p.rollCd-dt);p.atkCd=Math.max(0,p.atkCd-dt);p.attack=Math.max(0,p.attack-dt);p.comboT=Math.max(0,p.comboT-dt);p.buffer=Math.max(0,p.buffer-dt);p.coyote=p.ground?.1:Math.max(0,p.coyote-dt);p.hurtT=Math.max(0,p.hurtT-dt);p.landT=Math.max(0,p.landT-dt);
-    heroFSM.tick(dt,p);if(p.rollCd<=0&&(p.attack<=0||heroFSM.canCancel())&&inputQueue.take(2))roll();if(p.atkCd<=0&&p.roll<=0&&p.dash<=0&&inputQueue.take(1))attack();
+    heroFSM.tick(dt,p);if(p.rollCd<=0&&(p.attack<=0||heroFSM.canCancel())&&inputQueue.take(2))roll();if(p.atkCd<=0&&p.roll<=0&&p.dash<=0&&!p.charge&&inputQueue.take(1))attack();
     updatePlatforms(dt);
     const D=dirs(),l=D.l,r=D.r;
     if(p.dash>0){p.dash-=dt;p.vx=p.face*960;if((p.trailT-=dt)<=0){p.trailT=.028;(p.dtrail=p.dtrail||[]).push({x:p.x+p.w/2,y:p.y+p.h,f:p.face,life:.24});}dashHits();if(p.dash<=0){p.vx=p.face*245;dust(p.x+13,p.y+p.h,5,p.face);}}
-    else if(p.roll>0){p.roll-=dt;const k=Math.max(0,p.roll)/ROLL;p.vx=p.face*(300+480*k);if((p.trailT-=dt)<=0){p.trailT=.035;p.trail.push({x:p.x+p.w/2,y:p.y+p.h-13,a:(1-k)*TAU,f:p.face,life:.2});}if(p.roll<=0&&p.ground)dust(p.x+13,p.y+p.h,4,p.face);}
-    else{const m=(r?1:0)-(l?1:0);p.vx+=(m*245-p.vx)*Math.min(1,dt*(p.ground?22:(m?11:2)));if(m&&!(p.attack>.1))p.face=m;}
+    else if(p.roll>0){p.roll-=dt;const k=Math.max(0,p.roll)/ROLL;p.vx=(p.rollDir||p.face)*(400+520*k);if((p.trailT-=dt)<=0){p.trailT=.035;p.trail.push({x:p.x+p.w/2,y:p.y+p.h-13,a:(1-k)*TAU,f:p.rollDir||p.face,life:.2});}if(p.roll<=0&&p.ground)dust(p.x+13,p.y+p.h,4,p.rollDir||p.face);}
+    else{const m=(r?1:0)-(l?1:0),mul=p.char==='bell'?.74:p.char==='lamp'?1.08:1,vmax=245*mul;
+      if(p.kbT>0){p.kbT-=dt;p.vx=p.kbX;}
+      else if(p.ground){if(m){p.vx+=m*(vmax/FEEL.accel)*dt;p.vx=clamp(p.vx,-vmax,vmax);}else{const s=Math.sign(p.vx);p.vx=s*Math.max(0,Math.abs(p.vx)-(vmax/FEEL.brake)*dt);}}
+      else p.vx+=(m*vmax-p.vx)*Math.min(1,dt*(m?11:2));
+      if(m&&!(p.attack>.1)&&!(p.kbT>0))p.face=m;}
     p.trail.forEach(t=>t.life-=dt);p.trail=p.trail.filter(t=>t.life>0);if(p.dtrail){p.dtrail.forEach(t=>t.life-=dt);p.dtrail=p.dtrail.filter(t=>t.life>0);}
-    if(down('attack')||isKey('attack'))attack();
+    if(p.charge>0){if(isKey('attack')||down('attack')){p.charge=Math.min(p.chargeMax||.45,p.charge+dt);if(p.charge>=(p.chargeMax||.45)-.001)fireCharge(true);}else fireCharge(false);}
+    else if(down('attack')||isKey('attack'))attack();
     p.castCd=Math.max(0,p.castCd-dt);const stand=p.ground&&D.d&&platforms.find(a=>!a.solid&&!a.off&&a.h<100&&Math.abs(p.y+p.h-a.y)<3&&p.x+p.w>a.x+2&&p.x<a.x+a.w-2);
     if(p.buffer>0&&stand){p.drop=stand;p.y+=3;p.vy=65;p.ground=false;p.coyote=0;p.jumps=1;p.buffer=0;p.on=null;dust(p.x+13,p.y+p.h,4,0);}
-    else if(p.buffer>0&&(p.coyote>0||p.jumps<2)){p.vy=-510-p.skills.spring*30;p.jumps=p.coyote>0?1:p.jumps+1;p.ground=false;p.coyote=0;p.buffer=0;p.on=null;if(p.jumps>1)burst(p.x+13,p.y+44,'#9fe0d4',8);else dust(p.x+13,p.y+p.h,5,0);beep(340,.07);}
+    else if(p.buffer>0&&(p.coyote>0||p.jumps<(p.char==='lamp'?2:1))){p.vy=-510-p.skills.spring*30;p.jumps=p.coyote>0?1:p.jumps+1;p.ground=false;p.coyote=0;p.buffer=0;p.on=null;if(p.jumps>1)burst(p.x+13,p.y+44,'#9fe0d4',8);else dust(p.x+13,p.y+p.h,5,0);beep(340,.07);}
     const was=p.ground,fall=p.vy;
-    if(p.drop&&p.y>=p.drop.y)p.drop=null;if(p.dash>0)p.vy=0;else p.vy+=1420*dt;
+    if(p.drop&&p.y>=p.drop.y)p.drop=null;if(p.dash>0)p.vy=0;else p.vy+=(p.vy>40?FEEL.grav*FEEL.fall:FEEL.grav)*dt;
     physics.move(p,(p.vx+(p.kickX||0))*dt,p.vy*dt,platforms,FLOOR);p.x=clamp(p.x,12,WORLD-45);p.on=null;
     if(p.kickX){p.kickX*=Math.pow(.0001,dt);if(Math.abs(p.kickX)<4)p.kickX=0;}
     const landed=physics.landed;if(landed){const a=landed;if(a.mv||a.cr)p.on=a;if(a.cr&&!a.cr.st){a.cr.st=1;a.cr.t=.5;beep(220,.05,'square',.02);}if(a.w>=120&&!a.mv&&!a.cr){p.safeX=clamp(p.x,a.x+40,a.x+a.w-p.w-40);p.safeY=a.y-p.h;}springPad();}
     climbRope(dt);
     const cameraTarget=Math.min(verticalBase,p.y-120);viewY+=(cameraTarget-viewY)*Math.min(1,dt*8);
-    if(!was&&p.ground){p.landT=.12;if(fall>360)dust(p.x+13,p.y+p.h,7,0);}
+    if(!was&&p.ground){p.landT=.12;beep(160,.05,'sine',.03);if(fall>360)dust(p.x+13,p.y+p.h,7,0);}
     if(p.ground)p.walk+=Math.abs(p.vx)*dt*.085;
     updateCape(dt);
     if(p.ground&&Math.abs(p.vx)>150&&Math.random()<dt*(lowFx?3:8))ember(p.x+13-p.face*8,p.y+30,1,'#ffb066');
@@ -1437,9 +1478,9 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(L.rest&&Math.random()<dt*(lowFx?5:12))ember(L.fire+(Math.random()-.5)*22,FLOOR-26,1,'#ffb35c');
     // 掉下断崖：扣血，回到最后站稳的地方；掉进腐水深潭也一样，只是溅起一片绿水
     const pit=L.gaps.find(g=>p.x+p.w/2>g[0]&&p.x+p.w/2<g[1]),acidPit=!!(pit&&pit[2]==='acid');
-    if(p.y>(acidPit?FLOOR+24:700)){if(acidPit){splash(p.x+p.w/2,FLOOR+2);burst(p.x+13,FLOOR,'#9be36a',14);}const d=Math.round(20*L.dmgK);p.inv=0;hurt(d,p.x+10);Object.assign(p,{x:p.safeX,y:p.safeY,vx:0,vy:0,roll:0,dash:0,cape:null,on:null});if(state==='play')say(acidPit?'跌进了腐水':'跌下了断崖',1.5);}
+    if(p.y>(acidPit?FLOOR+24:700)){if(acidPit){splash(p.x+p.w/2,FLOOR+2);burst(p.x+13,FLOOR,'#9be36a',14);}const d=Math.round(20*L.dmgK);p.inv=0;hurt(d,p.x+10,false,acidPit?'跌进了腐水':'跌下了断崖');Object.assign(p,{x:p.safeX,y:p.safeY,vx:0,vy:0,roll:0,dash:0,cape:null,on:null});if(state==='play')say(acidPit?'跌进了腐水':'跌下了断崖',1.5);}
     // 刀的有效判定只在出刀前 0.15 秒；空中下劈碰到尖刺也会弹起来（可以踩着尖刺过去），毒水不行
-    const SA=heroFSM.hitbox&&p.attack>.1&&(p.char!=='bow'||p.slash==='down')?slashArea():null;
+    const SA=heroFSM.hitbox&&p.attack>0&&(p.char!=='bow'||p.slash==='down')?slashArea():null;
     if(SA&&p.slash==='down'&&!p.pogo&&!p.ground&&(L.spikes.some(s=>inArea(SA,s[0],FLOOR-18,s[0]+s[1]*20-4,FLOOR))||traps.some(t=>t.k==='tspike'&&t.up&&inArea(SA,t.x,FLOOR-18,t.x+t.n*20-4,FLOOR)))){p.pogo=true;p.vy=-470;p.jumps=1;burst(SA.x,FLOOR-16,'#dfe6ea',8);fx.push({k:'star',x:SA.x,y:FLOOR-16,a:0,life:.1,max:.1,r:18});beep(420,.08);}
     if(!run.cacheTip&&breakables.some(b=>!b.broken&&Math.abs(b.x-p.x)<140)){run.cacheTip=true;say('攻击击碎发光的陶罐，可以找到补给',2.5);}
     if(SA)breakables.forEach(b=>{if(!b.broken&&inArea(SA,b.x-13,b.y-31,b.x+13,b.y))breakCache(b);});
@@ -1447,30 +1488,35 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(secrets.length){secrets.forEach((s,i)=>{if(s.shake>0)s.shake-=dt;if(s.open){if(s.t<1)s.t+=dt;return;}if(SA&&!p.hit.has(s)&&inArea(SA,s.x-30,s.y-84,s.x+30,s.y)){p.hit.add(s);hitSecret(s,i);}if(Math.random()<dt*(relics.guide?3:1.1)&&Math.abs(s.x-p.x)<W)emit_particles(s.x+(Math.random()-.5)*44,s.y-84+Math.random()*10,(Math.random()-.5)*6,14+Math.random()*12,1.4,1.4,relics.guide?'#ffd27a':'#a49a88',1.2+Math.random(),.06,!!relics.guide,undefined,undefined,true);});}
     // 城墙的弩炮：砍三下就散架
     if(SA)traps.forEach(t=>{if(t.k!=='ballista'||t.broken||p.hit.has(t)||!inArea(SA,t.x-28,t.y-46,t.x+28,t.y))return;p.hit.add(t);t.hp=(t.hp==null?3:t.hp)-1;clang(SA.x,SA.y);t.kick=.15;if(t.hp<=0){t.broken=true;burst(t.x,t.y-20,'#b08a5a',18);dust(t.x,t.y,8,0);for(let i=0;i<8;i++)chunks.push({x:t.x+(Math.random()-.5)*40,y:t.y-20-Math.random()*20,vx:(Math.random()-.5)*240,vy:-120-Math.random()*200,r:Math.random()*TAU,vr:(Math.random()-.5)*14,s:4+Math.random()*6,c:i%2?'#6a4a2f':'#8a6a44',life:1.4,floor:t.y,x0:t.x-400,x1:t.x+400});beep(160,.3,'square');score+=10;}});
-    if(L.spikes.some(s=>p.x>s[0]&&p.x<s[0]+s[1]*20)&&p.y+p.h>FLOOR-13)hurt(Math.round(16*L.dmgK),p.x+20);
+    if(L.spikes.some(s=>p.x>s[0]&&p.x<s[0]+s[1]*20)&&p.y+p.h>FLOOR-13)hurt(Math.round(16*L.dmgK),p.x+20,false,'踩中了尖刺');
     L.acid.forEach(s=>{if(p.x+p.w/2>s[0]+4&&p.x+p.w/2<s[0]+s[1]-4&&p.y+p.h>FLOOR-8){if(p.inv<=0)burst(p.x+13,FLOOR-4,'#9be36a',12);hurt(Math.round(14*L.dmgK),s[0]+s[1]/2);}});
     updateTraps(dt);if(lamps.length)updateLamps();updateSigns();teachOnRoad();if(p.ringT>0)ringHits(dt);if(p.domeT>0)domeBlock(dt);if(state!=='play')return;
-    if(L.checkpoint&&!checkpoint&&p.x>L.checkpoint){checkpoint=true;p.hp=p.max;p.potions=Math.max(p.potions,1);p.soul=3;burst(L.checkpoint,FLOOR-40,'#f4c27f',26);say('钟火已点燃 · 生命与魂火恢复\n倒下后会从这里再战',3.5);beep(520,.3);}
+    const fires=L.checks||(L.checkpoint!=null?[L.checkpoint]:[]);
+    for(const fx of fires){if(p.checkX!=null&&fx<=p.checkX+1)continue;if(Math.abs(p.x+p.w/2-fx)<48&&p.y+p.h>FLOOR-80){p.checkX=fx;checkpoint=true;L.checkpoint=fx;p.hp=p.max;p.potions=Math.max(p.potions,1);p.soul=3;burst(fx,FLOOR-40,'#f4c27f',26);say('钟火已点燃 · 倒下后从这里回来',2.6);beep(520,.3);saveRun();break;}}
+    if(L.hints){const h=L.hints.find(q=>Math.abs(p.x+p.w/2-q.x)<120);if(h&&run.hintAt!==h.x){run.hintAt=h.x;say(h.t,3.2);}}
+    if(L.shortcut&&!run.shortcut&&p.x>L.shortcut.open){run.shortcut=true;say('城墙捷径开了 · 回到入口的门可以抄近路',2.6);saveRun();}
+    if(L.shortcut&&run.shortcut&&Math.abs(p.x+p.w/2-L.shortcut.door)<40&&p.ground&&p.y+p.h>FLOOR-70){p.x=L.shortcut.dest;p.vx=0;say('抄近路',1.2);}
+    if(run.guided&&stage===0&&!L.tutorial&&!run.coachSkip&&!coachDone){const btn=document.getElementById('coach-skip');if(btn)btn.hidden=false;const n=run.coach||0;if(n===0&&Math.abs(p.x-120)>36){run.coach=1;say('跳跃：空格。刚离开平台的一瞬间还能起跳。',3.2);}else if(n===1&&!p.ground){run.coach=2;say('攻击：J。落地前按跳跃，落地会马上起跳。',3.2);}else if(n===2&&(p.attack>0||p.charge>0)){run.coach=3;run.coachSkip=true;coachDone=true;if(btn)btn.hidden=true;try{localStorage.setItem('ember:coach','1');}catch(e){}say('会了。向东走，地刺会先变色。',2.4);}else if(messageT<.25)say(['移动：A / D。','跳跃：空格。离开平台后仍有一小段土狼时间。','攻击：J。近战第三击会把敌人推开。'][n],1.2);}else{const btn=document.getElementById('coach-skip');if(btn)btn.hidden=true;}
     // 走进首领房：第一次是一段登场对白，倒下再来时只说一句；对白结束亮出名号卡，身后的铁闸落下
-    if(L.arena&&!flags.boss&&p.x>L.trigger&&enemies.some(e=>e.type==='boss'&&!e.dead)){flags.boss=true;titleT=0;messageT=0;notice.style.opacity=0;bossCue('enter');const key='bossMet_'+L.bossKind,story=BOSSES[L.bossKind];startTalk(run[key]?story.again:story.intro,()=>{titleT=0;messageT=0;notice.style.opacity=0;bossCardT=2.05;});run[key]=true;return;}
+    if(L.arena&&!flags.boss&&p.x>L.trigger&&enemies.some(e=>e.type==='boss'&&!e.dead)){flags.boss=true;titleT=0;messageT=0;notice.style.opacity=0;bossCue('enter');const key='bossMet_'+L.bossKind,story=BOSSES[L.bossKind];startTalk(run[key]?story.again:story.intro,()=>{titleT=0;messageT=0;notice.style.opacity=0;bossCardT=2;});run[key]=true;return;}
     const bossAlive=enemies.some(e=>e.type==='boss'&&!e.dead),bossOn=!!(L.arena&&flags.boss&&bossAlive);gateK=clamp(gateK+(bossOn?dt:-dt)*3,0,1);if(L.arena)sealK=clamp(sealK+(bossAlive?dt:-dt)*1.6,0,1);if(bossOn&&p.x<L.gate+6){p.x=L.gate+6;if(p.vx<0)p.vx=0;}
     enemies.forEach(e=>{if(e.dead){e.dieT=Math.max(0,e.dieT-dt);e.flash=Math.max(0,e.flash-dt);if(e.type==='boss'&&e.dieT>0&&Math.random()<dt*30)ember(e.x+Math.random()*e.w,e.y+Math.random()*e.h,1,BOSSES[e.kind].color);if(e.type==='flyer')e.y=Math.min(e.floor-e.h,e.y+300*dt);return;}
       e.flash=Math.max(0,e.flash-dt);e.swing=Math.max(0,e.swing-dt);e.hitT=Math.max(0,e.hitT-dt);e.cd-=dt;if(e.blockT>0)e.blockT-=dt;const boss=e.type==='boss',el=e.elite,dx=p.x-e.x,dy=Math.abs(p.y+p.h-e.floor),ox=e.x,kind=boss?e.kind:el?'elite':e.type,frozen=e.frozen>0,dazed=e.daze>0;
       if(e.type!=='dummy'&&!codex.seen[kind]&&onScreen(e))note('seen',kind);if(frozen)e.frozen=Math.max(0,e.frozen-dt);if(dazed)e.daze=Math.max(0,e.daze-dt);if(e.brk>0)e.brk=Math.max(0,e.brk-dt);
       // 持盾狱卒转身慢：绕到背后半秒内它还转不过来
       if(!frozen&&!dazed&&e.wind<=0&&!boss){const want=dx<0?-1:1;if(e.type==='shield'&&want!==e.face){if(!(e.brk>0)){e.turnT=(e.turnT||0)+dt;if(e.turnT>.5){e.face=want;e.turnT=0;}}}else{e.face=want;e.turnT=0;}}
-      if(e.kb){const B=bounds(e);e.x=clamp(e.x+e.kb*dt,B[0],B[1]);e.kb*=Math.pow(.002,dt);if(Math.abs(e.kb)<5)e.kb=0;}
+      if(e.kbT>0){e.kbT-=dt;const B=bounds(e);e.x=clamp(e.x+e.kb*dt,B[0],B[1]);if(e.kbT<=0)e.kb=0;}
       if(el&&Math.random()<dt*(lowFx?4:10))ember(e.x+e.w/2+(Math.random()-.5)*34,e.y+10+Math.random()*44,1,'#ffc46a');
       if(boss){if(!frozen&&!dazed&&(!L.arena||flags.boss))bossAI(e,dt);}   // 首领在登场对白前不动；冰冻、震晕期间停止行动
       else if(!frozen&&!dazed&&!(e.brk>0)){
       if(FOE_AI[e.type])FOE_AI[e.type](e,dt,dx,dy);
       else{const sh=e.type==='shield',spd=1-.1*Math.min(3,cycle);
       // 小怪：蓄力（动作预兆 + 刃口一闪）→ 出手；不画攻击范围
-      if(e.wind>0){e.wind-=dt;if(e.wind<=0){e.swing=.22;if(sh||(!el&&e.type==='guard'&&L.theme==='sewers')){const B=bounds(e);e.x=clamp(e.x+e.face*(sh?60:75),B[0],B[1]);}
+      if(e.wind>0){e.wind-=dt;if(e.wind<=0){e.swing=.22;if(e.leap){const B=bounds(e);e.x=clamp(e.x+e.face*130,B[0],B[1]);e.leap=0;}else if(sh||(!el&&e.type==='guard'&&L.theme==='sewers')){const B=bounds(e);e.x=clamp(e.x+e.face*(sh?60:75),B[0],B[1]);}
           if(e.type==='archer'){const pattern=L.theme==='ramparts'?[-85,0,85]:L.theme==='tower'?[-55,55]:[0];pattern.forEach(v=>emit_shots(undefined,e.x+14,e.y+17,e.face*(L.theme==='sewers'?250:320),v,undefined,4,Math.round(12*L.dmgK),undefined,undefined,undefined,undefined,L.theme==='sewers'?'#a5e66c':L.theme==='ossuary'?'#d8aaff':'#dfe3e0',undefined,undefined));beep(290,.08);}
           else if(Math.abs(p.x-e.x)<(el?125:sh?100:92)&&(p.x-e.x)*e.face>-15&&dy<80)if(p.roll>0)perfectDodge(e.x+e.w/2);else hurt(Math.round((el?22:14)*L.dmgK),e.x,el&&cycle>=2);
           if(!el&&e.type==='guard'&&L.theme==='ossuary'&&e.floor===FLOOR)waves.push({x:e.x+e.w/2,dir:e.face,life:1.1});if(el){dust(e.x+e.w/2+e.face*40,e.floor,6,0);shake=Math.max(shake,4);}if(sh){dust(e.x+e.w/2+e.face*30,e.floor,5,e.face);beep(180,.08,'square');}e.cd=el?1.02:sh?1.35:1.12;}}
-      else if(Math.abs(dx)<(e.type==='archer'?620:el?160:sh?140:L.theme==='sewers'?200:136)&&dy<110&&e.cd<=0&&(e.type!=='archer'||onScreen(e))){e.wind=e.wt=(e.type==='archer'?.48:el?.46:sh?.5:.36)*spd;}
+      else if(Math.abs(dx)<(e.type==='archer'?620:el?160:sh?140:L.theme==='sewers'?200:136)&&dy<110&&e.cd<=0&&(e.type!=='archer'||onScreen(e))){const leap=cycle>=2&&e.type==='guard'&&!sh&&!el;e.wind=e.wt=(leap?.62:(e.type==='archer'?.48:el?.46:sh?.5:.36))*spd;e.leap=leap?1:0;}
       else if(e.type!=='archer'&&e.hitT<=0&&Math.abs(dx)<650&&Math.abs(dx)>55){const B=bounds(e);e.x=clamp(e.x+e.face*(el?84:sh?50:66)*dt,B[0],B[1]);}}}
       // 刀砍中：积一格魂火。持盾狱卒正面挡下横斩和上挑——重劈（连砍第三下）或钟锤能破防，下劈从头顶砍不挡
       if(SA&&!p.hit.has(e)&&!bossShielded(e)&&inArea(SA,e.x,e.y,e.x+e.w,e.y+e.h)){p.hit.add(e);const heavy=p.slash==='side'&&p.combo===0,side=p.x+p.w/2<e.x+e.w/2?1:-1,dmg=p.damage*(heavy?(relics.tassel?1.89:1.35):1)*(relics.hunter&&p.hp/p.max>.7?1.3:1),hx=clamp(SA.x,e.x+4,e.x+e.w-4),hy=clamp(SA.y,e.y+6,e.y+e.h-6);
@@ -1508,7 +1554,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     const lead=p.face>0?.35:.62,lo=bossOn?Math.min(L.gate-40,WORLD-W):0,hi=bossOn?Math.max(lo,Math.min(WORLD-W,L.seal+130-W)):Math.max(0,WORLD-W);cam+=(clamp(p.x-W*lead,lo,hi)-cam)*Math.min(1,dt*5);if(bossCardT>0){bossCardT=Math.max(0,bossCardT-dt);notice.style.opacity=0;}markSeen();
     // 墨翁的哼曲：越近越清楚
     if(L.ink!=null&&!hasMap()){const dd=Math.abs(p.x-L.ink);if(dd<620){inkHum-=dt;if(inkHum<=0){inkHum=.36;const mel=[0,2,4,2,0,-1,7,4,2,-1,0,-1],nn=mel[inkStep++%mel.length];if(nn>=0)musicTone(330*Math.pow(2,nn/12),.32,.014*(1-dd/620)+.002,'sine');}}}
-    noteBand();syncHud();
+    if(state==='play')run.time=(run.time||0)+dt;noteBand();syncHud();
   }
 
   // ================= 画面 =================
@@ -2168,8 +2214,8 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       if(k<1){const a=clamp((k-.25)/.3,0,1);ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=a*.5;ctx.fillStyle='#ffd88a';for(let i=0;i<5;i++){const t=-Math.PI/2+(i-2)*.33+Math.sin(time*3+i)*.05,len=50+100*a;ctx.beginPath();ctx.moveTo(x-7,y-25);ctx.lineTo(x+7,y-25);ctx.lineTo(x+Math.cos(t+.07)*len,y-25+Math.sin(t+.07)*len);ctx.lineTo(x+Math.cos(t-.07)*len,y-25+Math.sin(t-.07)*len);ctx.closePath();ctx.fill();}ctx.restore();addLight(x-cam,y-40,40+120*a,'#ffd38a',.2+.6*a);}
       ctx.save();ctx.translate(x-19,y-24);ctx.rotate(ang);box(0,-9,38,9,'#7f5a39');box(0,-6,38,2,'#4a4f55');ctx.strokeStyle=OL;ctx.strokeRect(0,-9,38,9);ctx.restore();box(x-16,y-27,32,3,k<1?'rgba(255,236,180,.8)':'rgba(255,226,160,.25)');}
     else{poly([x-21,y-24,x+21,y-24,x+19,y-34,x-19,y-34],'#86603c',OL,1.5);box(x-21,y-27,42,3,'#4a4f55');box(x-3,y-27,6,8,'#e2bd6e');box(x-1,y-24,2,3,'#3a2a1a');for(let i=0;i<2;i++){const a=time*1.6+i*3.1;circle(x+Math.cos(a)*16,y-30+Math.sin(a*1.3)*8,1.2,'#ffe6a6');}}}
-  function brazier(){const x=L.checkpoint||CHECKPOINT,y=FLOOR;box(x-12,y-26,24,26,'#3d454c');box(x-12,y-26,4,26,'#2d343a');box(x-16,y-6,32,6,'#4a535a');poly([x-22,y-32,x+22,y-32,x+16,y-24,x-16,y-24],'#a7803f',OL,1.5);box(x-23,y-34,46,3,'#d7b064');
-    if(checkpoint){flame(x-7,y-33,1.3,1.3);flame(x+7,y-33,1.15,2.1);flame(x,y-33,1.8,.4);addLight(x-cam,y-48,170,'#ffa040',.62+Math.sin(time*11)*.05);}
+  function brazier(at,lit){const x=at==null?(L.checkpoint||CHECKPOINT):at,y=FLOOR,on=lit!=null?lit:!!checkpoint;box(x-12,y-26,24,26,'#3d454c');box(x-12,y-26,4,26,'#2d343a');box(x-16,y-6,32,6,'#4a535a');poly([x-22,y-32,x+22,y-32,x+16,y-24,x-16,y-24],'#a7803f',OL,1.5);box(x-23,y-34,46,3,'#d7b064');
+    if(on){flame(x-7,y-33,1.3,1.3);flame(x+7,y-33,1.15,2.1);flame(x,y-33,1.8,.4);addLight(x-cam,y-48,170,'#ffa040',.62+Math.sin(time*11)*.05);}
     else{circle(x-5,y-34,2,'#7a3a22');circle(x+3,y-34,1.6,'#9a4a2a');addLight(x-cam,y-36,44,'#c0603a',.18);if(p&&Math.abs(p.x-x)<260)text('钟火',x,y-50,13,'#cfd9da','center',true);}}
   // Boss 场地后方吊着的沉钟：典狱长进入二阶段时会被敲响（摇晃 + 裂纹发光）
   function greatBell(){const x=L.bell||3990,top=Math.min(38,viewY),len=150-top,sw=Math.sin(time*.6)*.03+Math.sin(time*7)*.09*bellRing;ctx.save();ctx.translate(x,top);ctx.rotate(sw);
@@ -2200,7 +2246,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function crescent(T,skew){const n=14;ctx.beginPath();for(let i=0;i<=n;i++){const s=-Math.PI/2+Math.PI*i/n;ctx.lineTo(Math.cos(s),Math.sin(s));}for(let i=n;i>=0;i--){const u=i/n,s=-Math.PI/2+Math.PI*u,r=1-T*Math.pow(Math.sin(Math.PI*u),.8)*(1+skew*(u-.5));ctx.lineTo(Math.cos(s)*r,Math.sin(s)*r);}ctx.closePath();ctx.fill();}
   function drawSlash(){if(!p||!(p.attack>0)||p.roll>0)return;if(p.char==='bow'&&p.slash!=='down')return;const C=CHARS[p.char]||CHARS.lamp,k=1-p.attack/C.swing;if(k>.72)return;const A=slashArea(),bell=p.char==='bell',heavy=p.slash==='side'&&p.combo===0,th=p.slash==='up'?-Math.PI/2:p.slash==='down'?Math.PI/2:p.atkFace>0?0:Math.PI,skew=p.slash==='side'?(p.combo===2?-.6:.6):0,a=Math.pow(1-k/.72,.7);
     ctx.save();ctx.translate(A.x,A.y);ctx.scale(A.rx,A.ry);ctx.rotate(th);if(th===Math.PI)ctx.scale(1,-1);
-    ctx.globalAlpha=a*.55;ctx.fillStyle=heavy||bell?'#ffd88a':'#dfeaff';crescent(heavy?.5:bell?.46:.42,skew);ctx.globalAlpha=a;ctx.fillStyle=heavy?'#fff1cf':bell?'#fff4dc':'#ffffff';crescent(heavy?.2:.16,skew);ctx.restore();}
+    ctx.globalAlpha=a*.55;ctx.fillStyle=p.skin?'#ffb35c':heavy||bell?'#ffd88a':'#dfeaff';crescent(heavy?.5:bell?.46:.42,skew);ctx.globalAlpha=a;ctx.fillStyle=p.skin?'#ffe2a8':heavy?'#fff1cf':bell?'#fff4dc':'#ffffff';crescent(heavy?.2:.16,skew);ctx.restore();}
   function boot(x,y,c){poly([x-3,y-4,x+3,y-4,x+6.5,y-1,x+6.5,y+.5,x-3.5,y+.5],c,OL,1.2);}
   // 小幽灵：圆头 + 三道波浪下摆，大黑眼睛，青色围巾；身体里那团暖光就是“余火”
   function ghostPath(t){ctx.beginPath();ctx.moveTo(-14,-12);ctx.lineTo(-14,-31);ctx.arc(0,-31,14,Math.PI,0,false);ctx.lineTo(14,-12);for(let i=0;i<3;i++){const x0=14-i*28/3,x1=x0-28/3,dip=5.5+Math.sin(t+i*1.9)*2.2;ctx.quadraticCurveTo((x0+x1)/2,-12+dip*2,x1,-12);}ctx.closePath();}
@@ -2242,7 +2288,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     footShadow(cx,cy-1,p.roll>0?11:16);
     for(const t of p.trail){ctx.save();ctx.globalAlpha=t.life/.2*.32;ctx.translate(t.x,t.y);ctx.scale(t.f,1);ctx.rotate(t.a);ghostBall(GH_TRAIL);ctx.restore();}
     if(p.dtrail)for(const t of p.dtrail){ctx.save();ctx.globalAlpha=t.life/.24*.45;ctx.translate(t.x,t.y-5);ctx.scale(t.f,1);line([-52,-20,-26,-26,12,-28],3,'#abf9ed');line([-36,-12,-18,-16,2,-16],2,'#78bad6');drawGhost(GH_SHADE,time*6,0);ctx.restore();}
-    ctx.save();ctx.translate(cx,cy);if(p.inv>0&&p.roll<=0&&p.dash<=0&&p.domeT<=0&&p.hurtT<=.18&&Math.floor(time*18)%2===0)ctx.globalAlpha=.55;
+    ctx.save();ctx.translate(cx,cy);if(p.inv>0&&p.roll<=0&&p.dash<=0&&p.domeT<=0&&Math.floor(time*16)%2===0)ctx.globalAlpha=.22;
     if(p.roll>0){const k=1-Math.max(0,p.roll)/ROLL;ctx.translate(0,-13);ctx.scale(f,1);ctx.save();ctx.globalAlpha*=.45;ctx.strokeStyle='#e6f7ff';ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(0,0,16.5,Math.PI*.55,Math.PI*1.3);ctx.stroke();ctx.restore();ctx.rotate(k*TAU);ghostBall(P);ctx.restore();addLight(cx-cam,cy-14,46,'#cfefff',.25);return;}
     ctx.scale(f,1);
     // 平时贴地飘着上下浮动；移动时往前倾，起跳拉长、下落和落地压扁
@@ -2682,7 +2728,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(bone)for(let i=10;i<a.w-6;i+=22){circle(x+i,y+a.h-4,3.4,'#e8dfc8',OL,1);circle(x+i-1.2,y+a.h-4.5,.9,'#2a2420');circle(x+i+1.2,y+a.h-4.5,.9,'#2a2420');}ctx.restore();}
   // 机关分两遍画：back 是底座、刀刃、弩炮（画在主角身后），front 是喷出来的东西、落锤、风（画在主角前面）
   function drawTraps(front){for(const t of traps){const x0=t.x0!=null?t.x0:t.x-220,x1=t.x1!=null?t.x1:t.x+220;if(x1<cam-80||x0>cam+W+80)continue;const u=t.t/(t.per||3);
-    if(t.k==='tspike'){if(front)continue;const n=t.n,h=u<.4?0:u<.55?2.5+Math.sin(time*50):u<.6?18*(u-.55)/.05:u<.85?18:u<.9?18*(1-(u-.85)/.05):0;box(t.x-3,FLOOR-3,n*20+2,4,'#2a3036');for(let k=0;k<n;k++){const sx=t.x+k*20;box(sx+3,FLOOR-2,10,2,'#14181c');if(h>.5){poly([sx+1,FLOOR-2,sx+8,FLOOR-2-h,sx+15,FLOOR-2],T.spikeC[0],OL,1.1);poly([sx+8,FLOOR-2-h,sx+15,FLOOR-2,sx+10,FLOOR-2],T.spikeC[1]);}}continue;}
+    if(t.k==='tspike'){if(front)continue;const n=t.n,warn=!!t.warn,h=u<.55-0.5/(t.per||3)?0:warn?3+Math.sin(time*46)*2.4:u<.6?18*(u-.55)/.05:u<.85?18:u<.9?18*(1-(u-.85)/.05):0,wob=warn?Math.sin(time*42)*2.4:0,c0=warn?'#ffb35c':T.spikeC[0],c1=warn?'#ff6a3a':T.spikeC[1];box(t.x-3+wob,FLOOR-3,n*20+2,4,warn?'#6a3a22':'#2a3036');if(warn){ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=.55;circle(t.x+n*10,FLOOR-8,28+Math.sin(time*30)*6,'#ffb35c');ctx.restore();text('！',t.x+n*10,FLOOR-28-Math.abs(Math.sin(time*20))*6,16,'#ffd2a0','center',true);}for(let k=0;k<n;k++){const sx=t.x+k*20+wob;box(sx+3,FLOOR-2,10,2,'#14181c');if(h>.5){poly([sx+1,FLOOR-2,sx+8,FLOOR-2-h,sx+15,FLOOR-2],c0,OL,1.1);poly([sx+8,FLOOR-2-h,sx+15,FLOOR-2,sx+10,FLOOR-2],c1);}}continue;}
     if(t.k==='pendulum'){if(!front)continue;const a=t.a!=null?t.a:t.amp*Math.sin(TAU*u),bx=t.x+Math.sin(a)*t.len,by=t.top+Math.cos(a)*t.len;box(t.x-16,t.top-10,32,10,'#3a3028');circle(t.x,t.top,5,'#6a5a48',OL,1.4);
       ctx.strokeStyle='#2c343b';ctx.lineWidth=3.4;ctx.beginPath();ctx.moveTo(t.x,t.top);ctx.lineTo(bx,by);ctx.stroke();ctx.strokeStyle='rgba(150,160,170,.5)';ctx.lineWidth=1;ctx.stroke();
       ctx.save();ctx.translate(bx,by);ctx.rotate(-a);shape(()=>{ctx.moveTo(-28,-6);ctx.quadraticCurveTo(0,31,28,-6);ctx.quadraticCurveTo(0,9,-28,-6);ctx.closePath();},lg(0,-6,0,24,'#e8eef0','#9aa8b0','#5a646c'),OL,1.6);line([-23,-3,0,17,23,-3],1,'rgba(255,255,255,.75)');box(-4,-15,8,11,'#4a4038');ctx.restore();continue;}
@@ -2771,7 +2817,8 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(L.exit&&L.exit>cam-90&&L.exit<cam+W+90)exitDoor(L.exit);
     if(L.npc!=null&&L.npc<cam+W+80)keeper(L.npc);if(L.ink!=null&&L.ink>cam-120&&L.ink<cam+W+120)inkNPC(L.ink);if(L.lore&&L.lore.x>cam-120&&L.lore.x<cam+W+120)loreSpot(L.lore);
     drawCaches();for(const c of chests)if(c.x>cam-60&&c.x<cam+W+60)chest(c);
-    if(L.checkpoint&&L.checkpoint>cam-80&&L.checkpoint<cam+W+80)brazier();
+    {const fires=L.checks||(L.checkpoint!=null?[L.checkpoint]:[]);for(const fx of fires)if(fx>cam-80&&fx<cam+W+80)brazier(fx,p&&p.checkX!=null&&fx<=p.checkX+8);}
+    if(L.shortcut&&L.shortcut.door>cam-40&&L.shortcut.door<cam+W+40){const x=L.shortcut.door,open=!!run.shortcut;box(x-16,FLOOR-78,32,78,open?'#3a4a32':'#2a241c');box(x-12,FLOOR-70,24,54,open?'#6a8a4a':'#4a3a28');text(open?'捷径':'门',x,FLOOR-86,12,open?'#d7ecc0':'#cbb89a','center',true);}
     if(L.arena){if(L.gate>cam-60&&L.gate<cam+W+60)portcullis(L.gate,gateK);if(L.seal+44>cam-60&&L.seal+44<cam+W+60)portcullis(L.seal+44,sealK);}
     drawChunks();for(const e of enemies)if((!e.dead||e.dieT>0)&&e.x>cam-160&&e.x<cam+W+160)drawEnemy(e);
     if(p&&state!=='menu')drawHero();
@@ -2788,10 +2835,11 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   // 溺灯的蓄水池：脚下一层浅浅的污水，挡住脚踝
   function drawWater(){const x0=Math.max(L.gate-40,cam-20),x1=Math.min(L.seal+80,cam+W+20);if(x1<=x0)return;ctx.fillStyle='rgba(60,120,70,.34)';ctx.fillRect(x0,FLOOR-7,x1-x0,9);ctx.strokeStyle='rgba(190,255,170,.42)';ctx.lineWidth=1.4;ctx.beginPath();for(let x=x0;x<=x1;x+=12)ctx.lineTo(x,FLOOR-7+Math.sin(x*.05+time*2)*1.2);ctx.stroke();}
   // 首领血条：带端饰的细框，颜色跟首领走，中间一道刻度是二阶段
-  function drawBossBar(boss){const B=BOSSES[L.bossKind],bw=Math.min(460,W*.62),bx=(W-bw)/2,by=tall?175:coarse()?100:84,k=Math.max(0,boss.hp/boss.max);
-    box(bx-6,by-4,bw+12,15,'rgba(5,8,12,.82)');ctx.strokeStyle='rgba(220,200,160,.55)';ctx.lineWidth=1.2;ctx.strokeRect(bx-6.5,by-4.5,bw+13,16);poly([bx-15,by+3.5,bx-6,by-5,bx-6,by+12],'rgba(220,200,160,.75)');poly([bx+bw+15,by+3.5,bx+bw+6,by-5,bx+bw+6,by+12],'rgba(220,200,160,.75)');
-    box(bx,by,bw,7,'#221a26');const g=ctx.createLinearGradient(bx,0,bx+bw,0);g.addColorStop(0,tint(B.color,.5));g.addColorStop(1,boss.rage?tint(B.color,1.15):B.color);ctx.fillStyle=g;ctx.fillRect(bx,by,bw*k,7);box(bx,by,bw*k,2,'rgba(255,255,255,.28)');box(bx+bw/2-1,by-2,2,11,'rgba(240,225,190,.75)');
-    text(B.name,W/2,by-11,13,'#e9dcc0','center',true);}
+  function drawBossBar(boss){const B=BOSSES[L.bossKind],bw=Math.min(460,W*.62),bx=(W-bw)/2,by=H-52,k=Math.max(0,boss.hp/boss.max),phase=boss.phase||0;
+    box(bx-6,by-18,bw+12,28,'rgba(5,8,12,.82)');ctx.strokeStyle=phase>=2?'#ffb35c':'rgba(220,200,160,.55)';ctx.lineWidth=1.2;ctx.strokeRect(bx-6.5,by-4.5,bw+13,16);
+    box(bx,by,bw,7,'#221a26');const g=ctx.createLinearGradient(bx,0,bx+bw,0);g.addColorStop(0,tint(B.color,.5));g.addColorStop(1,phase>=2?'#ffd2a8':phase>=1?tint(B.color,1.2):B.color);ctx.fillStyle=g;ctx.fillRect(bx,by,bw*k,7);box(bx,by,bw*k,2,'rgba(255,255,255,.28)');
+    [2/3,1/3].forEach(m=>box(bx+bw*m-1,by-2,2,11,'rgba(240,225,190,.9)'));
+    text(B.name+' · '+(phase>=2?'终相':phase>=1?'二相':'初相'),W/2,by-10,13,'#e9dcc0','center',true);}
   // 首领名号卡：登场对白结束后淡入，小字是名号，大字是名字
   function drawBossCard(){if(bossCardT<=0||!L.arena)return;const B=BOSSES[L.bossKind],t=2.05-bossCardT,a=clamp(t/.25,0,1)*clamp(bossCardT/.45,0,1);if(a<=.01)return;const y=tall?H*.22:H*.2;
     ctx.save();ctx.globalAlpha=a;ctx.fillStyle='rgba(5,8,12,'+(.72*a).toFixed(3)+')';ctx.fillRect(0,y-28,W,78);
@@ -2815,11 +2863,12 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   // 按实际耗时判断，不按帧间隔：iOS 省电模式之类把刷新率限在 30 帧时并不需要降特效
   function drawCharIdles(){if(panel.hidden||panelView!=='chars')return;const keep=ctx;try{panel.querySelectorAll('canvas[data-idle]').forEach(c=>{const ch=c.dataset.idle,P=ch==='bell'?GH_BELL:ch==='bow'?GH_BOW:GH,b=Math.sin(time*2.8);ctx=c.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,240,240);ctx.save();ctx.translate(120,215);ctx.scale(3.5,3.5);oval(0,0,13-b,2,'rgba(0,0,0,.25)');ctx.translate(0,-4+b*1.6);ctx.rotate(Math.sin(time*1.4)*.025);ctx.scale(1+b*.012,1-b*.018);shape(()=>{ctx.moveTo(-10,-22);ctx.bezierCurveTo(-19,-24,-24,-14+b*3,-32,-15+b*3);ctx.quadraticCurveTo(-25,-7+b*3,-12,-17);ctx.closePath();},P.scarf,OL,1.3);if(ch==='bow')quiver();drawGhost(P,time*6,0);heroGear(ch);ghostEmber(P,true);oval(-10,-18+b*.6,3.1,3.6,P.body);const a=-.94+Math.sin(time*2.8+.4)*.055,y=-18+b*.65;if(ch==='bow')bowW(12,y,-.12+b*.035,0);else if(ch==='bell')hammer(12,y,a,24);else nail(12,y,a,P,28);circle(12,y,3.3,P.body,OL,1.3);ctx.restore();});}finally{ctx=keep;}}
   let lastMenuPaint=-Infinity;
-  function frame(now){requestAnimationFrame(frame);if(!canvas.width)resize();const dt=clamp((now-last)/1000,0,.033);last=now;const t0=performance.now();step(dt);if((state==='menu'||paused)&&now-lastMenuPaint<32)return;lastMenuPaint=now;draw();drawCharIdles();if(state==='play'&&!paused&&settings.fx==='auto'){if(performance.now()-t0>11)slowT+=dt;else slowT=Math.max(0,slowT-dt*.5);if(slowT>2)lowFx=true;}}
+  let simAcc=0;
+  function frame(now){requestAnimationFrame(frame);if(!canvas.width)resize();const raw=last?Math.min(.05,(now-last)/1000):1/60;last=now;simAcc+=raw;const t0=performance.now();let steps=0;while(simAcc>=1/60&&steps<3){step(1/60);simAcc-=1/60;steps++;}if(!steps)simAcc=0;if((state==='menu'||paused)&&now-lastMenuPaint<32)return;lastMenuPaint=now;draw();drawCharIdles();if(state==='play'&&!paused&&settings.fx==='auto'){if(performance.now()-t0>11)slowT+=raw;else slowT=Math.max(0,slowT-raw*.5);if(slowT>2)lowFx=true;}}
   document.getElementById('landscape-go').onclick=async()=>{try{if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();}catch(e){}try{if(window.screen&&screen.orientation&&screen.orientation.lock)await screen.orientation.lock('landscape');}catch(e){}resize();};
   resize();
   reset(true);applySettings();showMenu();cam=220;
   muteBtn.textContent=muted?'静音':'声音';if(muted)muteBtn.classList.add('off');
-  window.EmberGame={get state(){return state;},get player(){return p;},get enemies(){return enemies;},get chests(){return chests;},get score(){return score;},get paused(){return paused;},get checkpoint(){return checkpoint;},get waves(){return waves;},get lowFx(){return lowFx;},get cam(){return cam;},get stage(){return stage;},get stageName(){return L.name;},get embers(){return embers;},set embers(v){embers=v;},get bag(){return bag;},get relics(){return relics;},get codex(){return codex;},get talking(){return !!talk;},get music(){return musicMode;},talkNext:talkNext,goto:loadStage,start:reset,respawn:respawn,version:VERSION};
+  window.EmberGame={get state(){return state;},get player(){return p;},get enemies(){return enemies;},get chests(){return chests;},get traps(){return traps;},get score(){return score;},get paused(){return paused;},get checkpoint(){return checkpoint;},get waves(){return waves;},get lowFx(){return lowFx;},get cam(){return cam;},get stage(){return stage;},get stageName(){return L.name;},get embers(){return embers;},set embers(v){embers=v;},get bag(){return bag;},get relics(){return relics;},get codex(){return codex;},get talking(){return !!talk;},get music(){return musicMode;},talkNext:talkNext,goto:loadStage,start:reset,respawn:respawn,version:VERSION};
   requestAnimationFrame(frame);
 })();

@@ -92,7 +92,7 @@ test('archers hold fire while off-screen and shoot once visible',()=>{
 });
 test('boss enrages at half health, roars, then slams out shockwaves that can be jumped or rolled',()=>{
   t.loadStage(FINAL);t.flags.boss=true;const b=t.enemies.find(e=>e.type==='boss');b.hp=b.max/2;b.cd=0;t.player.x=b.x-80;t.player.inv=100;
-  advance(.05);assert(b.rage);assert(b.roar,'it roars before phase two');advance(1.6);assert.equal(t.waves.length,2,'the phase-two slam sends a wave each way');
+  advance(.05);assert(b.rage);assert(b.roar,'it roars before phase two');advance(2.6);assert.equal(t.waves.length,2,'the phase-two slam sends a wave each way');
   t.waves.length=0;b.frozen=99;t.enemies.forEach(e=>{if(e.type!=='boss')e.dead=true;});   // 冻住首领，单独检查冲击波
   const ground=()=>{t.player.x=900;t.player.y=428;t.player.vx=0;t.player.vy=0;t.player.inv=0;t.player.roll=0;t.player.rollCd=0;t.player.hp=100;t.player.face=1;advance(.05);};
   ground();t.waves.push({x:t.player.x+13+90,dir:-1,life:1});advance(.5);assert.equal(t.player.hp,80);
@@ -104,12 +104,12 @@ test('checkpoint lights, heals and respawn restarts only the boss fight',()=>{
   assert(t.checkpoint);assert.equal(t.player.hp,100);assert.equal(t.player.potions,1);
   const b=t.enemies.find(e=>e.type==='boss');b.hp=60;b.rage=true;
   t.player.hp=20;t.player.inv=0;t.hurt(500,0);assert.equal(t.state,'dead');
-  t.respawn();assert.equal(t.state,'play');assert.equal(t.player.hp,100);assert(t.player.x>t.L.checkpoint);assert.equal(b.hp,b.max);assert(!b.rage);
+  t.respawn();assert.equal(t.state,'play');assert.equal(t.player.hp,100);assert(t.player.x>t.L.checkpoint);assert.equal(b.hp,60);assert(b.rage,'the depleted phase stays');
 });
 test('slain enemies fade out before disappearing',()=>{
   const e=t.enemies[0];t.player.x=e.x-45;t.player.face=1;t.player.inv=100;
-  t.action('attack');advance(.45);t.action('attack');advance(.5);t.action('attack');advance(.05);
-  assert(e.dead);assert(e.dieT>.3);advance(.55);assert.equal(e.dieT,0); // frame-2 attack startup
+  t.action('attack');advance(.45);t.action('attack');advance(.5);t.action('attack');advance(.12);
+  assert(e.dead);assert(e.dieT>.3);advance(.55);assert.equal(e.dieT,0); // 4-frame attack startup
 });
 test('chest button only shows next to an unopened chest',()=>{
   t.player.x=600;t.player.y=318;t.player.vy=0;advance(.02);assert.equal(nodes['chest-btn'].hidden,false);
@@ -132,7 +132,7 @@ test('arrows fly over a rolling player but hit a standing one',()=>{
 });
 test('slain enemies scatter embers that fly into the player',()=>{
   const e=t.enemies[0];t.player.x=e.x-45;t.player.face=1;t.player.inv=100;
-  t.action('attack');advance(.45);t.action('attack');advance(.5);t.action('attack');advance(.05);
+  t.action('attack');advance(.45);t.action('attack');advance(.5);t.action('attack');advance(.12);
   assert(e.dead);assert(t.orbs.length>=5);advance(2);assert.equal(t.orbs.length,0);
 });
 test('chest rewards mix an upgrade, an item and usually a relic, picked with 1 / 2 / 3',()=>{
@@ -144,24 +144,24 @@ test('chest rewards mix an upgrade, an item and usually a relic, picked with 1 /
 });
 test('holding up turns the swing into an up slash that reaches a guard above',()=>{
   const e=t.enemies[3];t.player.x=e.x+1;t.player.y=428;t.player.vy=0;t.player.face=1;t.player.inv=100;advance(.02);
-  press('KeyW');t.action('attack');advance(.06);release('KeyW');assert.equal(e.hp,48);
-  advance(.4);t.action('attack');advance(.06);assert.equal(e.hp,48,'a side slash cannot reach the platform above');
+  press('KeyW');t.action('attack');advance(.12);release('KeyW');assert.equal(e.hp,48);
+  advance(.4);t.action('attack');advance(.12);assert.equal(e.hp,48,'a side slash cannot reach the platform above');
 });
 test('down slash in the air hits a guard below and bounces off it',()=>{
   const e=t.enemies[2];e.cd=99;t.player.x=e.x+1;t.player.y=340;t.player.vy=0;t.player.ground=false;t.player.inv=100;
-  press('KeyS');t.action('attack');advance(.04);release('KeyS');assert.equal(e.hp,48);assert(t.player.vy<-300,'bounced, vy='+t.player.vy);
+  press('KeyS');t.action('attack');advance(.12);release('KeyS');assert.equal(e.hp,48);assert(t.player.vy<-300,'bounced, vy='+t.player.vy);
 });
 test('down slash bounces off spikes instead of landing on them',()=>{
   t.player.x=1530;t.player.y=390;t.player.vy=200;t.player.ground=false;t.player.inv=0;
-  press('KeyS');t.action('attack');advance(.04);release('KeyS');assert(t.player.vy<0,'bounced');advance(.2);assert.equal(t.player.hp,100);
+  press('KeyS');t.action('attack');advance(.12);release('KeyS');assert(t.player.vy<0,'bounced');advance(.2);assert.equal(t.player.hp,100);
 });
 test('side slash only reaches as far as the drawn arc',()=>{
-  const e=t.enemies[0];e.cd=99;t.player.face=1;t.player.inv=100;t.player.y=428;t.player.x=e.x-100-13;t.action('attack');advance(.04);assert.equal(e.hp,72,'100 away is out of reach');
-  advance(.4);t.player.x=e.x-80-13;t.action('attack');advance(.04);assert(e.hp<72,'80 away is inside the arc');
+  const e=t.enemies[0];e.cd=99;t.player.face=1;t.player.inv=100;t.player.y=428;t.player.x=e.x-100-13;t.action('attack');advance(.12);assert.equal(e.hp,72,'100 away is out of reach');
+  advance(.4);t.player.x=e.x-80-13;t.action('attack');advance(.12);assert(e.hp<72,'80 away is inside the arc');
 });
 test('a slash cuts arrows out of the air',()=>{
   t.player.x=1800;t.player.y=428;t.player.face=-1;t.player.inv=0;advance(.05);
-  t.shots.push({x:t.player.x+13-50,y:t.player.y+20,vx:320,life:2});t.action('attack');advance(.06);
+  t.shots.push({x:t.player.x+13-50,y:t.player.y+20,vx:320,life:2});t.action('attack');advance(.12);
   assert.equal(t.shots.length,0);assert.equal(t.player.hp,100);
 });
 test('heal is on L now, H does nothing',()=>{
@@ -196,7 +196,7 @@ test('the merchant sells healing for embers and you can walk away',()=>{
 });
 test('kills pay embers, and later maps hit harder with tougher enemies',()=>{
   const e=t.enemies[0];t.player.x=e.x-45;t.player.face=1;t.player.inv=100;
-  t.action('attack');advance(.45);t.action('attack');advance(.5);t.action('attack');advance(.05);assert(e.dead);assert.equal(t.embers,25);
+  t.action('attack');advance(.45);t.action('attack');advance(.5);t.action('attack');advance(.12);assert(e.dead);assert.equal(t.embers,25);
   t.loadStage(stageOf('sewers'));assert.equal(t.enemies[0].max,Math.round(72*1.35));
   t.loadStage(stageOf('ramparts'));const el=t.enemies.find(q=>q.elite);assert(el);assert.equal(el.max,Math.round(260*1.7));assert(el.w>30);
   t.player.inv=0;t.player.x=1400;t.shots.push({x:t.player.x+13-60,y:t.player.y+20,vx:320,life:2,d:Math.round(12*t.L.dmgK)});advance(.3);assert.equal(t.player.hp,80);
@@ -208,7 +208,7 @@ test('falling into a rampart gap hurts and puts you back on solid ground',()=>{
 });
 test('sewer acid burns and cannot be pogoed off',()=>{
   t.loadStage(stageOf('sewers'));const a=t.L.acid[0];t.player.x=a[0]+40;t.player.y=428;advance(.02);assert(t.player.hp<100);
-  t.player.inv=100;t.player.x=a[0]+40;t.player.y=388;t.player.vy=200;t.player.ground=false;press('KeyS');t.action('attack');advance(.04);release('KeyS');assert(t.player.vy>0,'no bounce off acid');
+  t.player.inv=100;t.player.x=a[0]+40;t.player.y=388;t.player.vy=200;t.player.ground=false;press('KeyS');t.action('attack');advance(.12);release('KeyS');assert(t.player.vy>0,'no bounce off acid');
 });
 test('dying on a later map retries it with the stats you came in with',()=>{
   t.player.damage=50;t.player.potions=3;t.embers=120;t.loadStage(stageOf('sewers'));
@@ -217,9 +217,9 @@ test('dying on a later map retries it with the stats you came in with',()=>{
 });
 test('hits knock enemies back but never off their ledge, with slash marks; kills shatter',()=>{
   const e=t.enemies[3];e.cd=99;e.x=1830-e.w-6;e.hp=e.max=400;t.player.x=e.x-45;t.player.y=318;t.player.vy=0;t.player.face=1;t.player.inv=100;advance(.02);
-  t.action('attack');advance(.04);assert(t.fx.some(f=>f.k==='cut')&&t.fx.some(f=>f.k==='star'),'slash mark and spark');assert(e.kb>0,'knocked back');
-  for(let i=0;i<4;i++){advance(.4);assert(e.x+e.w<=1830&&e.x>=1650,'stays on its ledge');t.player.x=e.x-45;t.player.y=318;t.player.face=1;t.action('attack');advance(.05);}
-  e.hp=1;advance(.4);t.player.x=e.x-45;t.player.y=318;t.action('attack');advance(.05);assert(e.dead);assert(t.chunks.length>=8,'shattered');
+  t.action('attack');advance(.12);assert(t.fx.some(f=>f.k==='cut')&&t.fx.some(f=>f.k==='star'),'slash mark and spark');assert(e.kb>0,'knocked back');
+  for(let i=0;i<4;i++){advance(.4);assert(e.x+e.w<=1830&&e.x>=1650,'stays on its ledge');t.player.x=e.x-45;t.player.y=318;t.player.face=1;t.action('attack');advance(.12);}
+  e.hp=1;advance(.4);t.player.x=e.x-45;t.player.y=318;t.action('attack');advance(.12);assert(e.dead);assert(t.chunks.length>=8,'shattered');
 });
 test('the prologue plays on the very first run only',()=>{
   t.introSeen=false;delete storage['ember:intro-v3'];t.reset();assert.equal(t.state,'talk');assert.equal(t.talk.lines,t.TALK.prologue);
@@ -253,7 +253,7 @@ test('relics: the plate blocks every third hit, second wind saves a ghost, and t
 });
 test('the bag opens with B, and the codex keeps sightings, kills and items across runs',()=>{
   press('KeyB');release('KeyB');assert.equal(t.state,'bag');const x=t.enemies[0].x;advance(1);assert.equal(t.enemies[0].x,x);press('Escape');assert.equal(t.state,'play');
-  t.cam=0;advance(.02);assert(t.codex.seen.guard);const k=t.codex.kills.guard||0,e=t.enemies[0];e.hp=1;t.player.x=e.x-45;t.player.face=1;t.player.inv=100;t.action('attack');advance(.05);
+  t.cam=0;advance(.02);assert(t.codex.seen.guard);const k=t.codex.kills.guard||0,e=t.enemies[0];e.hp=1;t.player.x=e.x-45;t.player.face=1;t.player.inv=100;t.action('attack');advance(.12);
   assert.equal(t.codex.kills.guard,k+1);assert(JSON.parse(storage['ember:codex']).kills.guard>=1,'saved to the device');
   t.reset();assert.equal(t.codex.kills.guard,k+1,'a new run keeps the codex');assert.equal(t.bag.bomb,0,'but starts with an empty bag');
 });
@@ -261,7 +261,7 @@ test('the warden speaks when you enter his hall; after a retry only one line',()
   t.loadStage(FINAL);t.enemies.forEach(e=>{if(e.type!=='boss')e.dead=true;});t.player.x=t.L.trigger+20;t.player.y=428;t.player.inv=0;advance(.02);
   assert.equal(t.state,'talk');assert.equal(t.talk.lines,t.TALK.boss);advance(2);assert.equal(t.player.hp,100,'he waits while talking');finishTalk();assert.equal(t.state,'play');
   t.player.hp=20;t.hurt(999,0);t.retryStage();t.enemies.forEach(e=>{if(e.type!=='boss')e.dead=true;});t.player.x=t.L.trigger+20;t.player.y=428;advance(.02);assert.equal(t.talk.lines,t.TALK.boss2);finishTalk();
-  const b=t.enemies.find(e=>e.type==='boss');b.hp=1;t.player.x=b.x-60;t.player.face=1;t.player.inv=100;t.action('attack');advance(.05);assert(b.dead);assert.equal(t.state,'cine','the defeat plays out first');finishCine();assert.equal(t.talk.lines,t.TALK.bossDown);assert(t.talk.auto,'and the lines run by themselves');finishTalk();assert(t.codex.lore.warden);
+  const b=t.enemies.find(e=>e.type==='boss');b.hp=1;t.player.x=b.x-60;t.player.face=1;t.player.inv=100;t.action('attack');advance(.12);assert(b.dead);assert.equal(t.state,'cine','the defeat plays out first');finishCine();assert.equal(t.talk.lines,t.TALK.bossDown);assert(t.talk.auto,'and the lines run by themselves');finishTalk();assert(t.codex.lore.warden);
 });
 test('the waystation sells items and one relic per visit',()=>{
   t.loadStage(firstRest());t.embers=1000;t.player.x=t.L.shop-13;t.player.y=428;advance(.02);t.action('interact');finishTalk();assert.equal(t.state,'shop');
@@ -282,7 +282,7 @@ test('soul upgrade increases damage and can pierce multiple enemies',()=>{
   const a=t.enemies[0],b=t.enemies[2];a.cd=b.cd=99;a.hp=a.max=200;b.hp=b.max=200;a.x=a.origin=500;b.x=b.origin=550;a.y=b.y=434;a.floor=b.floor=480;t.player.x=300;t.player.y=428;t.player.face=1;t.player.inv=100;t.player.skills.flame=1;t.player.soul=3;t.action('cast');advance(.5);assert.equal(a.hp,142);assert.equal(b.hp,142);
 });
 test('breakable urns pay once and are restored on a stage retry',()=>{
-  const b=t.breakables[0];assert.equal(b.kind,0);t.player.x=b.x-40;t.player.face=1;t.player.inv=100;t.action('attack');advance(.05);assert(b.broken);assert.equal(t.embers,20);advance(.4);t.action('attack');advance(.05);assert.equal(t.embers,20);t.retryStage();assert(!t.breakables[0].broken);assert.equal(t.embers,0);
+  const b=t.breakables[0];assert.equal(b.kind,0);t.player.x=b.x-40;t.player.face=1;t.player.inv=100;t.action('attack');advance(.12);assert(b.broken);assert.equal(t.embers,20);advance(.4);t.action('attack');advance(.12);assert.equal(t.embers,20);t.retryStage();assert(!t.breakables[0].broken);assert.equal(t.embers,0);
 });
 test('the boss telegraphs and fires an aimed flame at a distant player',()=>{
   t.loadStage(FINAL);t.flags.boss=true;t.enemies.forEach(e=>{if(e.type!=='boss')e.dead=true;});const b=t.enemies.find(e=>e.type==='boss');t.player.x=b.x-300;t.player.y=428;t.player.inv=100;b.spellCd=0;advance(.05);assert(b.spell);assert(b.wind>0);assert.equal(t.shots.length,0);advance(1);assert(t.shots.some(s=>s.flame),'after the warning a flame travels toward the player');
@@ -295,7 +295,7 @@ test('freezing the warden cancels a queued ranged attack',()=>{
 });
 test('new relics reward soul casting, healthy swordplay and repeated kills',()=>{
   t.relics.wick=true;t.player.hp=60;t.player.soul=3;t.action('cast');assert.equal(t.player.hp,80);
-  t.reset();t.relics.hunter=true;const e=t.enemies[0];e.hp=100;e.cd=99;t.player.x=e.x-45;t.player.inv=100;t.action('attack');advance(.04);assert.equal(e.hp,69);
+  t.reset();t.relics.hunter=true;const e=t.enemies[0];e.hp=100;e.cd=99;t.player.x=e.x-45;t.player.inv=100;t.action('attack');advance(.12);assert.equal(e.hp,69);
   t.reset();t.relics.salvager=true;for(const foe of t.enemies.slice(0,4))t.killEnemy(foe);assert.equal(t.bag.bomb,1);
 });
 test('down plus jump drops through only the current suspended platform',()=>{
@@ -328,14 +328,14 @@ test('the lock beast charges across its hall, hits the wall, shakes rocks loose 
   advance(.05);assert.equal(b.move,'charge');assert(b.wind>0,'it scrapes and vents steam before charging');assert.equal(t.shots.length,0,'no projectiles');
   for(let i=0;i<400&&!b.stun;i++)t.step(1/120);
   assert(b.stun,'it crashed');assert(b.x<=t.L.gate+15,'it ran the whole hall');assert.equal(t.hazards.filter(h=>h.k==='rock').length,3,'rocks start to fall');
-  advance(.1);const hp=b.hp;t.player.x=b.x+b.w+10;t.player.face=-1;t.action('attack');advance(.05);assert(b.stun&&b.hp<hp,'a dazed beast can be punished');
+  advance(.1);const hp=b.hp;t.player.x=b.x+b.w+10;t.player.face=-1;t.action('attack');advance(.12);assert(b.stun&&b.hp<hp,'a dazed beast can be punished');
 });
 test('the drowned lantern spits arcing globs that leave acid pools, and dives where blades cannot reach',()=>{
   t.loadStage(t.STAGES.findIndex(s=>s.bossKind==='brood'));t.flags.boss=true;const b=t.enemies[0];b.cd=0;b.spellCd=99;t.player.x=b.x-300;t.player.y=428;t.player.inv=100;
   advance(.05);assert.equal(b.move,'spit');advance(.8);const globs=t.shots.filter(s=>s.k==='glob');assert.equal(globs.length,3);assert(globs.every(s=>s.g>0),'they fly in arcs');
   advance(1.2);assert(t.hazards.some(h=>h.k==='pool'),'globs leave pools of acid');
   t.shots.length=0;t.hazards.length=0;Object.assign(b,{move:'',wind:0,act:0,rec:0,cd:0,spellCd:0});advance(.7);assert(b.under>.5,'it sinks');
-  const hp=b.hp;t.player.x=b.x;t.player.face=1;t.action('attack');advance(.05);assert.equal(b.hp,hp,'a submerged lantern cannot be cut');
+  const hp=b.hp;t.player.x=b.x;t.player.face=1;t.action('attack');advance(.12);assert.equal(b.hp,hp,'a submerged lantern cannot be cut');
 });
 test('the standard-bearer plants its banner and spectral spears burst up one after another',()=>{
   t.loadStage(t.STAGES.findIndex(s=>s.bossKind==='standard'));t.flags.boss=true;const b=t.enemies[0];b.spellCd=0;t.player.x=b.x-300;t.player.y=428;t.player.inv=100;
@@ -351,7 +351,7 @@ test('the warden tolls his bell in phase two; the ring is too tall to jump but c
 });
 test('cutting one of the warden\'s soul-flames frees it and gives back a soul charge',()=>{
   t.loadStage(FINAL);t.player.x=600;t.player.y=428;t.player.face=1;t.player.inv=100;advance(.02);t.player.soul=0;t.shots.push({k:'flame',flame:true,x:t.player.x+13+50,y:t.player.y+20,vx:-200,vy:0,life:2,d:10});
-  t.action('attack');advance(.06);assert.equal(t.shots.length,0);assert.equal(t.player.soul,1);
+  t.action('attack');advance(.12);assert.equal(t.shots.length,0);assert.equal(t.player.soul,1);
 });
 test('an iron gate drops behind you when a boss fight starts and lifts once the boss falls',()=>{
   t.loadStage(t.STAGES.findIndex(s=>s.bossKind==='lock'));t.player.x=t.L.trigger+20;t.player.y=428;t.player.inv=100;advance(.03);finishTalk();advance(.4);assert(t.gateK>.9,'the gate is down');
@@ -364,7 +364,7 @@ test('ringing the bell plays the illustrated ending before the victory panel',()
   for(let i=0;i<40&&t.talk;i++)press('KeyE');assert(!t.talk);assert(t.credits,'then the credits roll');press('KeyE');assert(!t.credits);assert.equal(nodes.panel.hidden,false,'then the victory panel');assert.equal(storage['ember:clears'],'1','a clear is counted');assert(t.keepsakes.chain,'and you keep the broken lock');
 });
 test('pickups show up as drawn items with a count, never as written names',()=>{
-  const u=t.breakables.find(q=>q.kind===2);t.player.x=u.x-40;t.player.face=1;t.player.inv=100;t.action('attack');advance(.05);
+  const u=t.breakables.find(q=>q.kind===2);t.player.x=u.x-40;t.player.face=1;t.player.inv=100;t.action('attack');advance(.12);
   assert(t.floats.some(f=>f.art==='knife'&&f.t==='×2'),'a drawn knife bundle pops out');assert(!t.floats.some(f=>/飞刀/.test(f.t)),'no written name');assert(t.loot.some(o=>o.id==='knife'),'and flies to you');
   t.reset();t.player.x=t.L.npc-13;t.player.y=428;advance(.02);t.action('interact');finishTalk();assert(t.loot.some(o=>o.id==='bomb'),'the bellkeeper\'s fire flask flies over as a picture');
 });
@@ -394,8 +394,8 @@ test('consumable base damage does not silently scale with enemy health by chapte
   t.loadStage(stageOf('sewers'));const e=t.enemies[0];e.cd=99;t.player.inv=100;t.player.face=1;t.player.x=e.x-200;t.bag.knife=1;t.sel='knife';const before=e.hp;t.action('use');advance(.45);assert.equal(before-e.hp,30);
 });
 test('heavy swing damage is rounded consistently and tassel boosts it by forty percent',()=>{
-  const e=t.enemies[0];e.hp=e.max=300;e.cd=99;t.player.inv=100;t.player.x=e.x-45;t.player.face=1;t.action('attack');advance(.4);t.player.x=e.x-45;t.action('attack');advance(.4);const before=e.hp;t.player.x=e.x-45;t.action('attack');advance(.05);assert.equal(before-e.hp,32);
-  t.reset();t.relics.tassel=true;const q=t.enemies[0];q.hp=q.max=300;q.cd=99;t.player.inv=100;t.player.x=q.x-45;t.player.face=1;t.action('attack');advance(.4);t.player.x=q.x-45;t.action('attack');advance(.4);const before2=q.hp;t.player.x=q.x-45;t.action('attack');advance(.05);assert.equal(before2-q.hp,45);
+  const e=t.enemies[0];e.hp=e.max=300;e.cd=99;t.player.inv=100;t.player.x=e.x-45;t.player.face=1;t.action('attack');advance(.4);t.player.x=e.x-45;t.action('attack');advance(.4);const before=e.hp;t.player.x=e.x-45;t.action('attack');advance(.12);assert.equal(before-e.hp,32);
+  t.reset();t.relics.tassel=true;const q=t.enemies[0];q.hp=q.max=300;q.cd=99;t.player.inv=100;t.player.x=q.x-45;t.player.face=1;t.action('attack');advance(.4);t.player.x=q.x-45;t.action('attack');advance(.4);const before2=q.hp;t.player.x=q.x-45;t.action('attack');advance(.12);assert.equal(before2-q.hp,45);
 });
 test('inventory and shop display ghost counts rather than internal life units',()=>{
   t.player.hp=20;t.action('bag');assert(nodes.panel.innerHTML.includes('>1 / 5</b>'));press('Escape');t.loadStage(firstRest());t.player.hp=40;t.player.x=t.L.shop-13;t.action('interact');finishTalk();assert.equal(t.state,'shop');assert(nodes.panel.innerHTML.includes('>2 / 5</b>'));
@@ -429,19 +429,19 @@ test('the bell apprentice hits slow and heavy; the archer shoots arrows that als
   t.reset(false,'bell');assert.equal(t.player.char,'bell');assert.equal(t.player.max,120);const e=t.enemies[0];e.cd=99;e.hp=e.max=500;t.player.inv=100;t.player.x=e.x-50;t.player.face=1;
   t.action('attack');advance(.1);assert.equal(500-e.hp,36);t.player.soul=1;advance(.5);press('Digit1');release('Digit1');assert.equal(t.player.soul,0);assert.equal(t.thrown.filter(o=>o.k==='pwave').length,2,'a quake runs both ways');
   t.reset(false,'bow');assert.equal(t.player.max,80);const a=t.enemies[0];a.cd=99;a.hp=a.max=500;t.player.inv=100;t.player.x=a.x-200;t.player.face=1;t.player.soul=0;
-  t.action('attack');advance(.04);assert(t.thrown.some(o=>o.k==='arrow'),'an arrow flies');advance(.5);assert(a.hp<500,'and lands');assert.equal(t.player.soul,1,'arrows charge soul too');
+  t.action('attack');advance(.12);assert(t.thrown.some(o=>o.k==='arrow'),'an arrow flies');advance(.5);assert(a.hp<500,'and lands');assert.equal(t.player.soul,1,'arrows charge soul too');
   advance(.4);press('Digit1');release('Digit1');assert.equal(t.thrown.filter(o=>o.k==='arrow').length,5,'a fan of five');t.reset(false,'lamp');
 });
 test('keys can be rebound in the settings and work at once',()=>{
   t.rebinding={a:'attack',i:0};t.finishRebind('KeyX');assert.equal(t.BIND.attack[0],'KeyX');assert(JSON.parse(storage['ember:settings']).keys.attack.includes('KeyX'),'saved');
-  const e=t.enemies[0];e.cd=99;t.player.inv=100;t.player.x=e.x-45;t.player.face=1;press('KeyX');advance(.05);release('KeyX');assert(e.hp<e.max,'X attacks now');
+  const e=t.enemies[0];e.cd=99;t.player.inv=100;t.player.x=e.x-45;t.player.face=1;press('KeyX');advance(.12);release('KeyX');assert(e.hp<e.max,'X attacks now');
   t.rebinding={a:'attack',i:0};t.finishRebind('KeyJ');assert.equal(t.BIND.attack[0],'KeyJ');nodes.panel.hidden=true;
 });
 test('a shield jailer blocks frontal swings until a heavy third swing breaks its guard; its back is open',()=>{
   const s=t.enemies.find(e=>e.type==='shield');t.enemies.forEach(e=>{if(e!==s)e.dead=true;});t.player.x=s.origin-45;t.player.y=428;advance(.02);s.cd=99;s.x=s.origin;s.face=-1;t.player.inv=100;t.player.x=s.x-45;t.player.face=1;
-  const hp=s.hp;t.action('attack');advance(.05);assert.equal(s.hp,hp,'blocked');advance(.4);t.action('attack');advance(.45);assert.equal(s.hp,hp,'still blocked');
-  t.action('attack');advance(.05);assert(s.brk>0,'guard broken');assert(s.hp<hp);
-  advance(.4);s.brk=0;s.face=1;s.turnT=0;const hp2=s.hp;t.player.x=s.x-45;t.action('attack');advance(.05);assert(s.hp<hp2,'hit in the back');
+  const hp=s.hp;t.action('attack');advance(.12);assert.equal(s.hp,hp,'blocked');advance(.4);t.action('attack');advance(.45);assert.equal(s.hp,hp,'still blocked');
+  t.action('attack');advance(.12);assert(s.brk>0,'guard broken');assert(s.hp<hp);
+  advance(.4);s.brk=0;s.face=1;s.turnT=0;const hp2=s.hp;t.player.x=s.x-45;t.action('attack');advance(.12);assert(s.hp<hp2,'hit in the back');
 });
 test('bats swoop, bone casters blink away and cast, bombers lob flasks that leave pools',()=>{
   const f=t.enemies.filter(e=>e.type==='flyer')[1];t.enemies.forEach(e=>{if(e!==f)e.dead=true;});t.player.x=f.origin-150;t.player.y=428;t.player.inv=0;t.cam=f.origin-500;advance(.05);f.cd=0;advance(.05);assert(f.wind>0,'it rears back first');advance(1.4);assert(t.player.hp<100,'then dives into you');
@@ -463,7 +463,7 @@ test('every map is longer, has its own traps and the new enemies',()=>{
   ['lock','brood','standard','warden'].forEach(k=>assert(t.SONGS[k]&&t.SONGS[k+'2']&&t.SONGS[k].bpm<t.SONGS[k+'2'].bpm,k+' has a faster second phase theme'));
 });
 test('a new cycle makes enemies tougher and can start with an unlocked character',()=>{
-  t.clears=2;t.tutorialDone=true;t.startJourney('bow',2);finishTalk();advance(1);assert.equal(t.player.char,'bow');assert.equal(t.cycle,2);assert(!t.L.tutorial);finishTalk();assert.equal(t.enemies[0].max,Math.round(72*1.8));assert(t.enemies.some(q=>q.elite),'some jailers are elites now');
+  t.clears=2;t.tutorialDone=true;t.startJourney('bow',2);finishTalk();advance(1);assert.equal(t.player.char,'bow');assert.equal(t.cycle,2);assert(!t.L.tutorial);finishTalk();assert.equal(t.enemies[0].max,Math.round(72*(1+.35*2)));assert(t.enemies.some(q=>q.elite),'some jailers are elites now');
   t.cycle=0;t.clears=0;t.reset(false,'lamp');
 });
 test('the journey is saved at every door and can be continued from the title screen',()=>{
@@ -477,7 +477,7 @@ test('dialogue types with pauses at punctuation, and auto mode turns the pages i
   t.settings.autoTalk=true;const i0=t.talk.i;advance(5);assert(!t.talk||t.talk.i>i0,'auto mode turns the page');t.settings.autoTalk=false;finishTalk();
 });test('chapter one challenge does not force the first-run tutorial',()=>{t.tutorialDone=false;t.startChapter(1);assert.equal(JSON.parse(storage['ember:save']).stage,0);assert.equal(t.stage,0);assert(!t.L.tutorial);assert.equal(t.state,'talk');finishTalk();assert.equal(t.state,'play');t.tutorialDone=true;});
 test('portrait touch screen blocks combat and rotation resumes the same run',()=>{const x=t.player.x;t.settings.touch='show';sandbox.innerWidth=375;sandbox.innerHeight=812;listeners.resize();assert.equal(nodes['rotate-screen'].hidden,false);press('KeyD');advance(.5);t.action('attack');assert.equal(t.player.x,x);assert.equal(t.player.attack,0);release('KeyD');sandbox.innerWidth=812;sandbox.innerHeight=375;listeners.resize();assert.equal(nodes['rotate-screen'].hidden,true);press('KeyD');advance(.2);release('KeyD');assert(t.player.x>x);t.settings.touch='auto';sandbox.innerWidth=1100;sandbox.innerHeight=620;listeners.resize();});
-test('first journey starts as the lamp bearer and enters the furnace before level one',()=>{t.clears=0;t.tutorialDone=false;t.startJourney('bow',2);assert.equal(t.player.char,'lamp');assert.equal(t.talk.lines,t.TALK.prologue);finishTalk();advance(1);assert(t.L.tutorial);t.finishTutorial();advance(1);assert.equal(t.stage,0);assert(t.run.guided);finishTalk();assert.equal(t.state,'play');});
+test('first journey keeps the chosen bearer, stays on cycle one, and enters the furnace before level one',()=>{t.clears=0;t.tutorialDone=false;t.startJourney('bow',2);assert.equal(t.player.char,'bow');assert.equal(t.cycle,0);assert.equal(t.talk.lines,t.TALK.prologue);finishTalk();advance(1);assert(t.L.tutorial);t.finishTutorial();advance(1);assert.equal(t.stage,0);assert(t.run.guided);finishTalk();assert.equal(t.state,'play');});
 test('later journeys retain prologue and skip the completed tutorial',()=>{t.tutorialDone=true;t.startJourney('lamp',0);assert.equal(t.talk.lines,t.TALK.prologue);finishTalk();advance(1);assert.equal(t.stage,0);assert(!t.L.tutorial);assert.equal(t.state,'talk');finishTalk();assert.equal(t.state,'play');});
 test('the map opens with M, fills in as you explore, and the cartographer sells the whole floor',()=>{
   advance(.1);assert(t.run.seen&&t.run.seen.s0,'exploration is recorded');const seen0=t.run.seen.s0.reduce((a,b)=>a+b,0);t.player.inv=100;
