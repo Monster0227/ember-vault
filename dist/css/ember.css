@@ -44,7 +44,11 @@ h1{font:700 clamp(42px,6vw,78px)/1.2 Georgia,"SimSun",serif;letter-spacing:9px;m
 .keys{color:#979faa;font-size:12px;line-height:2.3;margin:22px 0}
 .footnote{color:#758490;font-size:11px}
 #hint{position:absolute;bottom:20px;left:0;right:0;text-align:center;color:#a2a8ac;font-size:12px;pointer-events:none}
-#touch{position:absolute;left:0;right:0;bottom:0;height:0;pointer-events:none}
+#coach-skip{position:absolute;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));z-index:6;min-width:64px;min-height:44px;padding:8px 14px;border-radius:999px;border:1px solid #e7d7b0;background:#2a2118ee;color:#f3e6c8;font:600 14px "PingFang SC","Microsoft YaHei",sans-serif}
+#coach-skip[hidden]{display:none}
+#touch{position:absolute;left:0;right:0;bottom:0;height:0;pointer-events:none;opacity:var(--touch-a,1)}
+#touch .actions{translate:var(--touch-x,0) var(--touch-y,0)}
+#pad{translate:calc(var(--touch-x,0) * -1) var(--touch-y,0)}
 #touch:not([hidden]){display:block}
 #touch button,#pad{position:absolute;pointer-events:auto;border:1px solid #c8d3d04d;background:#28384685;color:#e8ece8;font-size:13px;touch-action:none;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 #touch button{border-radius:50%;padding:0}
@@ -530,6 +534,8 @@ html,body,#stage{max-width:100%;overflow-x:hidden}
 }
 
 /* Very short landscape phones */
+#touch button{min-width:64px;min-height:64px}
+#touch button svg{width:48px;height:48px;max-width:48px;max-height:48px}
 @media (pointer:coarse) and (orientation:landscape) and (max-height:420px){
   #hud{top:max(4px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right))}
   #minimap{display:none}
