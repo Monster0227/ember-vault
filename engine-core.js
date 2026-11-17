@@ -46,7 +46,8 @@ class Physics {
         else{this.box.x=a.x;this.box.y=a.y;this.box.w=a.w;this.box.h=a.h||floor-a.y;if(sweepAABB(p,dx,dy,this.box,this.hit)&&this.hit.time<=best){best=this.hit.time;nx=this.hit.nx;ny=this.hit.ny;target=a;}}
       }
       p.x+=dx*best;p.y+=dy*best;if(!target)break;dx*=1-best;dy*=1-best;
-      if(nx){dx=0;p.vx=0;}if(ny){dy=0;p.vy=0;if(ny===-1){p.ground=true;p.jumps=0;this.landed=target;}}if(best===1)break;
+      if(nx){const rise=p.y+p.h-target.y;if(rise>-1&&rise<=16){p.y-=rise;p.vy=0;p.ground=true;if(p.jumps!=null)p.jumps=0;this.landed=target;}else{dx=0;p.vx=0;}}
+      if(ny){dy=0;p.vy=0;if(ny===-1){p.ground=true;if(p.jumps!=null)p.jumps=0;this.landed=target;}}if(best===1)break;
     }
   }
 }
