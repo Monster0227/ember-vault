@@ -207,7 +207,7 @@ test('falling into a rampart gap hurts and puts you back on solid ground',()=>{
   assert.equal(t.player.hp,80);assert(t.player.x<900-26,'back before the gap');assert.equal(t.player.y,428);
 });
 test('sewer acid burns and cannot be pogoed off',()=>{
-  t.loadStage(stageOf('sewers'));const a=t.L.acid[0];t.player.x=a[0]+40;t.player.y=428;advance(.02);assert(t.player.hp<100);
+  t.loadStage(stageOf('sewers'));const a=t.L.acid[0];t.player.x=a[0]+40;t.player.y=428;advance(.2);assert.equal(t.player.hp,100,'acid warns before it bites');advance(.4);assert(t.player.hp<100);
   t.player.inv=100;t.player.x=a[0]+40;t.player.y=388;t.player.vy=200;t.player.ground=false;press('KeyS');t.action('attack');advance(.12);release('KeyS');assert(t.player.vy>0,'no bounce off acid');
 });
 test('dying on a later map retries it with the stats you came in with',()=>{
