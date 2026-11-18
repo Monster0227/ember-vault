@@ -46,10 +46,11 @@ test('platform collision and landing above ground',()=>{
   assert.equal(t.player.y,370-t.player.h);assert(t.player.ground);
 });
 test('one hit per enemy per swing, combo and kill reward',()=>{
-  const e=t.enemies[0];t.player.x=e.x-45;t.player.face=1;t.player.inv=100;
-  t.action('attack');advance(.15);assert.equal(e.hp,48);
-  advance(.3);t.action('attack');advance(.2);assert.equal(e.hp,24);
-  advance(.3);t.action('attack');advance(.2);assert(e.dead);assert.equal(t.score,25);
+  const e=t.enemies[0];e.cd=99;t.player.inv=100;t.player.face=1;const dmg=t.player.damage;
+  t.player.x=e.x-40;t.action('attack');advance(.15);assert.equal(e.hp,72-dmg);
+  t.player.x=e.x-40;advance(.15);t.action('attack');advance(.2);assert.equal(e.hp,72-dmg*2);
+  let n=2;while(!e.dead&&n<8){t.player.x=e.x-40;t.player.face=1;advance(.2);t.action('attack');advance(.2);n++;}
+  assert(e.dead);assert(n>3,'the agile knife does not fell a guard in three hits');assert.equal(t.score,25);
 });
 test('roll immunity, cooldown and damage recovery',()=>{
   t.action('roll');t.hurt(20,200);assert.equal(t.player.hp,100);
@@ -92,7 +93,7 @@ test('archers hold fire while off-screen and shoot once visible',()=>{
 });
 test('boss enrages at half health, roars, then slams out shockwaves that can be jumped or rolled',()=>{
   t.loadStage(FINAL);t.flags.boss=true;const b=t.enemies.find(e=>e.type==='boss');b.hp=b.max/2;b.cd=0;t.player.x=b.x-80;t.player.inv=100;
-  advance(.05);assert(b.rage);assert(b.roar,'it roars before phase two');advance(2.6);assert.equal(t.waves.length,2,'the phase-two slam sends a wave each way');
+  advance(.05);assert(b.rage);assert(b.roar,'it roars before phase two');advance(4);assert.equal(t.waves.length,2,'the phase-two slam sends a wave each way');
   t.waves.length=0;b.frozen=99;t.enemies.forEach(e=>{if(e.type!=='boss')e.dead=true;});   // 冻住首领，单独检查冲击波
   const ground=()=>{t.player.x=900;t.player.y=428;t.player.vx=0;t.player.vy=0;t.player.inv=0;t.player.roll=0;t.player.rollCd=0;t.player.hp=100;t.player.face=1;advance(.05);};
   ground();t.waves.push({x:t.player.x+13+90,dir:-1,life:1});advance(.5);assert.equal(t.player.hp,80);
@@ -107,9 +108,9 @@ test('checkpoint lights, heals and respawn restarts only the boss fight',()=>{
   t.respawn();assert.equal(t.state,'play');assert.equal(t.player.hp,100);assert(t.player.x>t.L.checkpoint);assert.equal(b.hp,60);assert(b.rage,'the depleted phase stays');
 });
 test('slain enemies fade out before disappearing',()=>{
-  const e=t.enemies[0];t.player.x=e.x-45;t.player.face=1;t.player.inv=100;
-  t.action('attack');advance(.45);t.action('attack');advance(.5);t.action('attack');advance(.12);
-  assert(e.dead);assert(e.dieT>.3);advance(.55);assert.equal(e.dieT,0); // 4-frame attack startup
+  const e=t.enemies[0];e.hp=1;e.cd=99;t.player.x=e.x-40;t.player.face=1;t.player.inv=100;
+  t.action('attack');advance(.12);
+  assert(e.dead);assert(e.dieT>.3);advance(.55);assert.equal(e.dieT,0);
 });
 test('chest button only shows next to an unopened chest',()=>{
   t.player.x=600;t.player.y=318;t.player.vy=0;advance(.02);assert.equal(nodes['chest-btn'].hidden,false);
@@ -131,8 +132,8 @@ test('arrows fly over a rolling player but hit a standing one',()=>{
   assert.equal(t.player.hp,80);assert.equal(t.shots.length,0);
 });
 test('slain enemies scatter embers that fly into the player',()=>{
-  const e=t.enemies[0];t.player.x=e.x-45;t.player.face=1;t.player.inv=100;
-  t.action('attack');advance(.45);t.action('attack');advance(.5);t.action('attack');advance(.12);
+  const e=t.enemies[0];e.hp=1;e.cd=99;t.player.x=e.x-40;t.player.face=1;t.player.inv=100;
+  t.action('attack');advance(.12);
   assert(e.dead);assert(t.orbs.length>=5);advance(2);assert.equal(t.orbs.length,0);
 });
 test('chest rewards mix an upgrade, an item and usually a relic, picked with 1 / 2 / 3',()=>{
@@ -144,12 +145,12 @@ test('chest rewards mix an upgrade, an item and usually a relic, picked with 1 /
 });
 test('holding up turns the swing into an up slash that reaches a guard above',()=>{
   const e=t.enemies[3];t.player.x=e.x+1;t.player.y=428;t.player.vy=0;t.player.face=1;t.player.inv=100;advance(.02);
-  press('KeyW');t.action('attack');advance(.12);release('KeyW');assert.equal(e.hp,48);
-  advance(.4);t.action('attack');advance(.12);assert.equal(e.hp,48,'a side slash cannot reach the platform above');
+  press('KeyW');t.action('attack');advance(.12);release('KeyW');assert.equal(e.hp,72-t.player.damage);
+  advance(.4);t.action('attack');advance(.12);assert.equal(e.hp,72-t.player.damage,'a side slash cannot reach the platform above');
 });
 test('down slash in the air hits a guard below and bounces off it',()=>{
   const e=t.enemies[2];e.cd=99;t.player.x=e.x+1;t.player.y=340;t.player.vy=0;t.player.ground=false;t.player.inv=100;
-  press('KeyS');t.action('attack');advance(.12);release('KeyS');assert.equal(e.hp,48);assert(t.player.vy<-300,'bounced, vy='+t.player.vy);
+  press('KeyS');t.action('attack');advance(.12);release('KeyS');assert.equal(e.hp,72-t.player.damage);assert(t.player.vy<-300,'bounced, vy='+t.player.vy);
 });
 test('down slash bounces off spikes instead of landing on them',()=>{
   t.player.x=1530;t.player.y=390;t.player.vy=200;t.player.ground=false;t.player.inv=0;
@@ -195,8 +196,8 @@ test('the merchant sells healing for embers and you can walk away',()=>{
   t.action('interact');assert.equal(t.state,'shop','only one hello per visit');
 });
 test('kills pay embers, and later maps hit harder with tougher enemies',()=>{
-  const e=t.enemies[0];t.player.x=e.x-45;t.player.face=1;t.player.inv=100;
-  t.action('attack');advance(.45);t.action('attack');advance(.5);t.action('attack');advance(.12);assert(e.dead);assert.equal(t.embers,25);
+  const e=t.enemies[0];e.hp=1;e.cd=99;t.player.x=e.x-40;t.player.face=1;t.player.inv=100;
+  t.action('attack');advance(.12);assert(e.dead);assert.equal(t.embers,25);
   t.loadStage(stageOf('sewers'));assert.equal(t.enemies[0].max,Math.round(72*1.35));
   t.loadStage(stageOf('ramparts'));const el=t.enemies.find(q=>q.elite);assert(el);assert.equal(el.max,Math.round(260*1.7));assert(el.w>30);
   t.player.inv=0;t.player.x=1400;t.shots.push({x:t.player.x+13-60,y:t.player.y+20,vx:320,life:2,d:Math.round(12*t.L.dmgK)});advance(.3);assert.equal(t.player.hp,80);
@@ -249,7 +250,7 @@ test('fire flasks burst on enemies, knives fly straight, the frost bell freezes'
 test('relics: the plate blocks every third hit, second wind saves a ghost, and the pendant heals after four kills',()=>{
   t.relics.plate=true;t.hurt(20,0);assert.equal(t.player.hp,80);t.player.inv=0;t.hurt(20,0);assert.equal(t.player.hp,60);t.player.inv=0;t.hurt(20,0);assert.equal(t.player.hp,60);
   t.reset();t.relics.wind=true;t.player.hp=20;t.hurt(50,0);assert.equal(t.player.hp,20);assert.equal(t.state,'play');t.player.inv=0;t.hurt(50,0);assert.equal(t.state,'dead');
-  t.reset();t.relics.leech=true;t.player.hp=60;for(const e of t.enemies.slice(0,4))t.killEnemy(e);assert.equal(t.player.hp,80);
+  t.reset(false,'bell');t.relics.leech=true;t.player.hp=60;for(const e of t.enemies.slice(0,4))t.killEnemy(e);assert.equal(t.player.hp,80);t.reset(false,'lamp');
 });
 test('the bag opens with B, and the codex keeps sightings, kills and items across runs',()=>{
   press('KeyB');release('KeyB');assert.equal(t.state,'bag');const x=t.enemies[0].x;advance(1);assert.equal(t.enemies[0].x,x);press('Escape');assert.equal(t.state,'play');
@@ -295,7 +296,7 @@ test('freezing the warden cancels a queued ranged attack',()=>{
 });
 test('new relics reward soul casting, healthy swordplay and repeated kills',()=>{
   t.relics.wick=true;t.player.hp=60;t.player.soul=3;t.action('cast');assert.equal(t.player.hp,80);
-  t.reset();t.relics.hunter=true;const e=t.enemies[0];e.hp=100;e.cd=99;t.player.x=e.x-45;t.player.inv=100;t.action('attack');advance(.12);assert.equal(e.hp,69);
+  t.reset();t.relics.hunter=true;const e=t.enemies[0];e.hp=100;e.cd=99;t.player.x=e.x-45;t.player.inv=100;t.action('attack');advance(.12);assert.equal(e.hp,100-Math.round(t.player.damage*1.3));
   t.reset();t.relics.salvager=true;for(const foe of t.enemies.slice(0,4))t.killEnemy(foe);assert.equal(t.bag.bomb,1);
 });
 test('down plus jump drops through only the current suspended platform',()=>{
@@ -315,7 +316,7 @@ test('a ground enemy cannot walk into an elevated stone ledge',()=>{
   const e=t.enemies[0],a=t.platforms.find(q=>q.solid);t.player.x=a.x+80;t.player.inv=100;advance(5);assert(e.x+e.w<=a.x+.01);
 });
 test('a defeated chapter boss unlocks a replay with a balanced fresh loadout',()=>{
-  t.reset();const idx=t.STAGES.findIndex(s=>s.bossKind==='lock');t.loadStage(idx);t.killEnemy(t.enemies[0]);assert.equal(storage['ember:unlocked'],'2');assert.equal(nodes['chapter-2'].disabled,false);assert.equal(nodes['chapter-3'].disabled,true);t.startChapter(2);assert.equal(t.L.chapter,2);assert(t.L.chapterStart);assert.equal(t.state,'talk');assert.equal(t.player.damage,33);assert.equal(t.player.hp,120);assert.equal(t.player.potions,2);assert.equal(t.bag.bomb,2);
+  t.reset();const idx=t.STAGES.findIndex(s=>s.bossKind==='lock');t.loadStage(idx);t.killEnemy(t.enemies[0]);assert.equal(storage['ember:unlocked'],'2');assert.equal(nodes['chapter-2'].disabled,false);assert.equal(nodes['chapter-3'].disabled,true);t.startChapter(2);assert.equal(t.L.chapter,2);assert(t.L.chapterStart);assert.equal(t.state,'talk');assert.equal(t.player.damage,23);assert.equal(t.player.hp,120);assert.equal(t.player.potions,2);assert.equal(t.bag.bomb,2);
 });
 test('all four boss arenas have an intro, a sealed exit and the correct continuation',()=>{
   for(const arena of t.STAGES.filter(s=>s.arena)){t.reset();const index=t.STAGES.indexOf(arena);t.loadStage(index);t.player.x=arena.trigger+20;t.player.y=428;t.player.inv=100;advance(.03);assert.equal(t.state,'talk',arena.name+' has an introduction');finishTalk();const b=t.enemies.find(e=>e.type==='boss');t.player.x=arena.seal+20;advance(.03);assert.equal(t.state,'play');assert.equal(t.stage,index);assert(t.player.x<=arena.seal);t.killEnemy(b);assert.equal(t.state,'cine',arena.name+' has a defeat scene');finishCine();assert.equal(t.state,'talk',arena.name+' has a conclusion');finishTalk();t.player.x=arena.seal+20;advance(1.8);if(arena.bossKind==='warden'){finishCine();assert.equal(t.state,'win');}else{assert.equal(t.stage,index+1);assert(t.L.rest);}}
@@ -394,8 +395,8 @@ test('consumable base damage does not silently scale with enemy health by chapte
   t.loadStage(stageOf('sewers'));const e=t.enemies[0];e.cd=99;t.player.inv=100;t.player.face=1;t.player.x=e.x-200;t.bag.knife=1;t.sel='knife';const before=e.hp;t.action('use');advance(.45);assert.equal(before-e.hp,30);
 });
 test('heavy swing damage is rounded consistently and tassel boosts it by forty percent',()=>{
-  const e=t.enemies[0];e.hp=e.max=300;e.cd=99;t.player.inv=100;t.player.x=e.x-45;t.player.face=1;t.action('attack');advance(.4);t.player.x=e.x-45;t.action('attack');advance(.4);const before=e.hp;t.player.x=e.x-45;t.action('attack');advance(.12);assert.equal(before-e.hp,32);
-  t.reset();t.relics.tassel=true;const q=t.enemies[0];q.hp=q.max=300;q.cd=99;t.player.inv=100;t.player.x=q.x-45;t.player.face=1;t.action('attack');advance(.4);t.player.x=q.x-45;t.action('attack');advance(.4);const before2=q.hp;t.player.x=q.x-45;t.action('attack');advance(.12);assert.equal(before2-q.hp,45);
+  const e=t.enemies[0];e.hp=e.max=300;e.cd=99;t.player.inv=100;t.player.x=e.x-45;t.player.face=1;t.action('attack');advance(.4);t.player.x=e.x-45;t.action('attack');advance(.4);const before=e.hp;t.player.x=e.x-45;t.action('attack');advance(.12);assert.equal(before-e.hp,Math.round(t.player.damage*1.35));
+  t.reset();t.relics.tassel=true;const q=t.enemies[0];q.hp=q.max=300;q.cd=99;t.player.inv=100;t.player.x=q.x-45;t.player.face=1;t.action('attack');advance(.4);t.player.x=q.x-45;t.action('attack');advance(.4);const before2=q.hp;t.player.x=q.x-45;t.action('attack');advance(.12);assert.equal(before2-q.hp,Math.round(t.player.damage*1.89));
 });
 test('inventory and shop display ghost counts rather than internal life units',()=>{
   t.player.hp=20;t.action('bag');assert(nodes.panel.innerHTML.includes('>1 / 5</b>'));press('Escape');t.loadStage(firstRest());t.player.hp=40;t.player.x=t.L.shop-13;t.action('interact');finishTalk();assert.equal(t.state,'shop');assert(nodes.panel.innerHTML.includes('>2 / 5</b>'));

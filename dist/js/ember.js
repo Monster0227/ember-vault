@@ -69,7 +69,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   const gainBox=document.getElementById('gain'),gainArt=document.getElementById('gain-art'),gainName=document.getElementById('gain-name'),gainInfo=document.getElementById('gain-info');
   const LIFE=20,FLOOR=480,CHECKPOINT=3560,ROLL=.22,TAU=Math.PI*2,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   // 手感起步值，实机可调。攻击 4 帧前摇 / 3 帧判定 / 7 帧后摇，按 60fps。
-  const FEEL={coyote:.1,buffer:.12,grav:1420,fall:1.5,accel:.08,brake:.06,hitStop:3/60,hurtStop:6/60,shakeHit:2,shakeHurt:4,kb:200,kbTime:.15,kbBoss:.35,hurtInv:1,dodge:.2,dodgeCd:.8,dead:.1};
+  const FEEL={coyote:.1,buffer:.12,grav:1420,fall:1.5,accel:.08,brake:.06,hitStop:3/60,hurtStop:6/60,shakeHit:2,shakeHurt:4,shakeDur:.1,kb:200,kbTime:.15,kbBoss:.35,hurtInv:1,dodge:.2,dodgeCd:.8,dead:.1,swing:14/60};
   let WORLD=4400,stage=0,L=null,T=null,PAL=null,decor=null,embers=0,entry=null,titleT=0,nearKind='';
   let W=1100,H=620,scale=1,viewY=0,tall=false,cam=0,time=0,last=0,state='menu',paused=false,lowFx=false,slowT=0;
   let p,enemies=[],shots=[],waves=[],breakables=[],particles=[],floats=[],orbs=[],fx=[],chunks=[],platforms=[],chests=[],kills=0,shake=0,hitstop=0,checkpoint=false,nearChest=false,bellRing=0;
@@ -316,12 +316,16 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       chests:[[7030,220]],moreCaches:[5080,6060,7000]});}
   // 每张图最西端是一间关着的教学房，只放这张图的新机关。看它预警并触发一次，石门才打开。
   {const S=th=>STAGES.find(s=>s.theme===th&&!s.arena&&!s.rest);
-    const room=(th,trap,hint,checks)=>{const s=S(th);if(!s)return;s.traps=(s.traps||[]).filter(t=>!t.teach);s.traps.unshift(Object.assign({teach:1},trap));s.lesson={door:400,hint:hint};s.checks=checks;};
-    room('prison',{k:'tspike',x:248,n:4,per:2.2,ph:0},'这间屋子只有地刺。它会先发抖变色，半秒后再刺出来。看完一轮，石门打开。',[1680,3400,5200]);
-    room('sewers',{k:'spout',x:268,per:2.6,ph:0,h:150},'这间屋子只有喷口。先冒泡变色，再喷出来。看完一轮，石门打开。',[1700,3600,5400]);
-    room('ramparts',{k:'ballista',x:280,y:210,dir:1,per:2.8,ph:.15},'这间屋子只有弩炮。它朝东射。站在左边看它拉满、射出。石门随后打开。',[1800,3600,5400]);
-    room('ossuary',{k:'jet',x:250,y:FLOOR-24,dir:1,len:90,per:2.6,ph:0},'这间屋子只有喷火骷髅。眼里先聚紫火，再吐火舌。看完一轮，石门打开。',[1800,3600,5600]);
-    room('tower',{k:'piston',x:236,w:64,per:2.8,ph:0},'这间屋子只有落锤。它先在顶上发抖，再砸下来。看完一轮，石门打开。',[1700,3500,5400]);
+    const room=(th,trap,hint)=>{const s=S(th);if(!s)return;s.traps=(s.traps||[]).filter(t=>!t.teach);s.traps.unshift(Object.assign({teach:1},trap));s.lesson={door:400,hint:hint};};
+    room('prison',{k:'tspike',x:248,n:4,per:2.2,ph:0},'这间屋子只有地刺。它会先发抖变色，半秒后再刺出来。看完一轮，石门打开。');
+    room('sewers',{k:'spout',x:268,per:2.6,ph:0,h:150},'这间屋子只有喷口。先冒泡变色，再喷出来。看完一轮，石门打开。');
+    room('ramparts',{k:'ballista',x:280,y:210,dir:1,per:2.8,ph:.15},'这间屋子只有弩炮。它朝东射。站在左边看它拉满、射出。石门随后打开。');
+    room('ossuary',{k:'jet',x:250,y:FLOOR-24,dir:1,len:90,per:2.6,ph:0},'这间屋子只有喷火骷髅。眼里先聚紫火，再吐火舌。看完一轮，石门打开。');
+    room('tower',{k:'piston',x:236,w:64,per:2.8,ph:0},'这间屋子只有落锤。它先在顶上发抖，再砸下来。看完一轮，石门打开。');
+    // 钟火大约每隔 35 秒路程一处（按带战斗的前进速度约 80px/s，间距 2600–3200）。
+    const pace=th=>{const s=S(th);if(!s)return;const span=s.exit||s.w,bad=x=>(s.gaps||[]).some(g=>x>g[0]-60&&x<g[1]+60)||(s.spikes||[]).some(sp=>x>sp[0]-30&&x<sp[0]+sp[1]*20+30)||(s.acid||[]).some(a=>x>a[0]-30&&x<a[0]+a[1]+30)||(s.terrain||[]).some(t=>x>t[0]-20&&x<t[0]+t[1]+20)||x<520;
+      const checks=[];for(let x=2800;x<span-480;x+=2800){let spot=x;for(let i=0;i<24&&bad(spot);i++)spot+=60;if(!bad(spot)&&spot<span-240)checks.push(Math.round(spot));}if(checks.length)s.checks=checks;};
+    ['prison','sewers','ramparts','ossuary','tower'].forEach(pace);
     const wall=S('ramparts');if(wall)wall.shortcut={open:5400,door:520,dest:5280};}
   // 同一层地面上挨得太近的小怪拉开，避免挤成一团。平台上的和首领不动。
   STAGES.forEach(s=>{if(s.arena||s.rest||!s.ens)return;const gaps=s.gaps||[],limit=(s.exit||s.w)-150;
@@ -592,8 +596,8 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   // 新的一局：从第一层开始
   // ch：角色（不给就沿用当前角色，默认小引灯人）。第一次玩：开场旁白 → 焚炉底层的教程 → 监牢
   function reset(boot,ch){if(passage&&!passage.changed){passage=null;document.getElementById('scene-fade').hidden=true;}const C=CHARS[ch||(p&&p.char)||'lamp']||CHARS.lamp;
-    p={x:120,y:FLOOR-52,w:26,h:52,vx:0,vy:0,face:1,hp:C.hp*LIFE,max:C.hp*LIFE,char:C.id,jumps:0,ground:true,coyote:.1,buffer:0,roll:0,rollCd:0,attack:0,atkCd:0,combo:0,comboT:0,plateHits:0,leechKills:0,slash:'side',atkFace:1,pogo:false,inv:0,damage:C.dmg,hit:new Set(),potions:1,soul:0,castCd:0,drop:null,skills:{swift:0,reach:0,dash:0,vigor:0,spring:0,flame:0},walk:0,hurtT:0,landT:0,trail:[],trailT:0,cape:null,safeX:120,safeY:FLOOR-52,dash:0,dashHit:null,ringT:0,domeT:0,on:null};
-    kills=0;score=0;embers=0;bag={bomb:0,knife:0,frost:0};relics={};keepsakes={};sel='bomb';run={time:0,deaths:0};runSeed=1+Math.floor(Math.random()*1e6);loadStage(0,boot===true);applyBoons();
+    p={x:120,y:FLOOR-52,w:26,h:52,vx:0,vy:0,face:1,hp:C.hp*LIFE,max:C.hp*LIFE,char:C.id,jumps:0,ground:true,coyote:.1,buffer:0,roll:0,rollCd:0,attack:0,atkCd:0,combo:0,comboT:0,plateHits:0,leechKills:0,slash:'side',atkFace:1,pogo:false,inv:0,damage:C.dmg,hit:new Set(),potions:C.id==='lamp'?1:2,soul:0,castCd:0,drop:null,skills:{swift:0,reach:0,dash:0,vigor:0,spring:0,flame:0},walk:0,hurtT:0,landT:0,trail:[],trailT:0,cape:null,safeX:120,safeY:FLOOR-52,dash:0,dashHit:null,ringT:0,domeT:0,on:null};
+    kills=0;score=0;embers=0;bag={bomb:0,knife:C.id==='bow'?3:0,frost:0};relics={};keepsakes={};sel=C.id==='bow'?'knife':'bomb';run={time:0,deaths:0};runSeed=1+Math.floor(Math.random()*1e6);loadStage(0,boot===true);applyBoons();
     if(boot===true)return;try{localStorage.setItem('ember:char',C.id);}catch(e){}
     if(!introSeen){introSeen=true;try{localStorage.setItem('ember:intro-v3','1');}catch(e){}startTalk(TALK.prologue,()=>{note('lore','prologue');enterAfterPrologue();});}
     else say(startTip(),5);
@@ -661,7 +665,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     (L.movers||[]).forEach(m=>platforms.push({x:m[0],y:m[1],w:m[2],h:16,ddx:0,ddy:0,mv:{x0:m[0],y0:m[1],dx:m[3],dy:m[4],per:m[5],ph:m[6]||0}}));(L.crumbles||[]).forEach(c=>platforms.push({x:c[0],y:c[1],w:c[2],h:18,cr:{st:0,t:0,y0:c[1]}}));
     const caches={prison:[360,1560,3330],sewers:[560,1750,3520],ramparts:[680,2240,3850],ossuary:[610,1720,3860],tower:[620,1820,3370]};breakables=(L.arena?[]:(L.caches||caches[L.theme]||[]).concat(L.moreCaches||[])).map((x,i)=>({x:x,y:FLOOR,kind:((i+stage)%3+3)%3,broken:false}));
     // 二周目起，每三个狱卒里有一个换成精英
-    enemies=L.ens.map((a,i)=>enemy(a[0],a[1],a[2],cycle&&a[2]==='guard'&&i%3===1?Object.assign({},a[3],{elite:true}):a[3]));chests=L.chests.map(c=>({x:c[0],y:c[1],open:false}));traps=(L.traps||[]).map(t=>{const o=Object.assign({},t,{t:((t.ph||0)+(cycle?cycle*.37%1:0))*(t.per||3)});if(cycle>0&&!L.arena){const shift=(cycle%3)*28;if(o.x!=null&&!o.teach)o.x+=shift;if(o.x0!=null){o.x0+=shift;o.x1+=shift;}}return o;});lamps=(L.lamps||[]).map(x=>({x:x,lit:false}));signAt=-1;secrets=(L.secrets||[]).map((a,i)=>({x:a[0],y:a[1]||FLOOR,reward:a[2],hp:3,open:!!(run.found&&run.found['s'+n+':'+i]),t:1,shake:0}));
+    enemies=L.ens.map((a,i)=>enemy(a[0],a[1],a[2],cycle&&a[2]==='guard'&&i%3===1?Object.assign({},a[3],{elite:true}):a[3]));chests=L.chests.map(c=>({x:c[0],y:c[1],open:false}));traps=(L.traps||[]).map(t=>{const o=Object.assign({},t,{t:((t.ph||0)+(cycle?cycle*.17%1:0))*(t.per||3)});if(cycle>0&&!L.arena){const shift=Math.min(140,22*cycle);if(o.per)o.per=Math.max(1.35,o.per*(1-.05*Math.min(cycle,8)));if(o.x!=null&&!o.teach)o.x+=shift;if(o.x0!=null){o.x0+=shift;o.x1+=shift;}}return o;});lamps=(L.lamps||[]).map(x=>({x:x,lit:false}));signAt=-1;secrets=(L.secrets||[]).map((a,i)=>({x:a[0],y:a[1]||FLOOR,reward:a[2],hp:3,open:!!(run.found&&run.found['s'+n+':'+i]),t:1,shake:0}));
     Object.assign(p,{x:120,y:FLOOR-p.h,vx:0,vy:0,face:1,jumps:0,ground:true,coyote:FEEL.coyote,buffer:0,roll:0,rollCd:0,attack:0,atkCd:0,combo:0,comboT:0,castCd:0,drop:null,inv:0,hit:new Set(),hurtT:0,landT:0,trail:[],cape:null,safeX:120,safeY:FLOOR-p.h,dash:0,ringT:0,domeT:0,on:null,checkX:null,charge:0,kbT:0});
     shots=[];shotsPool.clear();waves=[];particles=[];particlesPool.clear();floats=[];floatsPool.clear();orbs=[];fx=[];chunks=[];hazards=[];loot=[];gateK=0;sealK=L.arena?1:0;bossCardT=0;revealC=null;keys={};clearHeld();cam=0;shake=0;hitstop=0;paused=false;checkpoint=false;nearChest=false;nearKind='';hudKey='';bellRing=0;
     flags={};p.windUsed=false;thrown=[];offers=[];chestC=null;talk=null;talkBox.hidden=true;cine=null;credits=null;flashT=0;bandId='';arm={};delete run['les'+stage];run.lessonSaid=-1;
@@ -723,10 +727,10 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function dirs(){return{l:!!(isKey('left')||stick.x<-FEEL.dead||down('left')),r:!!(isKey('right')||stick.x>FEEL.dead||down('right')),u:!!(isKey('up')||stick.y<-FEEL.dead),d:!!(isKey('down')||stick.y>FEEL.dead)};}
   // 挥刀（参考空洞骑士）：按住上 = 上挑；空中按住下 = 下劈，打中会弹起来；否则朝面向或按住的左右侧劈，侧劈第三下是重劈
   // 钟锤学徒出手慢、判定大，第三锤震出一道地波；拾灯弓手横着 / 向上是射箭，空中向下是下踢（和下劈一样能弹起来）
-  function attack(){if(p.atkCd>0||p.roll>0||p.dash>0||p.charge>0)return;const C=CHARS[p.char],d=dirs();if(d.l!==d.r)p.face=d.r?1:-1;p.atkFace=p.face;p.slash=d.u?'up':d.d&&!p.ground?'down':'side';if(p.char==='bow'&&p.slash!=='down'){p.charge=.001;p.chargeMax=.45;return;}if(p.slash==='side'){if(p.comboT<=0)p.combo=0;p.combo=(p.combo+1)%3;p.comboT=1.2;}p.attack=C.swing;p.atkCd=C.atkCd*(1-p.skills.swift*.12);p.hit.clear();p.pogo=false;heroFSM.enter('attack','combat',C.swing);}
+  function attack(){if(p.atkCd>0||p.roll>0||p.dash>0||p.charge>0)return;const C=CHARS[p.char],d=dirs();if(d.l!==d.r)p.face=d.r?1:-1;p.atkFace=p.face;p.slash=d.u?'up':d.d&&!p.ground?'down':'side';if(p.char==='bow'&&p.slash!=='down'){p.charge=.001;p.chargeMax=.45;return;}if(p.slash==='side'){if(p.comboT<=0)p.combo=0;p.combo=(p.combo+1)%3;p.comboT=1.2;}p.attack=FEEL.swing;p.atkCd=FEEL.swing;p.hit.clear();p.pogo=false;heroFSM.enter('attack','combat',FEEL.swing);}
   function fireCharge(full){if(!(p.charge>0))return;const f=p.atkFace||p.face,powered=!!full||p.charge>=(p.chargeMax||.45)-.02,up=p.slash==='up',dmg=Math.round(p.damage*(powered?2.4:1)*(relics.hunter&&p.hp/p.max>.7?1.3:1));
     thrown.push({k:'arrow',x:p.x+p.w/2+(up?f*4:f*14),y:up?p.y+2:p.y+22,vx:up?0:f*(powered?1040:900),vy:up?(powered?-1040:-900):0,t:0,r:0,dmg:dmg,soul:true,heavy:powered,pierce:powered?6:0,hits:powered?new Set():null});
-    p.charge=0;p.atkCd=CHARS.bow.atkCd*(1-(p.skills.swift||0)*.12);beep(powered?480:720,.07,'triangle');}
+    p.charge=0;p.atkCd=7/60;beep(powered?480:720,.07,'triangle');}
   function attackEvent(){
     if(p.char==='bow'&&p.slash!=='down'){shootArrow();return;}
     if(p.char==='bell'&&p.slash==='side'&&p.combo===0&&p.ground)thrown.push({k:'pwave',x:p.x+p.w/2+p.face*34,y:p.y+p.h,vx:0,vy:0,dir:p.face,t:0,r:0,life:.5,hits:new Set(),dmg:p.damage*.5});
@@ -896,9 +900,9 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     for(let i=0;i<26;i++){const a=Math.random()*TAU,v=60+Math.random()*170;emit_particles(x,y,Math.cos(a)*v,Math.sin(a)*v,.5+Math.random()*.5,1,'#d8f2ff',1.5+Math.random()*2,-.05,true,undefined,undefined,undefined);}beep(1320,.25,'sine');beep(1760,.35,'sine');}
   // ---- 角色：小引灯人（短刀）/ 钟锤学徒（钟锤，通关一次解锁）/ 拾灯弓手（弓，通关两次解锁）。每个角色三个技能，按 1 / 2 / 3，花 1 / 2 / 3 格魂火 ----
   const CHARS={
-    lamp:{id:'lamp',name:'小引灯人',title:'敏捷 · 二段跳，刀轻，翻滚是短突进',info:'只有她能二段跳。刀快但单下不重，翻滚向前突进一小段。',hp:5,dmg:24,atkCd:.31,swing:14/60,power:.48,speedK:.9,skills:['shade','ring','bolt']},
-    bell:{id:'bell',name:'钟锤学徒',title:'近战 · 三连，第三击击退，血厚步慢',info:'连砍三下，第三锤把敌人推开，并震出一道地波。生命多，走得慢，没有二段跳。',hp:6,dmg:36,atkCd:.46,swing:.32,power:.86,speedK:.42,skills:['quake','dome','toll']},
-    bow:{id:'bow',name:'拾灯弓手',title:'远程 · 蓄力穿透，血薄，闪避后撤',info:'按住攻击蓄力，蓄满的箭能穿透一排敌人。生命少，闪避向后撤。',hp:4,dmg:17,atkCd:.34,swing:.2,power:.4,speedK:.78,skills:['fan','trap','pierce']}};
+    lamp:{id:'lamp',name:'小引灯人',title:'敏捷 · 二段跳，攻击最弱，每三杀回一口火',info:'只有她能二段跳，刀是三人里最轻的。每打倒三个敌人，余火自己回来一口。',hp:5,dmg:14,atkCd:14/60,swing:14/60,power:.28,speedK:.9,skills:['shade','ring','bolt']},
+    bell:{id:'bell',name:'钟锤学徒',title:'近战 · 三连，第三击击退，血厚步慢',info:'连砍三下，第三锤把敌人推开，并震出一道地波。生命多，开局多一瓶药，走得慢，没有二段跳。',hp:6,dmg:36,atkCd:14/60,swing:14/60,power:.86,speedK:.42,skills:['quake','dome','toll']},
+    bow:{id:'bow',name:'拾灯弓手',title:'远程 · 蓄力穿透，血薄，闪避后撤',info:'按住攻击蓄力，蓄满的箭能穿透一排敌人。生命少，开局多一瓶药和三把飞刀，闪避向后撤。',hp:4,dmg:17,atkCd:14/60,swing:14/60,power:.46,speedK:.78,skills:['fan','trap','pierce']}};
   const SKILLS={
     shade:{name:'影步斩',cost:1,info:'化作影子向前冲斩一段，冲刺中不会受伤。'},
     ring:{name:'魂灯环',cost:2,info:'三团魂火绕身旋转 5 秒：烧伤碰到的敌人，挡下飞来的东西。'},
@@ -1148,7 +1152,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function pop(x,y,t,c,big){const o=floatsPool.acquire();if(!o)return;o.x=x+(Math.random()-.5)*10;o.y=y;o.t=String(t);o.c=c||'#efe2c8';o.life=.75;o.big=!!big;floats.push(o);}
   function punchShake(px){if(settings.shake===false)return;shake=Math.max(shake,px);shakeT=Math.max(shakeT||0,FEEL.shakeDur||.1);}
   // 生命以整格结算：每格对应一个小幽灵，普通命中 1 格，明确的首领重击 2 格。
-  function hurt(d,from,heavy,why){if(p.inv>0||state!=='play')return;let lost=heavy?2:1;if(cycle>0)lost=Math.max(1,Math.min(4,Math.round(lost*Math.min(2,1+.2*cycle))));
+  function hurt(d,from,heavy,why){if(p.inv>0||state!=='play')return;let lost=heavy?2:1;if(cycle>0)lost=Math.min(4,Math.max(lost,Math.ceil(lost*Math.min(2,1+.2*cycle))));
     if(relics.veil&&!flags.veil){flags.veil=true;p.inv=.8;fx.push({k:'ring',x:p.x+13,y:p.y+26,life:.4,max:.4,r:60});pop(p.x+13,p.y-8,'铃声挡下了','#ffe2a8');beep(1320,.3,'sine');beep(1760,.45,'sine');return;}   // 护身铃：每层挡一次
     if(relics.plate){p.plateHits++;if(p.plateHits%3===0){lost--;fx.push({k:'ring',x:p.x+13,y:p.y+26,life:.3,max:.3,r:45});if(!lost){p.inv=.6;pop(p.x+13,p.y-8,'挡住了','#bce3db');beep(500,.15,'triangle');return;}}}
     let points=lost*LIFE;if(points>=p.hp&&relics.wind&&!p.windUsed){p.windUsed=true;points=Math.max(0,p.hp-LIFE);fx.push({k:'ring',x:p.x+13,y:p.y+26,life:.4,max:.4,r:70});say('第二口气！',2);}
@@ -1208,14 +1212,14 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   // 打击感：命中点一道斩痕 + 白色星芒 + 顺着刀势飞出去的火花，重劈多一圈冲击波；顿帧和震屏按轻重区分
   // 刀、火油罐、飞刀都走这里：扣血、击退、打击特效；打死了交给 killEnemy
   // soft：魂灯环这类持续伤害，不顿帧不震屏
-  function hitEnemy(e,dmg,dir,heavy,hx,hy,ang,soft){const boss=e.type==='boss';if(boss&&((L.arena&&!flags.boss)||e.under>.5||e.phaseInv>0))return;let num='#efe2c8';if(e.weak>0&&hy<e.y+e.h*.45){dmg=Math.round(dmg*2.2);num='#7ec8ff';}else if(heavy)num='#ffd08a';dmg=Math.max(1,Math.round(dmg));e.hp=Math.max(0,e.hp-dmg);e.flash=.1;e.hitT=.2;e.hitDir=dir;if(dir){e.kb=dir*(boss?FEEL.kb*FEEL.kbBoss:heavy?FEEL.kb:90);e.kbT=heavy?FEEL.kbTime:.08;}
+  function hitEnemy(e,dmg,dir,heavy,hx,hy,ang,soft){const boss=e.type==='boss';if(boss&&((L.arena&&!flags.boss)||e.under>.5||e.phaseInv>0))return;let num='#efe2c8';if(e.weak>0&&hy<e.y+e.h*.45){dmg=Math.round(dmg*2.2);num='#7ec8ff';}else if(heavy)num='#ffd08a';dmg=Math.max(1,Math.round(dmg));e.hp=Math.max(0,e.hp-dmg);e.flash=.1;e.hitT=.2;e.hitDir=dir;if(dir){e.kb=dir*(boss?FEEL.kb*FEEL.kbBoss:FEEL.kb);e.kbT=FEEL.kbTime;}
     if(e.type==='flyer'){if(e.fly==='dive'){e.fly='rise';e.cd=1.2;}e.wind=0;}if(e.type==='caster'&&e.wind>0&&heavy)e.wind=0;if(e.type==='dummy')e.hp=Math.max(1,e.hp);
     hitFx(hx,hy,e,heavy,ang,soft);if(settings.nums)pop(e.x+e.w/2,e.y-8,String(Math.round(dmg)),num,heavy||num!=='#efe2c8');if(e.hp<=0&&!e.dead)killEnemy(e);}
   function killEnemy(e){const boss=e.type==='boss',el=e.elite,g=boss?120:el?80:e.type==='shield'||e.type==='caster'?35:25;e.dead=true;e.dieT=.45;e.frozen=0;e.daze=0;kills++;score+=g;embers+=Math.round(g*L.hpK*(relics.magnet?1.3:1)*(1+.25*cycle));note('kills',boss?(L.bossKind||'warden'):el?'elite':e.type);
     if(relics.salvager&&kills%4===0){gain('bomb',1,true);popArt('bomb','+1',p.x+13,p.y-34);}
     if(!boss&&relics.hunt){p.soul=Math.min(3,p.soul+1);hudKey='';}if(!boss&&(el||e.type==='shield'||e.type==='caster'||e.type==='bomber'))maybeBlueprint(e);
     if(relics.leech){p.leechKills++;if(p.leechKills%4===0&&p.hp<p.max){p.hp=Math.min(p.max,p.hp+LIFE);pop(p.x+13,p.y-12,'+1','#9be3c8');hudKey='';}}
-    if(!boss)killFx(e);burst(e.x,e.y,'#7ec8be',boss?8:20);ember(e.x+e.w/2,e.y+e.h/2,boss?12:10,'#ffb35c');for(let i=0;i<(boss?16:el?12:6);i++)orbs.push({x:e.x+e.w/2,y:e.y+e.h/2,vx:(Math.random()-.5)*280,vy:-60-Math.random()*220,t:0});
+    if(!boss)killFx(e);if(p.char==='lamp'&&kills%3===0&&p.hp<p.max){p.hp=Math.min(p.max,p.hp+LIFE);pop(p.x+13,p.y-12,'+1','#9be3c8');hudKey='';}burst(e.x,e.y,'#7ec8be',boss?8:20);ember(e.x+e.w/2,e.y+e.h/2,boss?12:10,'#ffb35c');for(let i=0;i<(boss?16:el?12:6);i++)orbs.push({x:e.x+e.w/2,y:e.y+e.h/2,vx:(Math.random()-.5)*280,vy:-60-Math.random()*220,t:0});
     // 首领：先放 3 秒的倒下过场（慢动作、裂光、魂火飞散、炸开），再自动讲完倒下的对白
     if(boss){e.dieT=9;waves=[];shots=[];shotsPool.clear();hazards=[];e.under=0;e.lift=0;e.surfacing=false;if(L.chapter<4)unlockChapter(L.chapter+1);const k=L.bossKind||'warden',story=BOSSES[k];bossCue('victory');bossCardT=0;hitstop=0;flashT=.25;keys={};clearHeld();hud.hidden=true;touch.hidden=true;messageT=0;notice.style.opacity=0;
       cine={k:'boss',e:e,kind:k,t:0,dur:3.1,slow:.8,boom:false,after:()=>{note('lore',k);touch.hidden=!coarse();startTalk(story.down,()=>{if(k!=='warden'){gain(story.drop);loot.push({id:story.drop,x:e.x+e.w/2,y:e.y+e.h/2,vx:0,vy:-260,t:0});}gainShard(e.x+e.w/2,e.y+e.h/2);say(k==='warden'?'钟舌已经松开 · 往右走，去敲响沉钟':'铁闸升起了 · 继续向右',4);},false,{auto:true,delay:.25});}};state='cine';}}
@@ -1228,7 +1232,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function killFx(e){const boss=e.type==='boss',arch=e.type==='archer',P=PAL[e.type]||PAL.guard,home=platforms.find(a=>a.y===e.floor&&e.x+e.w/2>=a.x&&e.x+e.w/2<a.x+a.w);
     const cols=e.type==='crawler'?[P.shell,P.body,P.claw,P.soul]:e.type==='hanger'?[P.cloth,P.chain,P.cage,P.soul]:arch?[P.cloak,P.cloakDark,P.skull,P.bow]:boss?BOSS_CHUNKS[e.kind]:e.type==='flyer'?[P.wing,P.body,P.bone]:e.type==='caster'?[P.robe,P.hood,P.skull,P.staff]:e.type==='bomber'?[P.cloak,P.pack,P.flask]:e.type==='shield'?[P.shield,P.armor,P.helm,P.shieldDark]:e.type==='dummy'?['#c8a860','#6a4a2f']:[P.armor,P.tabard,P.helm,P.armorDark,P.blade];
     for(let i=0;i<(boss?16:e.elite?12:8);i++)chunks.push({x:e.x+e.w*Math.random(),y:e.y+e.h*Math.random(),vx:(Math.random()-.5)*260+p.atkFace*90,vy:-120-Math.random()*260,r:Math.random()*TAU,vr:(Math.random()-.5)*16,s:3+Math.random()*(boss?9:6),c:cols[i%cols.length],life:1.2+Math.random()*.6,floor:e.floor,x0:home?home.x:0,x1:home?home.x+home.w:WORLD});
-    fx.push({k:'ring',x:e.x+e.w/2,y:e.y+e.h/2,life:.35,max:.35,r:boss?120:60});hitstop=Math.max(hitstop,boss?.2:.09);shake=Math.max(shake,boss?14:7);}
+    fx.push({k:'ring',x:e.x+e.w/2,y:e.y+e.h/2,life:.35,max:.35,r:boss?120:60});if(!boss){hitstop=Math.max(hitstop,FEEL.hitStop);punchShake(FEEL.shakeHit);}}
   // 打碎发光陶罐：金色是余烬、绿色回一个小幽灵、蓝色是两把飞刀
   function breakCache(b){b.broken=true;burst(b.x,b.y-15,b.kind===0?'#ffd18a':b.kind===1?'#9be3c8':'#a8dce8',12);dust(b.x,b.y,5,0);beep(540,.1);if(b.kind===0){embers+=20;popArt('ember','+20',b.x,b.y-38);for(let i=0;i<5;i++)orbs.push({x:b.x,y:b.y-15,vx:(Math.random()-.5)*220,vy:-80-Math.random()*180,t:0});}else if(b.kind===1){const amount=Math.min(LIFE,p.max-p.hp);p.hp+=amount;popArt('heart',amount?'+'+(amount/LIFE):'',b.x,b.y-38);}else{gain('knife',2,true);popArt('knife','×2',b.x,b.y-38);loot.push({id:'knife',x:b.x,y:b.y-20,vx:(Math.random()-.5)*80,vy:-260,t:0});}hudKey='';}
   // ---- 首领招式：每位首领一张招式表。出手前只靠动作预兆（刨地喷汽、灯门打开、高举旗帜、举锤过顶……），不画警示框 ----
@@ -1239,7 +1243,8 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function overlapP(x0,y0,x1,y1){return p.x+p.w>Math.min(x0,x1)&&p.x<Math.max(x0,x1)&&p.y+p.h>y0&&p.y<y1;}
   // 极限闪避（参考死亡细胞）：翻滚刚开始的 0.15 秒里被攻击擦过——时间放慢、白圈一闪、补一格魂火（每次翻滚一次）
   let slowMo=0;
-  function perfectDodge(x){if(p.perfect||p.roll<ROLL-.15||state!=='play')return;p.perfect=true;slowMo=.45;p.soul=Math.min(3,p.soul+1);hudKey='';fx.push({k:'ring',x:p.x+13,y:p.y+26,life:.45,max:.45,r:70},{k:'star',x:p.x+13,y:p.y+20,a:0,life:.16,max:.16,r:30});pop(p.x+13,p.y-14,'闪避','#cfefff',true);beep(1180,.18,'sine',.03);beep(1770,.25,'sine',.02);if(!run.dodgeTip){run.dodgeTip=true;say('极限闪避 · 翻滚擦过攻击的一瞬间，时间会慢下来',2.6);}}  function strike(e,x0,y0,x1,y1,d){if(e.struck||state!=='play'||!overlapP(x0,y0,x1,y1))return false;if(p.inv>0){perfectDodge(e.x+e.w/2);return false;}e.struck=true;hurt(Math.round(d*L.dmgK),e.x+e.w/2,d>=28);return true;}
+  function dodging(){return p.roll>0&&p.roll>=ROLL-FEEL.dodge;}
+  function perfectDodge(x){if(p.perfect||p.roll<ROLL-.15||state!=='play')return;p.perfect=true;slowMo=.45;p.soul=Math.min(3,p.soul+1);hudKey='';fx.push({k:'ring',x:p.x+13,y:p.y+26,life:.45,max:.45,r:70},{k:'star',x:p.x+13,y:p.y+20,a:0,life:.16,max:.16,r:30});pop(p.x+13,p.y-14,'闪避','#cfefff',true);beep(1180,.18,'sine',.03);beep(1770,.25,'sine',.02);if(!run.dodgeTip){run.dodgeTip=true;say('极限闪避 · 翻滚擦过攻击的一瞬间，时间会慢下来',2.6);}}  function strike(e,x0,y0,x1,y1,d){if(e.struck||state!=='play'||!overlapP(x0,y0,x1,y1))return false;if(p.inv>0||dodging()){perfectDodge(e.x+e.w/2);return false;}e.struck=true;hurt(Math.round(d*L.dmgK),e.x+e.w/2,d>=28,'被'+((e.kind&&BOSSES[e.kind]&&BOSSES[e.kind].name)||'首领')+'击中');return true;}
   function bossWalk(e,dir,sp,dt){const B=bounds(e);e.x=clamp(e.x+dir*sp*dt,B[0],B[1]);}
   function rocks(n){for(let i=0;i<n;i++)hazards.push({k:'rock',x:L.gate+70+Math.random()*(L.seal-L.gate-140),y:36,vy:0,delay:.5+Math.random()*.7,life:3,r:Math.random()*TAU,s:.8+Math.random()*.5,d:Math.round(14*L.dmgK)});}
   function spear(x,delay){if(x>L.gate+16&&x<L.seal-16)hazards.push({k:'spear',x:x,delay:delay,life:.55,max:.55,d:Math.round(18*L.dmgK)});}
@@ -1411,7 +1416,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       else if(t.k==='ballista'){if(t.broken)continue;if(t.t<prev&&vis(t)){emit_shots('bolt',t.x+t.dir*30,t.y-24,t.dir*560,0,undefined,t.teach?.42:3.2,14,undefined,undefined,undefined,undefined,undefined,0,undefined);beep(150,.12,'square');beep(900,.05,'triangle');t.kick=.2;}if(t.kick>0)t.kick-=dt;}
       else if(t.k==='jet'){const on=u>=.62&&u<.9,x0=Math.min(t.x,t.x+t.dir*t.len),x1=Math.max(t.x,t.x+t.dir*t.len),lead=.5/per;t.warn=u>=.62-lead&&u<.62;if(t.warn&&!t.warned&&vis(t)){t.warned=true;beep(700,.08,'triangle',.03);}if(!t.warn)t.warned=false;if(on&&!t.on&&vis(t))beep(110,.4,'sawtooth',.02);t.on=on;if(on&&p.x+p.w>x0+4&&p.x<x1&&p.y<t.y+12&&feet>t.y-12)hurt(14,t.x,false,'被喷火击中');if(t.warn&&Math.random()<dt*14)ember(t.x+t.dir*8,t.y,1,'#c58bff');}
       else if(t.k==='piston'){const w=t.w||80,hb=pistonY(t),slam=u>=.86&&u<.92;t.hb=hb;if(u>=.9&&!t.hit0){t.hit0=true;if(vis(t)){shake=Math.max(shake,5);dust(t.x+w/2,FLOOR,10,0);beep(70,.25,'square');}}if(u<.86)t.hit0=false;
-        if(p.x+p.w>t.x+2&&p.x<t.x+w-2&&hb>p.y+4){if(slam)hurt(14,t.x+w/2);if(pc<t.x+w/2)p.x=t.x-p.w;else p.x=t.x+w;p.vx=0;}}}}
+        if(p.x+p.w>t.x+2&&p.x<t.x+w-2&&hb>p.y+4){if(slam)hurt(14,t.x+w/2,false,'被落锤砸中');if(pc<t.x+w/2)p.x=t.x-p.w;else p.x=t.x+w;p.vx=0;}}}}
   // 墓窟的灵灯：走到旁边就点亮，照亮一大片黑暗
   function updateLamps(){for(const l of lamps)if(!l.lit&&Math.abs(p.x+p.w/2-l.x)<70){l.lit=true;burst(l.x,FLOOR-50,'#d8b3ff',14);ember(l.x,FLOOR-52,10,'#c58bff');beep(660,.2,'sine');beep(990,.3,'sine');if(!run.lampTip){run.lampTip=true;say('灵灯亮了 · 在黑暗里沿路把它们点亮',2.6);}}}
   // 教程石碑：走近就在下方说明（按键跟着设置走），每块石碑把生命补满
@@ -1440,7 +1445,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       [.25,1.35,2.45].forEach((at,i)=>{if(c.t>=at&&c.n===i){c.n++;bellRing=2.2;shake=Math.max(shake,9-i*2);fx.push({k:'ring',x:bx,y:300,life:1.4,max:1.4,r:520+i*120},{k:'ring',x:bx,y:300,life:1,max:1,r:300});bossCue('toll');
         for(let j=0;j<(lowFx?16:36);j++)emit_particles(cam+Math.random()*W,FLOOR-Math.random()*60,(Math.random()-.5)*30,-90-Math.random()*160,2.4+Math.random()*1.4,3.8,j%4?'#9ff3e0':'#ffe2a8',1.6+Math.random()*2.4,-.25,true,undefined,undefined,undefined);}});
       c.dawn=Math.min(1,c.t/3.4);if(c.t>=c.dur){cine=null;state='win';c.after();}}}
-  function touchEnemies(){if(p.inv>0||p.roll>0||p.dash>0||p.domeT>0)return;
+  function touchEnemies(){if(p.inv>0||dodging()||p.dash>0||p.domeT>0)return;
     for(const e of enemies){if(e.dead||e.type==='dummy'||bossShielded(e))continue;
       if(p.x+p.w-5>e.x+5&&p.x+5<e.x+e.w-5&&p.y+p.h-4>e.y+6&&p.y+8<e.y+e.h-2){hurt(Math.round(12*(L.dmgK||1)),e.x+e.w/2,false,'撞上了'+(e.type==='boss'?(BOSSES[e.kind]&&BOSSES[e.kind].name)||'首领':'敌人'));return;}}}
   function springPad(){if(!L.springs)return;const feet=p.y+p.h;
@@ -1474,8 +1479,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     else if(p.roll>0){p.roll-=dt;const k=Math.max(0,p.roll)/ROLL;p.vx=(p.rollDir||p.face)*(400+520*k);if((p.trailT-=dt)<=0){p.trailT=.035;p.trail.push({x:p.x+p.w/2,y:p.y+p.h-13,a:(1-k)*TAU,f:p.rollDir||p.face,life:.2});}if(p.roll<=0&&p.ground)dust(p.x+13,p.y+p.h,4,p.rollDir||p.face);}
     else{const m=(r?1:0)-(l?1:0),mul=p.char==='bell'?.74:p.char==='lamp'?1.08:1,vmax=245*mul;
       if(p.kbT>0){p.kbT-=dt;p.vx=p.kbX;}
-      else if(p.ground){if(m){p.vx+=m*(vmax/FEEL.accel)*dt;p.vx=clamp(p.vx,-vmax,vmax);}else{const s=Math.sign(p.vx);p.vx=s*Math.max(0,Math.abs(p.vx)-(vmax/FEEL.brake)*dt);}}
-      else p.vx+=(m*vmax-p.vx)*Math.min(1,dt*(m?11:2));
+      else if(m){p.vx+=m*(vmax/FEEL.accel)*dt;p.vx=clamp(p.vx,-vmax,vmax);}else{const s=Math.sign(p.vx);p.vx=s*Math.max(0,Math.abs(p.vx)-(vmax/FEEL.brake)*dt);}
       if(m&&!(p.attack>.1)&&!(p.kbT>0))p.face=m;}
     p.trail.forEach(t=>t.life-=dt);p.trail=p.trail.filter(t=>t.life>0);if(p.dtrail){p.dtrail.forEach(t=>t.life-=dt);p.dtrail=p.dtrail.filter(t=>t.life>0);}
     if(p.charge>0){if(isKey('attack')||down('attack')){p.charge=Math.min(p.chargeMax||.45,p.charge+dt);if(p.charge>=(p.chargeMax||.45)-.001)fireCharge(true);}else fireCharge(false);}
@@ -1521,7 +1525,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(L.arena&&!flags.boss&&p.x>L.trigger&&enemies.some(e=>e.type==='boss'&&!e.dead)){flags.boss=true;titleT=0;messageT=0;notice.style.opacity=0;bossCue('enter');const key='bossMet_'+L.bossKind,story=BOSSES[L.bossKind];startTalk(run[key]?story.again:story.intro,()=>{titleT=0;messageT=0;notice.style.opacity=0;bossCardT=2;});run[key]=true;return;}
     const bossAlive=enemies.some(e=>e.type==='boss'&&!e.dead),bossOn=!!(L.arena&&flags.boss&&bossAlive);gateK=clamp(gateK+(bossOn?dt:-dt)*3,0,1);if(L.arena)sealK=clamp(sealK+(bossAlive?dt:-dt)*1.6,0,1);if(bossOn&&p.x<L.gate+6){p.x=L.gate+6;if(p.vx<0)p.vx=0;}
     enemies.forEach(e=>{if(e.dead){e.dieT=Math.max(0,e.dieT-dt);e.flash=Math.max(0,e.flash-dt);if(e.type==='boss'&&e.dieT>0&&Math.random()<dt*30)ember(e.x+Math.random()*e.w,e.y+Math.random()*e.h,1,BOSSES[e.kind].color);if(e.type==='flyer')e.y=Math.min(e.floor-e.h,e.y+300*dt);return;}
-      e.flash=Math.max(0,e.flash-dt);e.swing=Math.max(0,e.swing-dt);e.hitT=Math.max(0,e.hitT-dt);e.cd-=dt;if(e.blockT>0)e.blockT-=dt;const boss=e.type==='boss',el=e.elite,dx=p.x-e.x,dy=Math.abs(p.y+p.h-e.floor),ox=e.x,kind=boss?e.kind:el?'elite':e.type,frozen=e.frozen>0,dazed=e.daze>0;
+      e.flash=Math.max(0,e.flash-dt);e.swing=Math.max(0,e.swing-dt);e.hitT=Math.max(0,e.hitT-dt);const boss=e.type==='boss';if(!(boss&&(e.wind>0||e.act>0||e.rec>0)))e.cd-=dt;if(e.blockT>0)e.blockT-=dt;const el=e.elite,dx=p.x-e.x,dy=Math.abs(p.y+p.h-e.floor),ox=e.x,kind=boss?e.kind:el?'elite':e.type,frozen=e.frozen>0,dazed=e.daze>0;
       if(e.type!=='dummy'&&!codex.seen[kind]&&onScreen(e))note('seen',kind);if(frozen)e.frozen=Math.max(0,e.frozen-dt);if(dazed)e.daze=Math.max(0,e.daze-dt);if(e.brk>0)e.brk=Math.max(0,e.brk-dt);
       // 持盾狱卒转身慢：绕到背后半秒内它还转不过来
       if(!frozen&&!dazed&&e.wind<=0&&!boss){const want=dx<0?-1:1;if(e.type==='shield'&&want!==e.face){if(!(e.brk>0)){e.turnT=(e.turnT||0)+dt;if(e.turnT>.5){e.face=want;e.turnT=0;}}}else{e.face=want;e.turnT=0;}}
@@ -1532,8 +1536,8 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       if(FOE_AI[e.type])FOE_AI[e.type](e,dt,dx,dy);
       else{const sh=e.type==='shield',spd=1-.1*Math.min(3,cycle);
       // 小怪：蓄力（动作预兆 + 刃口一闪）→ 出手；不画攻击范围
-      if(e.wind>0){e.wind-=dt;if(e.wind<=0){e.swing=.22;if(e.leap){const B=bounds(e);e.x=clamp(e.x+e.face*130,B[0],B[1]);e.leap=0;}else if(sh||(!el&&e.type==='guard'&&L.theme==='sewers')){const B=bounds(e);e.x=clamp(e.x+e.face*(sh?60:75),B[0],B[1]);}
-          if(e.type==='archer'){const pattern=L.theme==='ramparts'?[-85,0,85]:L.theme==='tower'?[-55,55]:[0];pattern.forEach(v=>emit_shots(undefined,e.x+14,e.y+17,e.face*(L.theme==='sewers'?250:320),v,undefined,4,Math.round(12*L.dmgK),undefined,undefined,undefined,undefined,L.theme==='sewers'?'#a5e66c':L.theme==='ossuary'?'#d8aaff':'#dfe3e0',undefined,undefined));beep(290,.08);}
+      if(e.wind>0){e.wind-=dt;if(e.wind<=0){e.swing=.22;if(e.leap){const B=bounds(e);e.x=clamp(e.x+e.face*(130+16*Math.max(0,cycle-2)),B[0],B[1]);e.leap=0;}else if(sh||(!el&&e.type==='guard'&&L.theme==='sewers')){const B=bounds(e);e.x=clamp(e.x+e.face*(sh?60:75),B[0],B[1]);}
+          if(e.type==='archer'){const pattern=L.theme==='ramparts'?[-85,0,85]:L.theme==='tower'||cycle>=4?[-55,55]:[0];pattern.forEach(v=>emit_shots(undefined,e.x+14,e.y+17,e.face*(L.theme==='sewers'?250:320),v,undefined,4,Math.round(12*L.dmgK),undefined,undefined,undefined,undefined,L.theme==='sewers'?'#a5e66c':L.theme==='ossuary'?'#d8aaff':'#dfe3e0',undefined,undefined));beep(290,.08);}
           else if(Math.abs(p.x-e.x)<(el?102:sh?82:74)&&(p.x-e.x)*e.face>-15&&dy<66)if(p.roll>0)perfectDodge(e.x+e.w/2);else hurt(Math.round((el?22:14)*L.dmgK),e.x,el&&cycle>=2);
           if(!el&&e.type==='guard'&&L.theme==='ossuary'&&e.floor===FLOOR)waves.push({x:e.x+e.w/2,dir:e.face,life:1.1});if(el){dust(e.x+e.w/2+e.face*40,e.floor,6,0);shake=Math.max(shake,4);}if(sh){dust(e.x+e.w/2+e.face*30,e.floor,5,e.face);beep(180,.08,'square');}e.cd=el?1.02:sh?1.35:1.12;}}
       else if(Math.abs(dx)<(e.type==='archer'?520:el?130:sh?114:L.theme==='sewers'?164:110)&&dy<90&&e.cd<=0&&(e.type!=='archer'||onScreen(e))){const leap=cycle>=2&&e.type==='guard'&&!sh&&!el;e.wind=e.wt=(leap?.62:(e.type==='archer'?.48:el?.46:sh?.5:.36))*spd;e.leap=leap?1:0;}
@@ -1549,17 +1553,17 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     // 飞行物：箭、典狱长的魂火（会追人）、溺灯的腐潮弹（抛物线，落地留一滩腐水）、灯蛾（慢慢飘过来）；刀光都能砍掉
     shots.forEach(s=>{if(s.home){const tx=p.x+p.w/2-s.x,ty=p.y+p.h/2-s.y,d=Math.hypot(tx,ty)||1,k=Math.min(1,dt*1.8*s.home),sp=s.sp||200;s.vx+=(tx/d*sp-s.vx)*k;s.vy+=(ty/d*sp-s.vy)*k;}if(s.g)s.vy+=s.g*dt;s.x+=s.vx*dt;s.y+=(s.vy||0)*dt;s.life-=dt;s.t=(s.t||0)+dt;
       if(SA&&inArea(SA,s.x-10,s.y-(s.k?9:2),s.x+10,s.y+(s.k?9:2))){s.life=0;cutShot(s);return;}
-      if(p.roll>0&&Math.abs(s.x-p.x-13)<23&&s.y>p.y-5&&s.y<p.y+p.h)perfectDodge(s.x);if(p.roll<=0&&Math.abs(s.x-p.x-13)<(s.k==='moth'?19:23)&&s.y>p.y-5&&s.y<p.y+p.h){hurt(s.d||12,s.x);s.life=0;if(s.k==='glob')splash(s.x,s.y);return;}
+      if(dodging()&&Math.abs(s.x-p.x-13)<23&&s.y>p.y-5&&s.y<p.y+p.h)perfectDodge(s.x);if(!dodging()&&Math.abs(s.x-p.x-13)<(s.k==='moth'?19:23)&&s.y>p.y-5&&s.y<p.y+p.h){hurt(s.d||12,s.x,false,s.k==='bolt'?'被弩箭射中':s.k==='flame'?'被魂火击中':s.k==='glob'?'被腐潮弹击中':s.k==='wisp'?'被灵火击中':s.k==='moth'?'被灯蛾扑中':'被箭射中');s.life=0;if(s.k==='glob')splash(s.x,s.y);return;}
       if(s.g&&s.vy>0&&s.y>=FLOOR-6){s.life=0;if(s.fire)ember(s.x,FLOOR-6,8,'#ffb347');else splash(s.x,FLOOR-4);if(!inGap(s.x))hazards.push({k:'pool',x:s.x,w:56,life:s.pool||2.2,max:s.pool||2.2,d:Math.round(10*L.dmgK),fire:!!s.fire});}});
     {let n=0;for(let i=0;i<shots.length;i++){const o=shots[i];if(o.life>0&&o.x>0&&o.x<WORLD&&o.y<FLOOR+200)shots[n++]=o;else shotsPool.release(o);}shots.length=n;}updateThrown(dt);
     // 地面冲击波（默认）、旗手的风（矮，跳过去）、典狱长的钟声（高，只能翻滚穿过）
-    waves.forEach(w=>{w.x+=w.dir*(w.v||380)*dt;w.life-=dt;w.t=(w.t||0)+dt;if(!w.k&&Math.random()<dt*14)burst(w.x,FLOOR-4,'#cdb58e',1);if(p.inv<=0&&Math.abs(w.x-p.x-p.w/2)<(w.k?26:20)&&p.y+p.h>FLOOR-(w.h||30)){hurt(Math.round((w.d||18)*L.dmgK),w.x);if(w.push)p.vx=w.dir*w.push;w.life=0;}});waves=waves.filter(w=>w.life>0&&w.x>0&&w.x<WORLD);
+    waves.forEach(w=>{w.x+=w.dir*(w.v||380)*dt;w.life-=dt;w.t=(w.t||0)+dt;if(!w.k&&Math.random()<dt*14)burst(w.x,FLOOR-4,'#cdb58e',1);if(p.inv<=0&&Math.abs(w.x-p.x-p.w/2)<(w.k?26:20)&&p.y+p.h>FLOOR-(w.h||30)){hurt(Math.round((w.d||18)*L.dmgK),w.x,false,w.k==='gust'?'被风卷到':w.k==='toll'?'被钟声击中':'被冲击波击中');if(w.push)p.vx=w.dir*w.push;w.life=0;}});waves=waves.filter(w=>w.life>0&&w.x>0&&w.x<WORLD);
     // 首领留下的机关：落石先往下掉灰、灵枪先冒紫烟——这些就是提示
     hazards.forEach(h=>{const pc=p.x+p.w/2;if(h.delay>0){h.delay-=dt;if(h.k==='rock'&&Math.random()<dt*24)emit_particles(h.x+(Math.random()-.5)*18,38,(Math.random()-.5)*10,40+Math.random()*80,.7,.7,'#a39c8e',1.4+Math.random()*2,1,undefined,undefined,undefined,undefined);else if(h.k==='spear'&&Math.random()<dt*30)emit_particles(h.x+(Math.random()-.5)*20,FLOOR-2,(Math.random()-.5)*16,-30-Math.random()*50,.5,.5,h.warm?'#ffc890':'#cfa8ff',1.5+Math.random()*2,-.1,true,undefined,undefined,undefined);return;}
       h.life-=dt;h.t=(h.t||0)+dt;
-      if(h.k==='rock'){h.vy+=1500*dt;h.y+=h.vy*dt;h.r+=dt*6;if(!h.hit&&p.inv<=0&&Math.abs(h.x-pc)<20&&h.y+12>p.y&&h.y-12<p.y+p.h){h.hit=true;hurt(h.d,h.x);}if(h.y>=FLOOR-12){h.life=0;burst(h.x,FLOOR-8,'#8f887b',10);dust(h.x,FLOOR,5,0);beep(150,.06,'square');}}
-      else if(h.k==='pool'){if(p.inv<=0&&Math.abs(pc-h.x)<h.w/2-4&&p.y+p.h>FLOOR-6){burst(pc,FLOOR-4,h.fire?'#ffb347':'#9be36a',8);hurt(h.d,h.x);}}
-      else if(h.k==='spear'){if(!h.up){h.up=true;burst(h.x,FLOOR-10,h.warm?'#ffd0a0':'#d8b3ff',8);beep(520,.06,'triangle');}if(!h.hit&&h.t<.3&&p.inv<=0&&Math.abs(pc-h.x)<p.w/2+14&&p.y+p.h>FLOOR-100){h.hit=true;hurt(h.d,h.x);}}});
+      if(h.k==='rock'){h.vy+=1500*dt;h.y+=h.vy*dt;h.r+=dt*6;if(!h.hit&&p.inv<=0&&Math.abs(h.x-pc)<20&&h.y+12>p.y&&h.y-12<p.y+p.h){h.hit=true;hurt(h.d,h.x,false,'被落石砸中');}if(h.y>=FLOOR-12){h.life=0;burst(h.x,FLOOR-8,'#8f887b',10);dust(h.x,FLOOR,5,0);beep(150,.06,'square');}}
+      else if(h.k==='pool'){if(p.inv<=0&&Math.abs(pc-h.x)<h.w/2-4&&p.y+p.h>FLOOR-6){burst(pc,FLOOR-4,h.fire?'#ffb347':'#9be36a',8);hurt(h.d,h.x,false,h.fire?'被炉火烫到':'踩进了腐水');}}
+      else if(h.k==='spear'){if(!h.up){h.up=true;burst(h.x,FLOOR-10,h.warm?'#ffd0a0':'#d8b3ff',8);beep(520,.06,'triangle');}if(!h.hit&&h.t<.3&&p.inv<=0&&Math.abs(pc-h.x)<p.w/2+14&&p.y+p.h>FLOOR-100){h.hit=true;hurt(h.d,h.x,false,'被灵枪刺中');}}});
     hazards=hazards.filter(h=>h.life>0);
     // 得到的东西画成图飞进主角怀里
     loot.forEach(o=>{o.t+=dt;if(o.t<.45){o.vy+=700*dt;o.vx*=Math.pow(.2,dt);}else{const tx=p.x+p.w/2-o.x,ty=p.y+18-o.y,d=Math.hypot(tx,ty)||1,sp=380+o.t*700;o.vx+=(tx/d*sp-o.vx)*Math.min(1,dt*8);o.vy+=(ty/d*sp-o.vy)*Math.min(1,dt*8);if(d<16){o.t=-1;burst(p.x+p.w/2,p.y+20,'#fff1c2',8);beep(1180,.06,'sine');}}o.x+=o.vx*dt;o.y+=o.vy*dt;});loot=loot.filter(o=>o.t>=0&&o.t<4);
