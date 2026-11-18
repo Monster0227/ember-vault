@@ -61,7 +61,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
 
 (function () {
   'use strict';
-  const VERSION='5.9';
+  const VERSION='5.14';
   const canvas=document.getElementById('world');let ctx=canvas.getContext('2d');   // 图鉴画敌人头像时会临时换成离屏画布
   const panel=document.getElementById('panel'),hud=document.getElementById('hud'),touch=document.getElementById('touch'),notice=document.getElementById('notice'),hint=document.getElementById('hint');
   const pad=document.getElementById('pad'),chestBtn=document.getElementById('chest-btn'),healBtn=document.getElementById('heal-btn'),muteBtn=document.getElementById('mute');
@@ -324,6 +324,30 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       tower:{steps:[[3480,466,44],[3528,452,44],[3572,438,50],[3622,438,64]],trenches:[[3720,96,24]],slopes:[[3480,206,480,438]],broken:[[3708,120]]}
     };
     Object.keys(ground).forEach(th=>{const s=S(th);if(!s)return;s.steps=ground[th].steps;s.trenches=ground[th].trenches;s.slopes=ground[th].slopes;s.broken=ground[th].broken;});}
+  // Elevated galleries: 80 px rise and 45 px gaps are within a normal jump.
+  const HIGH_ROUTES={prison:{x:3520,top:20},sewers:{x:3300,top:100},ramparts:{x:3550,top:-60},ossuary:{x:3860,top:20},tower:{x:4400,top:-140}};
+  for(const room of STAGES){
+    if(room.arena){
+      if(room.bossKind==='lock')room.movers=(room.movers||[]).concat([[870,350,120,0,-100,5,0]]);
+      if(room.bossKind==='brood')room.movers=(room.movers||[]).concat([[840,350,120,100,0,5,0],[1310,350,120,-100,0,5,.5]]);
+      if(room.bossKind==='standard')room.crumbles=(room.crumbles||[]).concat([[910,320,130],[1260,290,130]]);
+      if(room.bossKind==='warden')room.movers=(room.movers||[]).concat([[880,360,120,0,-140,4.8,0],[1300,360,120,0,-140,4.8,.5]]);
+      continue;
+    }
+    if(room.rest)continue;
+    const route=HIGH_ROUTES[room.theme];if(!route)continue;
+    room.highRoute=[];
+    const up=Math.round((420-route.top)/80);
+    for(let i=0;i<=up*2;i++){
+      const tier=Math.min(i,up*2-i),x=route.x+i*155;let y=420-tier*80;
+      if(x+110>=room.exit-120)break;
+      for(const spring of room.springs||[])if(x+110>spring[0]&&x<spring[0]+spring[2]&&y>=spring[1]-10)y=spring[1]-50;
+      room.plats.push([x,y,110]);room.highRoute.push([x,y,110]);
+    }
+    const summit=room.highRoute[Math.min(up,room.highRoute.length-1)];
+    room.chests.push([summit[0]+36,summit[1]]);
+    room.ceilingY=route.top-180;
+  }
   // ---- 教程：焚炉底层。石碑上画着按键（跟着设置里的改键变），走近时下方也会说明 ----
   THEMES.furnace={sky:[[0,'#0d0705'],[.5,'#1d0f09'],[.8,'#2a150b'],[1,'#120905']],farKind:'tunnel',far:'#1f120b',win:'255,150,70',mist:'50,22,10',mid:'arches',arch:'#22140d',shaft:['255,170,100','255,130,60'],banner:['#5b2a1c','#6b4a2f'],
     wall:['#2a1d17','#30211a','#261a14','#140d09'],stone:['#43322a','#3d2d25','#4a382e','#1f150f'],floor:['#3a2a22','#33251e','#3f2f26','#1a110c'],top:['#8a6a4a','#4d3a2a'],ledge:['#a07a54','#5a4232'],pil:'#3a2a20',moss:['#5a3a1c','#6a4a24'],fog:'230,140,80',light:'#ff9a4a',
@@ -641,7 +665,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     // 二周目起，每三个狱卒里有一个换成精英
     enemies=L.ens.map((a,i)=>enemy(a[0],a[1],a[2],cycle&&a[2]==='guard'&&i%3===1?Object.assign({},a[3],{elite:true}):a[3]));chests=L.chests.map(c=>({x:c[0],y:c[1],open:false}));traps=(L.traps||[]).map(t=>Object.assign({},t,{t:(t.ph||0)*(t.per||3)}));lamps=(L.lamps||[]).map(x=>({x:x,lit:false}));signAt=-1;secrets=(L.secrets||[]).map((a,i)=>({x:a[0],y:a[1]||FLOOR,reward:a[2],hp:3,open:!!(run.found&&run.found['s'+n+':'+i]),t:1,shake:0}));
     Object.assign(p,{x:120,y:FLOOR-p.h,vx:0,vy:0,face:1,jumps:0,ground:true,coyote:.1,buffer:0,roll:0,rollCd:0,attack:0,atkCd:0,combo:0,comboT:0,castCd:0,drop:null,inv:0,hit:new Set(),hurtT:0,landT:0,trail:[],cape:null,safeX:120,safeY:FLOOR-p.h,dash:0,ringT:0,domeT:0,on:null});
-    shots=[];shotsPool.clear();waves=[];particles=[];particlesPool.clear();floats=[];orbs=[];fx=[];chunks=[];hazards=[];loot=[];gateK=0;sealK=L.arena?1:0;bossCardT=0;revealC=null;keys={};clearHeld();cam=0;shake=0;hitstop=0;paused=false;checkpoint=false;nearChest=false;nearKind='';hudKey='';bellRing=0;
+    shots=[];shotsPool.clear();waves=[];particles=[];particlesPool.clear();floats=[];orbs=[];fx=[];chunks=[];hazards=[];loot=[];gateK=0;sealK=L.arena?1:0;bossCardT=0;revealC=null;keys={};clearHeld();cam=0;viewY=verticalBase;shake=0;hitstop=0;paused=false;checkpoint=false;nearChest=false;nearKind='';hudKey='';bellRing=0;
     flags={};p.windUsed=false;thrown=[];offers=[];chestC=null;talk=null;talkBox.hidden=true;cine=null;credits=null;flashT=0;bandId='';
     if(L.rest){const free=relicPool().filter(id=>!relics[id]),r=rng(runSeed+n*131);shopRelic=free.length?free[Math.floor(r()*free.length)]:'';}
     entry={hp:p.hp,max:p.max,damage:p.damage,potions:p.potions,embers:embers,score:score,kills:kills,bag:Object.assign({},bag),relics:Object.assign({},relics),keep:Object.assign({},keepsakes),skills:Object.assign({},p.skills),soul:p.soul,plateHits:p.plateHits,leechKills:p.leechKills,shards:p.shards||0,found:Object.assign({},run.found||{}),maps:Object.assign({},run.maps||{})};
@@ -695,7 +719,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(type==='flyer')Object.assign(e,{y:floor-150-S[1]/2,fly:'hover',hx:x,dvx:0,dvy:0,ft:0,cd:1});
     if(type==='hanger')Object.assign(e,{y:Math.max(90,floor-206),homeY:Math.max(90,floor-206),hang:'wait',vy:0,wait:0});
     if(type==='crawler')e.cd=.35;
-    if(b)Object.assign(e,{move:'',act:0,at:0,rec:0,rt:0,vx:0,lift:0,under:0,combo:0,tollCd:3,mothCd:2,struck:false,stun:false,roar:false,surfacing:false});return e;}
+    if(b)Object.assign(e,{move:'',lastMove:'',act:0,at:0,rec:0,rt:0,vx:0,lift:0,under:0,combo:0,tollCd:3,mothCd:2,struck:false,stun:false,roar:false,surfacing:false});return e;}
   function down(a){return Object.keys(held).some(k=>held[k]===a);}
   function action(a){if(state!=='play'||paused||rotationBlocked||passage)return;if(a==='jump')p.buffer=.2;if(a==='attack'){inputQueue.push(1);if(p.atkCd<=0&&p.roll<=0&&p.dash<=0){inputQueue.take(1);attack();}}if(a==='roll'){inputQueue.push(2);if(p.rollCd<=0&&(p.attack<=0||heroFSM.canCancel())){inputQueue.take(2);roll();}}if(a==='interact')interact();if(a==='use')useItem();if(a==='cast')castSoul();if(a==='skill1')useSkill(1);if(a==='skill2')useSkill(2);if(a==='skill3')useSkill(3);if(a==='cycle')cycleItem();if(a==='map')openMap();if(a==='bag')openBag();if(a==='heal'&&p.potions&&p.hp<p.max){const h=Math.min(p.max-p.hp,(3+p.skills.vigor)*LIFE);if(!L.tutorial)p.potions--;p.hp+=h;burst(p.x,p.y,'#91d6bd',22);pop(p.x+13,p.y-6,'+'+(h/LIFE),'#9be3c8');say('余火回温 · 恢复 '+(h/LIFE)+' 个小幽灵');beep(550,.25);syncHud();}}
   function dirs(){return{l:!!(isKey('left')||stick.x<-.28||down('left')),r:!!(isKey('right')||stick.x>.28||down('right')),u:!!(isKey('up')||stick.y<-.5),d:!!(isKey('down')||stick.y>.5)};}
@@ -979,7 +1003,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   // 地图的标题框和罗盘：像一张真正的手绘地图
   function mapCartouche(cw,title,sub){ctx.save();ctx.font='bold 18px "Songti SC","STSong","Noto Serif SC","SimSun",serif';const w=ctx.measureText(title).width+56;ctx.fillStyle='rgba(236,222,186,.9)';ctx.strokeStyle='rgba(60,42,22,.7)';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(22,16);ctx.lineTo(22+w,16);ctx.quadraticCurveTo(30+w,30,22+w,44);ctx.lineTo(22,44);ctx.quadraticCurveTo(30,30,22,16);ctx.closePath();ctx.fill();ctx.stroke();
     ctx.fillStyle=INK;ctx.textAlign='left';ctx.fillText(title,48,37);if(sub){ctx.font='12px "Kaiti SC","STKaiti","KaiTi","Songti SC",serif';ctx.fillStyle='rgba(44,33,22,.7)';ctx.fillText(sub,w+40,36);}
-    const cx=cw-46,cy=34;ctx.strokeStyle='rgba(44,33,22,.7)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(cx,cy,16,0,TAU);ctx.stroke();ctx.beginPath();ctx.arc(cx,cy,11,0,TAU);ctx.stroke();ctx.fillStyle=INK;[[0,-1],[1,0],[0,1],[-1,0]].forEach((d,i)=>{ctx.beginPath();ctx.moveTo(cx+d[0]*20,cy+d[1]*20);ctx.lineTo(cx+d[1]*4,cy-d[0]*4);ctx.lineTo(cx-d[1]*4,cy+d[0]*4);ctx.closePath();ctx.globalAlpha=i===1?1:.55;ctx.fill();});ctx.globalAlpha=1;ctx.font='bold 10px serif';ctx.textAlign='center';ctx.fillText('东',cx+28,cy+4);ctx.restore();}  function drawAreaMap(cw,ch){parchment(cw,ch);const pad=28,head=60,legH=36,avail=ch-head-legH,sx=(cw-pad*2)/L.w,sy=Math.min(avail/(FLOOR+30-150),sx*3.4),strip=(FLOOR+30-150)*sy,top=head+(avail-strip)/2,bot=top+strip,X=x=>pad+x*sx,Y=y=>top+(Math.max(150,y)-150)*sy,lv=x=>mapLevel(x),al=v=>v===2?1:.42,guide=!!relics.guide;
+    const cx=cw-46,cy=34;ctx.strokeStyle='rgba(44,33,22,.7)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(cx,cy,16,0,TAU);ctx.stroke();ctx.beginPath();ctx.arc(cx,cy,11,0,TAU);ctx.stroke();ctx.fillStyle=INK;[[0,-1],[1,0],[0,1],[-1,0]].forEach((d,i)=>{ctx.beginPath();ctx.moveTo(cx+d[0]*20,cy+d[1]*20);ctx.lineTo(cx+d[1]*4,cy-d[0]*4);ctx.lineTo(cx-d[1]*4,cy+d[0]*4);ctx.closePath();ctx.globalAlpha=i===1?1:.55;ctx.fill();});ctx.globalAlpha=1;ctx.font='bold 10px serif';ctx.textAlign='center';ctx.fillText('东',cx+28,cy+4);ctx.restore();}  function drawAreaMap(cw,ch){parchment(cw,ch);const pad=28,head=60,legH=36,avail=ch-head-legH,sx=(cw-pad*2)/L.w,mapTop=L.highRoute?Math.min(...L.highRoute.map(a=>a[1]))-55:150,sy=Math.min(avail/(FLOOR+30-mapTop),sx*3.4),strip=(FLOOR+30-mapTop)*sy,top=head+(avail-strip)/2,bot=top+strip,X=x=>pad+x*sx,Y=y=>top+(Math.max(mapTop,y)-mapTop)*sy,lv=x=>mapLevel(x),al=v=>v===2?1:.42,guide=!!relics.guide;
     mapCartouche(cw,L.rest?L.name:L.n+' · '+L.name,hasMap()?(L.rest||L.arena||L.tutorial?'':'墨翁 绘'):'自己摸索的草图');
     // 地面：每 100 一列，走过的列墨色深，地图上有但没走过的淡
     const segs=platforms.filter(a=>a.h>100&&!a.solid);for(let i=0;i*100<L.w;i++){const v=lv(i*100+50);if(!v)continue;const x0=i*100,x1=Math.min(L.w,x0+100);ctx.globalAlpha=al(v);
@@ -1194,7 +1218,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function breakCache(b){b.broken=true;burst(b.x,b.y-15,b.kind===0?'#ffd18a':b.kind===1?'#9be3c8':'#a8dce8',12);dust(b.x,b.y,5,0);beep(540,.1);if(b.kind===0){embers+=20;popArt('ember','+20',b.x,b.y-38);for(let i=0;i<5;i++)orbs.push({x:b.x,y:b.y-15,vx:(Math.random()-.5)*220,vy:-80-Math.random()*180,t:0});}else if(b.kind===1){const amount=Math.min(LIFE,p.max-p.hp);p.hp+=amount;popArt('heart',amount?'+'+(amount/LIFE):'',b.x,b.y-38);}else{gain('knife',2,true);popArt('knife','×2',b.x,b.y-38);loot.push({id:'knife',x:b.x,y:b.y-20,vx:(Math.random()-.5)*80,vy:-260,t:0});}hudKey='';}
   // ---- 首领招式：每位首领一张招式表。出手前只靠动作预兆（刨地喷汽、灯门打开、高举旗帜、举锤过顶……），不画警示框 ----
   // e.move 当前招式；e.wind 蓄力剩余，归零时 release 出手；e.act / e.at 出手持续；e.rec 收招硬直（趁机砍）；e.cd 下一招前的间隔
-  function begin(e,m,wind){e.move=m;e.wind=e.wt=wind;e.act=e.at=0;e.rec=0;e.struck=false;e.slapped=false;e.spell=m==='lantern';bossCue('attack');}
+  function begin(e,m,wind){e.lastMove=m;e.move=m;e.wind=e.wt=wind;e.act=e.at=0;e.rec=0;e.struck=false;e.slapped=false;e.spell=m==='lantern';bossCue('attack');}
   function startAct(e,t){e.act=e.at=t;e.struck=false;}
   function recover(e,r,cd){e.rec=e.rt=r;e.cd=cd;}
   function overlapP(x0,y0,x1,y1){return p.x+p.w>Math.min(x0,x1)&&p.x<Math.max(x0,x1)&&p.y+p.h>y0&&p.y<y1;}
@@ -1214,7 +1238,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     // 守锁兽：冲撞（撞墙会晕、震落碎石）、人立砸地、甩锁链；二阶段连撞两次，砸地带冲击波
     lock:{roar:1.1,
       idle(e,dt,dist){if(dist>190)bossWalk(e,e.face,e.rage?112:84,dt);},
-      choose(e,dist){if(dist<160)begin(e,'slam',e.rage?.42:.55);else if(dist<340&&Math.random()<.62)begin(e,'lash',e.rage?.48:.62);else{begin(e,'charge',e.rage?.5:.72);e.combo=e.rage?2:1;}},
+      choose(e,dist){if(dist<160&&e.lastMove==='slam')begin(e,'lash',e.rage?.48:.62);else if(dist<160)begin(e,'slam',e.rage?.42:.55);else if(dist<340&&Math.random()<.62)begin(e,'lash',e.rage?.48:.62);else{begin(e,'charge',e.rage?.5:.72);e.combo=e.rage?2:1;}},
       tick(e,dt){const ec=e.x+e.w/2;if(e.move==='charge'&&Math.random()<dt*22){emit_particles(ec-e.face*(18+Math.random()*16),e.y-4,(Math.random()-.5)*30,-70-Math.random()*50,.7,.7,'#e4ebee',3+Math.random()*4,-.12,undefined,undefined,undefined,true);if(Math.random()<.35)dust(ec+e.face*44,FLOOR,2,-e.face);}},
       release(e){const f=e.face,ec=e.x+e.w/2;
         if(e.move==='slam'){strike(e,ec,FLOOR-110,ec+f*156,FLOOR,28);dust(ec+f*70,FLOOR,14,0);burst(ec+f*80,FLOOR-6,'#c9a865',10);shake=Math.max(shake,9);beep(66,.32,'sawtooth');if(e.rage){waves.push({x:ec-20,dir:-1,life:1.8},{x:ec+20,dir:1,life:1.8});bellRing=Math.max(bellRing,.6);}recover(e,.62,e.rage?.65:.95);}
@@ -1230,10 +1254,10 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     brood:{roar:1,
       idle(e,dt,dist){const pc=p.x+p.w/2,ec=e.x+e.w/2,want=pc+(ec>pc?1:-1)*230;if(Math.abs(want-ec)>24)bossWalk(e,want>ec?1:-1,e.rage?96:70,dt);
         if(e.spellCd<=0){begin(e,'dive',.5);e.spellCd=e.rage?3.8:5.4;}else if(e.rage&&(e.mothCd-=dt)<=0){begin(e,'moths',.5);e.mothCd=6.2;}},
-      choose(e,dist){if(dist<180)begin(e,'sweep',e.rage?.42:.52);else begin(e,'spit',e.rage?.52:.7);},
+      choose(e,dist){if(dist<180&&e.lastMove!=='sweep')begin(e,'sweep',e.rage?.42:.52);else if(e.lastMove==='spit'&&dist>200){begin(e,'dive',.6);e.spellCd=5.4;}else begin(e,'spit',e.rage?.52:.7);},
       tick(e,dt){if(e.move==='dive')e.under=Math.min(1,e.under+dt/e.wt);else if(e.move==='spit'&&Math.random()<dt*20)emit_particles(e.x+e.w/2+e.face*20+(Math.random()-.5)*20,e.y+40,(Math.random()-.5)*30,-30-Math.random()*40,.5,.5,'#cfffb0',1.5+Math.random()*2,-.2,true,undefined,undefined,undefined);},
       release(e){const f=e.face,ec=e.x+e.w/2,pc=p.x+p.w/2;
-        if(e.move==='spit'){const n=e.rage?5:3;for(let i=0;i<n;i++){const o=i-(n-1)/2,sx=ec+f*24,sy=e.y+44,tx=clamp(pc+o*74,L.gate+20,L.seal-20),T=.8+Math.abs(o)*.07,g=780;emit_shots('glob',sx,sy,(tx-sx)/T,(FLOOR-8-sy)/T-.5*g*T,g,3,Math.round(13*L.dmgK),e.rage?3:2.2,undefined,undefined,undefined,undefined,undefined,undefined);}burst(ec+f*24,e.y+44,'#b8f08a',12);beep(170,.3,'sawtooth');recover(e,.55,e.rage?.85:1.2);}
+        if(e.move==='spit'){const n=e.rage?5:3;for(let i=0;i<n;i++){const o=i-(n-1)/2,sx=ec+f*24,sy=e.y+44,tx=clamp(pc+o*74,L.gate+20,L.seal-20),T=.8+Math.abs(o)*.07,g=780;emit_shots('glob',sx,sy,(tx-sx)/T,(clamp(p.y+p.h,FLOOR-260,FLOOR)-8-sy)/T-.5*g*T,g,3,Math.round(13*L.dmgK),e.rage?3:2.2,undefined,undefined,undefined,undefined,undefined,undefined);}burst(ec+f*24,e.y+44,'#b8f08a',12);beep(170,.3,'sawtooth');recover(e,.55,e.rage?.85:1.2);}
         else if(e.move==='sweep'){startAct(e,.32);beep(130,.2,'sawtooth');}
         else if(e.move==='moths'){for(let i=0;i<3;i++)emit_shots('moth',ec+(i-1)*30,e.y+30,(i-1)*70,-90,undefined,7,Math.round(10*L.dmgK),undefined,1,100,undefined,undefined,undefined,undefined);beep(900,.2,'sine');recover(e,.45,.6);}
         else{startAct(e,1.3);e.under=1;}},
@@ -1248,7 +1272,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     standard:{roar:1,
       idle(e,dt,dist){if(dist>190)bossWalk(e,e.face,e.rage?124:96,dt);else if(dist<70)bossWalk(e,-e.face,80,dt);
         if(e.spellCd<=0&&dist<580){begin(e,'plant',e.rage?.5:.68);e.spellCd=e.rage?4.4:5.8;}},
-      choose(e,dist){if(e.rage&&dist>120&&Math.random()<.5)begin(e,'leap',.36);else if(dist<140)begin(e,'sweep',e.rage?.32:.4);else if(dist<460&&Math.random()<.7)begin(e,'thrust',e.rage?.38:.48);else begin(e,'gust',e.rage?.42:.55);},
+      choose(e,dist){if(p.y+p.h<FLOOR-110&&dist<440)begin(e,'leap',.52);else if(e.rage&&dist>120&&Math.random()<.5)begin(e,'leap',.36);else if(dist<140)begin(e,'sweep',e.rage?.32:.4);else if(dist<460&&Math.random()<.7)begin(e,'thrust',e.rage?.38:.48);else begin(e,'gust',e.rage?.42:.55);},
       tick(e,dt){if(e.move==='plant'&&Math.random()<dt*24)emit_particles(e.x+e.w/2+(Math.random()-.5)*30,e.y-40+Math.random()*30,(Math.random()-.5)*20,-40-Math.random()*30,.6,.6,'#d8b3ff',1.5+Math.random()*2,-.15,true,undefined,undefined,undefined);},
       release(e){const f=e.face,ec=e.x+e.w/2;
         if(e.move==='sweep'){startAct(e,.24);beep(260,.12,'sawtooth');}
@@ -1271,7 +1295,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       idle(e,dt,dist){if(dist>150)bossWalk(e,e.face,e.rage?110:82,dt);
         if(e.spellCd<=0&&dist>130&&dist<600){begin(e,'lantern',.72);e.spellCd=e.rage?2.8:4;}
         else if(e.rage&&(e.tollCd-=dt)<=0&&dist<680){begin(e,'toll',.5);e.tollCd=5.2;}},
-      choose(e,dist){if(dist<155)begin(e,'slam',e.rage?.42:.55);else if(dist<280)begin(e,'sweep',.48);else begin(e,'slam',.78);},
+      choose(e,dist){if(p.y+p.h<FLOOR-100){begin(e,'lantern',.72);e.spellCd=3.8;}else if(dist<155&&e.lastMove!=='slam')begin(e,'slam',e.rage?.42:.55);else if(dist<280)begin(e,'sweep',.48);else{begin(e,'lantern',.72);e.spellCd=3.8;}},
       tick(e,dt){if(e.move==='lantern'&&Math.random()<dt*26)emit_particles(e.x+e.w/2-e.face*14+(Math.random()-.5)*26,e.y+4+Math.random()*20,(Math.random()-.5)*30,-30-Math.random()*40,.5,.5,'#bff5ea',1.4+Math.random()*2,-.2,true,undefined,undefined,undefined);},
       release(e){const f=e.face,ec=e.x+e.w/2,pc=p.x+p.w/2;
         if(e.move==='slam'){strike(e,ec,FLOOR-120,ec+f*152,FLOOR,28);dust(ec+f*80,FLOOR,12,0);burst(ec+f*90,FLOOR-8,'#e6a575',12);shake=Math.max(shake,8);beep(120,.35,'square');if(e.rage){waves.push({x:ec-12,dir:-1,life:1.8},{x:ec+12,dir:1,life:1.8});bellRing=Math.max(bellRing,.8);}recover(e,.5,e.rage?.8:.95);}
@@ -1428,7 +1452,8 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(p.kickX){p.kickX*=Math.pow(.0001,dt);if(Math.abs(p.kickX)<4)p.kickX=0;}
     const landed=physics.landed;if(landed){const a=landed;if(a.mv||a.cr)p.on=a;if(a.cr&&!a.cr.st){a.cr.st=1;a.cr.t=.5;beep(220,.05,'square',.02);}if(a.w>=120&&!a.mv&&!a.cr){p.safeX=clamp(p.x,a.x+40,a.x+a.w-p.w-40);p.safeY=a.y-p.h;}springPad();}
     climbRope(dt);
-    const cameraTarget=Math.min(verticalBase,p.y-120);viewY+=(cameraTarget-viewY)*Math.min(1,dt*8);
+    const cameraTarget=Math.min(verticalBase,p.y+p.h-H*(coarse()?.62:.65)+clamp(p.vy*.08,-28,40)),cameraDelta=cameraTarget-viewY;
+    if(Math.abs(cameraDelta)>12)viewY+=(cameraDelta-Math.sign(cameraDelta)*12)*(1-Math.exp(-dt*(p.ground?5:3.5)));
     if(!was&&p.ground){p.landT=.12;if(fall>360)dust(p.x+13,p.y+p.h,7,0);}
     if(p.ground)p.walk+=Math.abs(p.vx)*dt*.085;
     updateCape(dt);
@@ -1458,7 +1483,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       e.flash=Math.max(0,e.flash-dt);e.swing=Math.max(0,e.swing-dt);e.hitT=Math.max(0,e.hitT-dt);e.cd-=dt;if(e.blockT>0)e.blockT-=dt;const boss=e.type==='boss',el=e.elite,dx=p.x-e.x,dy=Math.abs(p.y+p.h-e.floor),ox=e.x,kind=boss?e.kind:el?'elite':e.type,frozen=e.frozen>0,dazed=e.daze>0;
       if(e.type!=='dummy'&&!codex.seen[kind]&&onScreen(e))note('seen',kind);if(frozen)e.frozen=Math.max(0,e.frozen-dt);if(dazed)e.daze=Math.max(0,e.daze-dt);if(e.brk>0)e.brk=Math.max(0,e.brk-dt);
       // 持盾狱卒转身慢：绕到背后半秒内它还转不过来
-      if(!frozen&&!dazed&&e.wind<=0&&!boss){const want=dx<0?-1:1;if(e.type==='shield'&&want!==e.face){if(!(e.brk>0)){e.turnT=(e.turnT||0)+dt;if(e.turnT>.5){e.face=want;e.turnT=0;}}}else{e.face=want;e.turnT=0;}}
+      if(!frozen&&!dazed&&e.wind<=0&&e.swing<=0&&!boss){const want=dx<0?-1:1;if(e.type==='shield'&&want!==e.face){if(!(e.brk>0)){e.turnT=(e.turnT||0)+dt;if(e.turnT>.5){e.face=want;e.turnT=0;}}}else{e.face=want;e.turnT=0;}}
       if(e.kb){const B=bounds(e);e.x=clamp(e.x+e.kb*dt,B[0],B[1]);e.kb*=Math.pow(.002,dt);if(Math.abs(e.kb)<5)e.kb=0;}
       if(el&&Math.random()<dt*(lowFx?4:10))ember(e.x+e.w/2+(Math.random()-.5)*34,e.y+10+Math.random()*44,1,'#ffc46a');
       if(boss){if(!frozen&&!dazed&&(!L.arena||flags.boss))bossAI(e,dt);}   // 首领在登场对白前不动；冰冻、震晕期间停止行动
@@ -1466,10 +1491,19 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       if(FOE_AI[e.type])FOE_AI[e.type](e,dt,dx,dy);
       else{const sh=e.type==='shield',spd=1-.1*Math.min(3,cycle);
       // 小怪：蓄力（动作预兆 + 刃口一闪）→ 出手；不画攻击范围
-      if(e.wind>0){e.wind-=dt;if(e.wind<=0){e.swing=.22;if(sh||(!el&&e.type==='guard'&&L.theme==='sewers')){const B=bounds(e);e.x=clamp(e.x+e.face*(sh?60:75),B[0],B[1]);}
+      if(e.wind>0){e.wind-=dt;if(e.wind<=0){e.swing=.22;e.struck=false;
           if(e.type==='archer'){const pattern=L.theme==='ramparts'?[-85,0,85]:L.theme==='tower'?[-55,55]:[0];pattern.forEach(v=>emit_shots(undefined,e.x+14,e.y+17,e.face*(L.theme==='sewers'?250:320),v,undefined,4,Math.round(12*L.dmgK),undefined,undefined,undefined,undefined,L.theme==='sewers'?'#a5e66c':L.theme==='ossuary'?'#d8aaff':'#dfe3e0',undefined,undefined));beep(290,.08);}
-          else if(Math.abs(p.x-e.x)<(el?125:sh?100:92)&&(p.x-e.x)*e.face>-15&&dy<80)if(p.roll>0)perfectDodge(e.x+e.w/2);else hurt(Math.round((el?22:14)*L.dmgK),e.x,el&&cycle>=2);
+          
           if(!el&&e.type==='guard'&&L.theme==='ossuary'&&e.floor===FLOOR)waves.push({x:e.x+e.w/2,dir:e.face,life:1.1});if(el){dust(e.x+e.w/2+e.face*40,e.floor,6,0);shake=Math.max(shake,4);}if(sh){dust(e.x+e.w/2+e.face*30,e.floor,5,e.face);beep(180,.08,'square');}e.cd=el?1.02:sh?1.35:1.12;}}
+      else if(e.swing>0){
+        if(e.type!=='archer'){
+          const B=bounds(e),lunge=sh?270:(!el&&L.theme==='sewers'?340:90);
+          if(e.swing>.06)e.x=clamp(e.x+e.face*lunge*dt,B[0],B[1]);
+          if(!e.struck&&e.swing<=.15&&e.swing>.045){e.struck=true;
+            if(Math.abs(p.x-e.x)<(el?125:sh?100:92)&&(p.x-e.x)*e.face>-15&&Math.abs(p.y+p.h-e.floor)<80){if(p.roll>0)perfectDodge(e.x+e.w/2);else hurt(Math.round((el?22:14)*L.dmgK),e.x,el&&cycle>=2);}
+          }
+        }
+      }
       else if(Math.abs(dx)<(e.type==='archer'?620:el?160:sh?140:L.theme==='sewers'?200:136)&&dy<110&&e.cd<=0&&(e.type!=='archer'||onScreen(e))){e.wind=e.wt=(e.type==='archer'?.48:el?.46:sh?.5:.36)*spd;}
       else if(e.type!=='archer'&&e.hitT<=0&&Math.abs(dx)<650&&Math.abs(dx)>55){const B=bounds(e);e.x=clamp(e.x+e.face*(el?84:sh?50:66)*dt,B[0],B[1]);}}}
       // 刀砍中：积一格魂火。持盾狱卒正面挡下横斩和上挑——重劈（连砍第三下）或钟锤能破防，下劈从头顶砍不挡
@@ -1477,7 +1511,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
         if(p.slash!=='down'&&blocks(e,side,0)){if(heavy||p.char==='bell'){e.brk=1.4;e.wind=0;e.swing=0;clang(hx,hy);fx.push({k:'ring',x:hx,y:hy,life:.3,max:.3,r:46});pop(e.x+e.w/2,e.y-24,'破防','#ffe2a8',true);hitEnemy(e,dmg*.6,side,true,hx,hy);}else{clang(hx,hy);e.blockT=.25;p.vx=-side*230;hitstop=.04;if(!run.shieldTip){run.shieldTip=true;say('盾挡住了 · 绕到背后、从上面下劈，或者用重击破防',2.8);}}}
         else{p.soul=Math.min(3,p.soul+1);hudKey='';if(p.soul===3&&!run.soulTip){run.soulTip=true;say('魂火已满 · '+(coarse()?'点右边的技能键':'按 '+K('skill1')+' / '+K('skill2')+' / '+K('skill3')+' 放技能'),2.5);}if(p.slash==='down'&&!p.pogo){p.pogo=true;p.vy=-470;p.jumps=1;}if(p.slash==='side')p.kickX=-p.atkFace*(p.char==='bell'?40:70);   // 砍中时自己被往后推一点（空洞骑士的刀反冲）
           hitEnemy(e,dmg,p.slash==='side'?p.atkFace:0,heavy,hx,hy);}}
-      e.walk+=Math.abs(e.x-ox)*.12;
+      e.motionX=(e.x-ox)/Math.max(dt,.001);e.walk+=Math.abs(e.x-ox)*.12;
     });
     touchEnemies();
     // 飞行物：箭、典狱长的魂火（会追人）、溺灯的腐潮弹（抛物线，落地留一滩腐水）、灯蛾（慢慢飘过来）；刀光都能砍掉
@@ -1505,7 +1539,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(L.seal){if(p.x>L.seal+10){if(enemies.some(e=>e.type==='boss'&&!e.dead)){p.x=L.seal;say('铁闸紧闭 · 先击败首领',2);}else if(L.bossKind==='warden')finish(true);else{nextStage();return;}}}
     else if(p.x+p.w/2>L.exit+20&&p.ground){nextStage();return;}
     // 镜头：首领战时框住铁闸与封印之间的场地
-    const lead=p.face>0?.35:.62,lo=bossOn?Math.min(L.gate-40,WORLD-W):0,hi=bossOn?Math.max(lo,Math.min(WORLD-W,L.seal+130-W)):Math.max(0,WORLD-W);cam+=(clamp(p.x-W*lead,lo,hi)-cam)*Math.min(1,dt*5);if(bossCardT>0){bossCardT=Math.max(0,bossCardT-dt);notice.style.opacity=0;}markSeen();
+    const lead=.5-clamp(p.vx/1800,-.13,.13),lo=bossOn?Math.min(L.gate-40,WORLD-W):0,hi=bossOn?Math.max(lo,Math.min(WORLD-W,L.seal+130-W)):Math.max(0,WORLD-W);cam+=(clamp(p.x-W*lead,lo,hi)-cam)*(1-Math.exp(-dt*4.5));if(bossCardT>0){bossCardT=Math.max(0,bossCardT-dt);notice.style.opacity=0;}markSeen();
     // 墨翁的哼曲：越近越清楚
     if(L.ink!=null&&!hasMap()){const dd=Math.abs(p.x-L.ink);if(dd<620){inkHum-=dt;if(inkHum<=0){inkHum=.36;const mel=[0,2,4,2,0,-1,7,4,2,-1,0,-1],nn=mel[inkStep++%mel.length];if(nn>=0)musicTone(330*Math.pow(2,nn/12),.32,.014*(1-dd/620)+.002,'sine');}}}
     noteBand();syncHud();
@@ -1791,7 +1825,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       else if(o.k==='candle')candles(x,300+s*80);
       else if(o.k==='gear')wallGear(x,250+s*110,s);
       else crack(x,Math.max(210,wy+20)+s*(T.outdoor?60:150));}}
-  function drawCeiling(){if(T.outdoor)return;const y1=34;patRect(wallPat(),-10,viewY-20,W+20,y1-viewY+20,-cam*.55);box(-10,viewY-20,W+20,y1-viewY+20,'rgba(4,7,10,.72)');box(-10,y1,W+20,4,'#1d2a35');box(-10,y1+4,W+20,3,'#0b1117');}
+  function drawCeiling(){if(T.outdoor)return;const y1=L.ceilingY==null?34:L.ceilingY;patRect(wallPat(),-10,viewY-20,W+20,y1-viewY+20,-cam*.55);box(-10,viewY-20,W+20,y1-viewY+20,'rgba(4,7,10,.72)');box(-10,y1,W+20,4,'#1d2a35');box(-10,y1+4,W+20,3,'#0b1117');}
   // ---- 主场景（跟着镜头走）：石柱、吊灯、地面、平台、机关 ----
   const pillarSprites=new Map();
   function pillar(pl){
@@ -1880,6 +1914,16 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     for(const d of decor.floor)if(d.x>v0&&d.x<v1)floorProp(d);
     for(const s of L.slopes||[]){if(s[0]+s[1]<v0||s[0]>v1)continue;ctx.beginPath();ctx.moveTo(s[0],FLOOR+6);ctx.lineTo(s[0],s[2]);ctx.lineTo(s[0]+s[1],s[3]);ctx.lineTo(s[0]+s[1],FLOOR+6);ctx.closePath();ctx.fillStyle=T.floor?T.floor[0]:T.top[1];ctx.fill();ctx.strokeStyle=T.top[0];ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(s[0],s[2]);ctx.lineTo(s[0]+s[1],s[3]);ctx.stroke();ctx.strokeStyle=T.top[1];ctx.lineWidth=2;ctx.stroke();}
     for(const b of L.broken||[]){if(b[0]+b[1]<v0||b[0]>v1)continue;for(let x=b[0];x<b[0]+b[1];x+=18){const h=4+(x*7)%9;poly([x,FLOOR,x+10,FLOOR,x+6,FLOOR-h],T.top[0],OL,.8);if((x/18)%3===0)poly([x+4,FLOOR,x+14,FLOOR,x+12,FLOOR+7,x+2,FLOOR+6],'#1a1410');}}}
+  function drawHighRoute(){if(!L.highRoute)return;
+    for(const a of L.highRoute){const x=a[0],y=a[1],w=a[2];if(x+w<cam-60||x>cam+W+60)continue;
+      ctx.save();ctx.globalAlpha=.8;
+      box(x+12,y+12,13,FLOOR-y-12,T.far);box(x+w-25,y+12,13,FLOOR-y-12,T.far);
+      ctx.strokeStyle=T.arch;ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(x+18,y+90);ctx.quadraticCurveTo(x+w/2,y+6,x+w-18,y+90);ctx.stroke();
+      line([x+12,y+16,x+12,FLOOR],1,T.top[1]);
+      for(let yy=y+50;yy<FLOOR;yy+=52)box(x+8,yy,21,4,T.arch);
+      ctx.restore();
+    }
+  }
   function drawTerrain(){for(const a of platforms){if(!a.solid||a.x+a.w<cam-20||a.x>cam+W+20)continue;patRect(floorPat(),a.x,a.y,a.w,FLOOR-a.y,0);box(a.x,a.y,a.w,5,T.top[0]);box(a.x,a.y+5,a.w,4,T.top[1]);box(a.x,a.y,3,FLOOR-a.y,'rgba(8,12,16,.45)');box(a.x+a.w-3,a.y,3,FLOOR-a.y,'rgba(8,12,16,.45)');for(let i=14;i<a.w;i+=31)line([a.x+i,a.y+12,a.x+i-3,a.y+19,a.x+i+2,a.y+24],1,'rgba(6,12,15,.4)');}}
   // 下水道的毒水池：冒泡，发绿光
   function acid(x,w){const y=FLOOR;box(x-4,y-2,w+8,4,T.top[1]);box(x,y,w,16,'#163016');ctx.fillStyle='rgba(120,220,70,.85)';ctx.fillRect(x,y+1,w,10);ctx.fillStyle='rgba(205,255,160,.8)';for(let i=0;i<w-6;i+=14)ctx.fillRect(x+i,y+1.5+Math.sin(time*3+i*.4)*1.2,8,1.4);
@@ -2275,10 +2319,12 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function captiveFace(x,y,S,flash){ctx.save();ctx.translate(x,y);shape(()=>{ctx.moveTo(-5,5);ctx.quadraticCurveTo(-8,-6,0,-7);ctx.quadraticCurveTo(8,-6,6,4);ctx.lineTo(3,3);ctx.lineTo(1,6);ctx.lineTo(-2,3);ctx.closePath();},flash?'#fff':S.fire,OL,1);oval(0,-1,1,2,'#14262c');oval(3.6,-1,1,2,'#14262c');ctx.restore();}
   function soulCage(x,y,S,flash){ctx.save();ctx.translate(x,y);shape(()=>{ctx.moveTo(-6,6);ctx.lineTo(-6,-5);ctx.quadraticCurveTo(0,-10,6,-5);ctx.lineTo(6,6);ctx.closePath();},flash?'#fff':S.dark,OL,1.3);captiveFace(0,0,S,flash);line([-6,6,6,6],2,S.metal);line([-3,-6,-3,5],1,S.metal);line([3,-6,3,5],1,S.metal);circle(0,-10,2,null,S.metal,1);ctx.restore();}
   function drawStoryGuard(e,P,w,sw,theme){const k=theme||e.biome||L.theme,S=SOUL_FOE[k]||SOUL_FOE.prison,flash=e.flash>0,ice=e.frozen>0,C=flash?'#fff':ice?'#a8dfff':S.cloth,D=flash?'#fff':ice?'#658da6':S.dark,M=flash?'#fff':ice?'#d5f5ff':S.metal,t=time*2+(e.seed||0),walk=Math.sin(e.walk||0),strike=sw>=0?Math.sin(Math.min(1,sw*2)*Math.PI):0;
-    ctx.save();ctx.translate(0,Math.sin(t)*.7);ctx.rotate(-w*.16+strike*.12);
+    const travel=Math.min(1,Math.abs(e.motionX||0)/85),plant=w>0?8:strike*10,stride=walk*6*travel;
+    ctx.save();ctx.translate(strike*3,Math.sin(t)*.7+Math.abs(walk)*travel*1.8+w*3);ctx.rotate(-w*.16+strike*.17-(e.hitT>0?.12:0));
+    line([-7,-31,-12-stride*.45,-24,-11-stride*.65,-17],3,D,OL);
     if(k==='ramparts'){line([-7,-35,-12,-55],1.6,M);poly([-12,-54,-27,-50,-22,-43,-29,-37,-10,-42],C,OL,1.2);line([-22,-49,-15,-46],.7,M);}
     if(k==='sewers'){shape(()=>{ctx.moveTo(-12,-35);ctx.quadraticCurveTo(-22,-18,-13,-7);ctx.lineTo(-7,-30);ctx.closePath();},D,OL,1.5);for(let i=0;i<3;i++)line([-15+i*3,-29,-18+i*3+Math.sin(t+i)*2,-13+i*2],1.2,C);}
-    line([-4,-14,-6+walk*3,-5,-7+walk*3,0],3.7,D,OL);line([4,-14,5-walk*3,-5,7-walk*3,0],4,C,OL);boot(-7+walk*3,0,M);boot(7-walk*3,0,M);
+    line([-4,-14,-6+stride-plant*.4,-5,-7+stride-plant,0],3.7,D,OL);line([4,-14,5-stride+plant*.4,-5,7-stride+plant,0],4,C,OL);boot(-7+stride-plant,0,M);boot(7-stride+plant,0,M);
     shape(()=>{ctx.moveTo(-9,-36);ctx.quadraticCurveTo(-14,-24,-13,-9);ctx.lineTo(-6,-12);ctx.lineTo(-2,-7);ctx.lineTo(3,-11);ctx.lineTo(10,-8);ctx.quadraticCurveTo(12,-25,8,-36);ctx.closePath();},lg(-13,0,12,0,D,C,D),OL,1.8);
     line([-9,-30,-5,-13],1,M);line([8,-30,5,-13],1,M);soulCage(0,-24,S,flash);
     if(k==='prison'||k==='furnace'){shape(()=>{ctx.moveTo(-8,-37);ctx.lineTo(-9,-48);ctx.quadraticCurveTo(0,-56,9,-48);ctx.lineTo(9,-37);ctx.closePath();},D,OL,1.5);captiveFace(0,-43,S,flash);for(let i=-5;i<=5;i+=5)line([i,-50,i,-37],1.4,M);line([-10,-37,10,-37],2,M);line([-12,-28,-16,-17,-12,-13],1.5,M);circle(-12,-11,2,null,M,1.2);}
@@ -2763,7 +2809,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(L.bell&&cam+W>L.bell-100&&cam<L.bell+100)greatBell();
     if(!T.outdoor)for(const pl of decor.pillars)if(pl.x>cam-60&&pl.x<cam+W+20)pillar(pl);
     if(T.lantern)for(let x=230;x<WORLD;x+=460)if(x>cam-40&&x<cam+W+40)lantern(x);
-    drawWorldLandmark();drawFloor();drawTerrain();for(const a of platforms)if(!a.solid&&a.h<100&&a.x<cam+W+30&&a.x+a.w>cam-30){if(a.mv)moverArt(a);else if(a.cr)crumbleArt(a);else ledge(a);}
+    drawWorldLandmark();drawFloor();drawHighRoute();drawTerrain();for(const a of platforms)if(!a.solid&&a.h<100&&a.x<cam+W+30&&a.x+a.w>cam-30){if(a.mv)moverArt(a);else if(a.cr)crumbleArt(a);else ledge(a);}
     drawClimbs();drawSprings();drawBandDress();
     for(const s of L.spikes)if(cam<s[0]+s[1]*20+20&&cam+W>s[0]-20)spikes(s[0],s[1]);
     drawTraps(false);if(lamps.length)drawLamps();if(L.signs)drawSigns();if(secrets.length)drawSecrets();

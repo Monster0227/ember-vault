@@ -86,9 +86,10 @@ test('death, restart, victory and best-score storage',()=>{
   advance(4.2);assert.equal(t.state,'win');assert(t.talk&&t.talk.auto,'the ending narration plays by itself');
 });
 test('archers hold fire while off-screen and shoot once visible',()=>{
-  t.player.x=1400;t.player.y=303;t.player.vy=0;t.player.inv=100;t.player.face=1;t.cam=1015;
+  const archer=t.enemies.find(e=>e.type==='archer');t.enemies.forEach(e=>{if(e!==archer)e.dead=true;});
+  t.player.x=2300;t.player.y=303;t.player.vy=0;t.player.inv=100;t.player.face=1;t.cam=1800;
   advance(1.2);assert.equal(t.shots.length,0);
-  t.player.face=-1;advance(1.2);assert(t.shots.length>0);
+  t.player.x=archer.x+200;t.player.y=archer.y;t.player.vy=0;advance(1.2);assert(t.shots.length>0);
 });
 test('boss enrages at half health, roars, then slams out shockwaves that can be jumped or rolled',()=>{
   t.loadStage(FINAL);t.flags.boss=true;const b=t.enemies.find(e=>e.type==='boss');b.hp=b.max/2;b.cd=0;t.player.x=b.x-80;t.player.inv=100;
