@@ -29,7 +29,7 @@ sandbox.window=sandbox;
 sandbox.matchMedia=() => ({matches:false});
 let code=fs.readFileSync(require('path').join(__dirname,'../dist/js/ember.js'),'utf8');
 // Instrument only this VM instance; no test controls are shipped in the browser.
-code=code.replace(/\}\)\(\);\s*$/, 'window.test={step,action,hurt,strike,killEnemy,startChapter,finish,reset,respawn,loadStage,retryStage,STAGES,TALK,get bag(){return bag},get relics(){return relics},get keepsakes(){return keepsakes},get sel(){return sel},set sel(v){sel=v},get offers(){return offers},get flags(){return flags},get run(){return run},get codex(){return codex},get thrown(){return thrown},get breakables(){return breakables},get hazards(){return hazards},get loot(){return loot},get floats(){return floats},get gateK(){return gateK},get talk(){return talk},set introSeen(v){introSeen=v},get player(){return p},get enemies(){return enemies},get shots(){return shots},get waves(){return waves},get orbs(){return orbs},get fx(){return fx},get chunks(){return chunks},get platforms(){return platforms},get chests(){return chests},get state(){return state},get score(){return score},get stage(){return stage},get unlocked(){return unlocked},set unlocked(v){unlocked=v},get L(){return L},get embers(){return embers},set embers(v){embers=v},get checkpoint(){return checkpoint},get credits(){return credits},get cine(){return cine},get traps(){return traps},get lamps(){return lamps},get clears(){return clears},set clears(v){clears=v},get cycle(){return cycle},set cycle(v){cycle=v},useSkill,get secrets(){return secrets},hasMap,parseLine,relicPool,gainShard,gainBlueprint,startTutorial,finishTutorial,TUTORIAL,CHARS,SKILLS,showMenu,startJourney,continueRun,finishRebind,SONGS,set tutorialDone(v){tutorialDone=v},get settings(){return settings},get BIND(){return BIND},set rebinding(v){rebinding=v},get cam(){return cam},set cam(v){cam=v}};})();');
+code=code.replace(/\}\)\(\);\s*$/, 'window.test={step,action,selectLevel,renderChapters,showWinPanel,hurt,strike,killEnemy,startChapter,finish,reset,respawn,loadStage,retryStage,STAGES,TALK,get bag(){return bag},get relics(){return relics},get keepsakes(){return keepsakes},get sel(){return sel},set sel(v){sel=v},get offers(){return offers},get flags(){return flags},get run(){return run},get codex(){return codex},get thrown(){return thrown},get breakables(){return breakables},get hazards(){return hazards},get loot(){return loot},get floats(){return floats},get gateK(){return gateK},get talk(){return talk},set introSeen(v){introSeen=v},get player(){return p},get enemies(){return enemies},get shots(){return shots},get waves(){return waves},get orbs(){return orbs},get fx(){return fx},get chunks(){return chunks},get platforms(){return platforms},get chests(){return chests},get state(){return state},get score(){return score},get stage(){return stage},get unlocked(){return unlocked},set unlocked(v){unlocked=v},get L(){return L},get embers(){return embers},set embers(v){embers=v},get checkpoint(){return checkpoint},get credits(){return credits},get cine(){return cine},get traps(){return traps},get lamps(){return lamps},get clears(){return clears},set clears(v){clears=v},get cycle(){return cycle},set cycle(v){cycle=v},useSkill,get secrets(){return secrets},hasMap,parseLine,relicPool,gainShard,gainBlueprint,startTutorial,finishTutorial,TUTORIAL,CHARS,SKILLS,showMenu,startJourney,continueRun,finishRebind,SONGS,set tutorialDone(v){tutorialDone=v},get settings(){return settings},get BIND(){return BIND},set rebinding(v){rebinding=v},get cam(){return cam},set cam(v){cam=v}};})();');
 vm.runInNewContext(code,sandbox);
 const t=sandbox.test;
 function advance(seconds) { for(let i=0;i<Math.ceil(seconds*120);i++)t.step(1/120); }
@@ -87,7 +87,7 @@ test('platform enemy stays on its platform',()=>{
   advance(5);assert(e.x>=1650&&e.x+e.w<=1830);
 });
 test('archer fires projectiles and boss locks exit',()=>{
-  t.player.x=800;t.player.y=243;t.player.inv=100;advance(1.3);assert(t.shots.length>0);
+  t.player.x=800;t.player.y=243;t.player.inv=100;advance(1.65);assert(t.shots.length>0);
   t.loadStage(FINAL);t.flags.boss=true;t.player.x=t.L.seal+30;t.player.y=428;t.player.inv=100;advance(.1);assert.equal(t.state,'play');assert.equal(t.stage,FINAL);assert(t.player.x<=t.L.seal);
 });
 test('death, restart, victory and best-score storage',()=>{
@@ -465,7 +465,7 @@ test('lifts carry you, crumbling bridges drop away and grow back, vents lift you
   const lift=t.platforms.find(a=>a.mv);t.player.inv=100;t.player.x=lift.x;advance(.02);t.player.x=lift.x+20;t.player.y=lift.y-t.player.h-1;t.player.vy=0;t.player.inv=100;advance(.1);assert(t.player.ground);const x0=t.player.x,lx=lift.x;advance(.5);assert(Math.abs((t.player.x-x0)-(lift.x-lx))<2,'you ride with the lift');
   t.loadStage(stageOf('ramparts'));const c=t.platforms.find(a=>a.cr);t.player.x=c.x+20;t.player.y=c.y-t.player.h-1;t.player.vy=0;t.player.inv=100;advance(.1);assert.equal(c.cr.st,1,'it cracks under you');advance(.6);assert(c.off,'and falls');advance(3.2);assert(!c.off,'then grows back');
   t.loadStage(stageOf('sewers'));const v=t.traps.find(q=>q.k==='vent');v.t=v.per*.5;t.player.x=v.x-13;t.player.y=428;t.player.vy=0;advance(.4);assert(t.player.y<380,'the steam carries you up');
-  t.loadStage(stageOf('prison'));t.enemies.forEach(e=>e.dead=true);const s=t.traps.find(q=>q.k==='tspike');t.player.x=s.x+20;t.player.y=428;t.player.inv=0;t.player.hp=t.player.max;s.t=s.per*.2;advance(.1);assert.equal(t.player.hp,100,'spikes down');s.t=s.per*.6;advance(.05);assert(t.player.hp<100,'spikes up');
+  t.loadStage(stageOf('prison'));t.enemies.forEach(e=>e.dead=true);const s=t.traps.find(q=>q.k==='tspike'&&!q.teach);t.player.x=s.x+20;t.player.y=428;t.player.inv=0;t.player.hp=t.player.max;s.t=s.per*.2;advance(.1);assert.equal(t.player.hp,100,'spikes down');s.t=s.per*.6;advance(.05);assert(t.player.hp<100,'spikes up');
 });
 test('five main routes keep their signature obstacles and an accessible exit',()=>{
   const kinds={prison:['tspike','pendulum'],sewers:['spout','vent'],ramparts:['wind','ballista'],ossuary:['jet'],tower:['piston','pendulum','vent']};
@@ -549,6 +549,30 @@ test('the ramparts shortcut carries a relit ember and a continued run remembers 
   t.showMenu();t.continueRun();assert.equal(t.run.guideX,saved.run.guideX);
   delete saved.run.guideX;storage['ember:save']=JSON.stringify(saved);
   t.showMenu();t.continueRun();assert.equal(t.run.guideX,saved.checkX);
+});
+test('fresh journeys have safe training spikes and a gradual first patrol',()=>{
+  const practice=t.traps.find(q=>q.teach);
+  t.player.x=practice.x;t.player.hp=20;advance(2);assert.equal(t.player.hp,20);
+  assert.equal(t.enemies[0].trainingPace,1.9);
+  assert.equal(t.enemies.find(e=>e.origin>=1000&&e.origin<1800).trainingPace,1.4);
+  assert.equal(t.enemies.find(e=>e.origin>=1800).trainingPace,1);
+  t.loadStage(stageOf('sewers'));assert(t.enemies.every(e=>e.trainingPace===1));
+});
+test('free selection can enter every map with a new profile and keeps the journey save',()=>{
+  t.unlocked=1;t.loadStage(0);
+  const journey=storage['ember:save'],beforeClears=t.clears;
+  t.showMenu();t.renderChapters();
+  assert.equal((nodes.panel.innerHTML.match(/data-level=/g)||[]).length,5);
+  assert(!nodes.panel.innerHTML.includes('disabled'));
+  for(const theme of ['prison','sewers','ramparts','ossuary','tower']){
+    const stage=stageOf(theme);
+    t.selectLevel(t.STAGES[stage]);assert.equal(t.stage,stage);
+    assert.equal(JSON.parse(storage['ember:selected-save']).stage,stage);
+    assert.equal(storage['ember:save'],journey);
+  }
+  t.showMenu();t.continueRun(true);assert.equal(t.L.theme,'tower');
+  t.showWinPanel();assert.equal(t.clears,beforeClears);
+  t.showMenu();t.continueRun();assert.equal(t.stage,0);
 });
 console.log('All '+passed+' gameplay checks passed.');
 
