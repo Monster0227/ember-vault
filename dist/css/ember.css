@@ -44,7 +44,11 @@ h1{font:700 clamp(42px,6vw,78px)/1.2 Georgia,"SimSun",serif;letter-spacing:9px;m
 .keys{color:#979faa;font-size:12px;line-height:2.3;margin:22px 0}
 .footnote{color:#758490;font-size:11px}
 #hint{position:absolute;bottom:20px;left:0;right:0;text-align:center;color:#a2a8ac;font-size:12px;pointer-events:none}
-#touch{position:absolute;left:0;right:0;bottom:0;height:0;pointer-events:none}
+#coach-skip{position:absolute;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));z-index:6;min-width:64px;min-height:44px;padding:8px 14px;border-radius:999px;border:1px solid #e7d7b0;background:#2a2118ee;color:#f3e6c8;font:600 14px "PingFang SC","Microsoft YaHei",sans-serif}
+#coach-skip[hidden]{display:none}
+#touch{position:absolute;left:0;right:0;bottom:0;height:0;pointer-events:none;opacity:var(--touch-a,1)}
+#touch .actions{translate:var(--touch-x,0) var(--touch-y,0)}
+#pad{translate:calc(var(--touch-x,0) * -1) var(--touch-y,0)}
 #touch:not([hidden]){display:block}
 #touch button,#pad{position:absolute;pointer-events:auto;border:1px solid #c8d3d04d;background:#28384685;color:#e8ece8;font-size:13px;touch-action:none;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 #touch button{border-radius:50%;padding:0}
@@ -360,7 +364,8 @@ h1{font:700 clamp(42px,6vw,78px)/1.2 Georgia,"SimSun",serif;letter-spacing:9px;m
 @media(pointer:coarse){.skills{display:none}}
 
 /* 触屏：三个技能键排成一道弧，围在攻击键上方 */
-#touch .sk{width:48px;height:48px;padding:3px;border-radius:50%;opacity:.55;background:#203038b8;border-color:#8bdac980}
+#touch .sk{width:64px;height:64px;min-width:64px;min-height:64px;padding:8px;border-radius:50%;opacity:.55;background:#203038b8;border-color:#8bdac980}
+#touch .sk img,#touch .sk svg{width:48px;height:48px;max-width:48px;max-height:48px}
 #touch .sk.ready{opacity:1;box-shadow:0 0 14px #8ae4d399;border-color:#8be1ce}
 #touch .sk i{display:none}
 #touch .sk em{right:50%;transform:translateX(50%);bottom:-7px}
@@ -465,7 +470,7 @@ h1{font:700 clamp(42px,6vw,78px)/1.2 Georgia,"SimSun",serif;letter-spacing:9px;m
 
 #world{touch-action:none;image-rendering:pixelated;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 /* Landscape controls occupy a reserved 132px strip below the world canvas. */
-@media(orientation:landscape){#touch{background:linear-gradient(transparent calc(100% - 132px),#101b28 calc(100% - 132px));}#pad{width:96px;height:96px;bottom:12px}#touch .heal{left:124px;bottom:12px;width:42px;height:42px}#touch .item{left:176px;bottom:12px;width:42px;height:42px}#touch .chest{left:124px;bottom:66px;width:94px;height:42px}.actions{bottom:10px;width:224px;height:70px}#touch .attack{width:64px;height:64px}#touch .jump{right:78px;bottom:2px;width:60px;height:60px}#touch .roll{right:152px;bottom:6px;width:52px;height:52px}#touch .sk{width:40px;height:40px}#touch .t1{right:152px;bottom:84px}#touch .t2{right:88px;bottom:84px}#touch .t3{right:24px;bottom:84px}}
+@media(orientation:landscape){#touch{background:linear-gradient(transparent calc(100% - 132px),#101b28 calc(100% - 132px));}#pad{width:96px;height:96px;bottom:12px}#touch .heal{left:124px;bottom:12px;width:42px;height:42px}#touch .item{left:176px;bottom:12px;width:42px;height:42px}#touch .chest{left:124px;bottom:66px;width:94px;height:42px}.actions{bottom:10px;width:224px;height:70px}#touch .attack{width:64px;height:64px}#touch .jump{right:78px;bottom:2px;width:60px;height:60px}#touch .roll{right:152px;bottom:6px;width:52px;height:52px}#touch .sk{width:64px;height:64px;min-width:64px;min-height:64px}#touch .t1{right:152px;bottom:84px}#touch .t2{right:88px;bottom:84px}#touch .t3{right:24px;bottom:84px}}
 @media(orientation:landscape) and (max-height:500px){#hud{top:6px;left:12px;right:12px}#hud b{font-size:17px}#zone{font-size:10px}.hud-buttons button{width:34px;height:34px}#minimap{max-height:40px}.health{transform:scale(.8);transform-origin:left center}#notice{top:70px;font-size:12px}}
 @media(orientation:landscape) and (max-height:500px){#hud>div:first-child{padding-top:0;width:auto}#hud>div:first-child>b,#hud .skills,#hud .hud-row{display:none}#zone{margin:0;display:block;max-width:260px}#hud .health{margin-top:3px;min-height:18px;height:18px;width:auto;transform:none}.life-ghost{width:15px;height:18px}#soul-meter{margin-top:2px;height:18px}#soul-meter svg{width:15px;height:18px}#minimap{display:none}#notice{top:62px}}
 
@@ -502,11 +507,11 @@ html,body,#stage{max-width:100%;overflow-x:hidden}
   #touch .heal{left:max(12px,env(safe-area-inset-left));bottom:calc(max(16px,env(safe-area-inset-bottom)) + 132px);width:48px;height:48px;min-width:48px;min-height:48px}
   #touch .item{left:calc(max(12px,env(safe-area-inset-left)) + 56px);bottom:calc(max(16px,env(safe-area-inset-bottom)) + 132px);width:48px;height:48px;min-width:48px;min-height:48px}
   #touch .chest{left:calc(max(12px,env(safe-area-inset-left)) + 112px);bottom:calc(max(16px,env(safe-area-inset-bottom)) + 132px);width:72px;height:48px;min-width:72px;min-height:48px;border-radius:24px}
-  .actions{right:max(12px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));width:200px;height:200px}
+  .actions{right:max(12px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));width:228px;height:248px}
   #touch .attack{right:0;bottom:0;width:80px;height:80px;min-width:80px;min-height:80px}
   #touch .jump{right:92px;bottom:8px;width:68px;height:68px;min-width:68px;min-height:68px}
   #touch .roll{right:18px;bottom:96px;width:60px;height:60px;min-width:60px;min-height:60px}
-  #touch .sk{width:48px;height:48px;min-width:48px;min-height:48px}
+  #touch .sk{width:64px;height:64px;min-width:64px;min-height:64px}
   #touch .t1{right:152px;bottom:96px}
   #touch .t2{right:96px;bottom:140px}
   #touch .t3{right:28px;bottom:176px}
@@ -518,18 +523,20 @@ html,body,#stage{max-width:100%;overflow-x:hidden}
   #touch .heal{left:calc(max(10px,env(safe-area-inset-left)) + 108px);bottom:max(10px,env(safe-area-inset-bottom));width:44px;height:44px;min-width:44px;min-height:44px}
   #touch .item{left:calc(max(10px,env(safe-area-inset-left)) + 158px);bottom:max(10px,env(safe-area-inset-bottom));width:44px;height:44px;min-width:44px;min-height:44px}
   #touch .chest{left:calc(max(10px,env(safe-area-inset-left)) + 108px);bottom:calc(max(10px,env(safe-area-inset-bottom)) + 52px);width:94px;height:44px;min-width:94px;min-height:44px;border-radius:22px}
-  .actions{right:max(10px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom));width:220px;height:118px}
+  .actions{right:max(10px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom));width:230px;height:150px}
   #touch .attack{right:0;bottom:0;width:64px;height:64px;min-width:64px;min-height:64px}
   #touch .jump{right:74px;bottom:2px;width:56px;height:56px;min-width:56px;min-height:56px}
   #touch .roll{right:140px;bottom:6px;width:52px;height:52px;min-width:52px;min-height:52px}
-  #touch .sk{width:44px;height:44px;min-width:44px;min-height:44px}
-  #touch .t1{right:148px;bottom:70px}
-  #touch .t2{right:86px;bottom:70px}
-  #touch .t3{right:24px;bottom:70px}
+  #touch .sk{width:64px;height:64px;min-width:64px;min-height:64px}
+  #touch .t1{right:156px;bottom:76px}
+  #touch .t2{right:84px;bottom:76px}
+  #touch .t3{right:12px;bottom:76px}
   .hud-buttons button,.hud-buttons .quick-item{min-width:44px;min-height:44px;width:44px;height:44px}
 }
 
 /* Very short landscape phones */
+#touch button{min-width:64px;min-height:64px}
+#touch button svg{width:48px;height:48px;max-width:48px;max-height:48px}
 @media (pointer:coarse) and (orientation:landscape) and (max-height:420px){
   #hud{top:max(4px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right))}
   #minimap{display:none}

@@ -1,7 +1,7 @@
 const assert=require('assert');require('./engine-core.js');const {ObjectPool,InputQueue,HeroFSM,Physics,sweepAABB}=global.EmberCore;
 const pool=new ObjectPool(2,()=>({life:0}),o=>{o.life=0});const a=pool.acquire(),b=pool.acquire();assert.equal(pool.acquire(),null);pool.release(a);assert.strictEqual(pool.acquire(),a);pool.release(b);pool.release(b);assert.equal(pool.count,1);
 const q=new InputQueue();q.push(1);q.tick(.19);assert(q.take(1));q.push(2);q.tick(.201);assert(!q.take(2));for(let i=0;i<100;i++)q.push(1);assert.equal(q.count,1);
-let emitted=0;const f=new HeroFSM(()=>emitted++),p={x:0,y:0,w:10,h:10,vx:5000,vy:0,ground:false,attack:.3,hurtT:0,roll:0,dash:0};f.enter('attack','combat',.3);f.tick(.01,p);assert(!f.hitbox);f.tick(.03,p);assert(f.hitbox);f.tick(.03,p);assert.equal(emitted,1);assert(!f.canCancel());f.tick(.2,p);assert(f.canCancel());
+let emitted=0;const f=new HeroFSM(()=>emitted++),p={x:0,y:0,w:10,h:10,vx:5000,vy:0,ground:false,attack:.3,hurtT:0,roll:0,dash:0};f.enter('attack','combat',.3);f.tick(1/60,p);assert(!f.hitbox);f.tick(2/60,p);assert(!f.hitbox);f.tick(1/60,p);assert(f.hitbox);f.tick(1/60,p);assert.equal(emitted,1);assert(!f.canCancel());f.tick(.2,p);assert(f.canCancel());
 const ph=new Physics(),wall={x:50,y:-50,w:2,h:100,solid:true};ph.move(p,500,0,[wall],480);assert.equal(p.x,40);assert.equal(p.vx,0);
 p.x=0;p.y=0;p.vy=2000;const ledge={x:0,y:80,w:100,h:8,solid:false};ph.move(p,0,300,[ledge],480);assert.equal(p.y,70);assert(p.ground);
 p.y=120;p.vy=-2000;ph.move(p,0,-200,[ledge],480);assert.equal(p.y,-80);p.y=0;p.drop=ledge;ph.move(p,0,300,[ledge],480);assert.equal(p.y,300);
