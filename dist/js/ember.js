@@ -73,7 +73,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   let WORLD=4400,stage=0,L=null,T=null,PAL=null,decor=null,embers=0,entry=null,titleT=0,nearKind='';
   let W=1100,H=620,scale=1,viewY=0,tall=false,cam=0,time=0,last=0,state='menu',paused=false,lowFx=false,slowT=0;
   let p,enemies=[],shots=[],waves=[],breakables=[],particles=[],floats=[],orbs=[],fx=[],chunks=[],platforms=[],chests=[],kills=0,shake=0,hitstop=0,checkpoint=false,nearChest=false,bellRing=0;
-  let hazards=[],loot=[],gateK=0,sealK=0,bossCardT=0,gainT=0,revealC=null,sceneA='',sceneB='',sceneT=0,traps=[],signs={},panelView='menu',saveMode='journey',secrets=[],arm={};   // 首领的落石 / 腐水 / 灵枪；飞向主角的道具图；铁闸；首领名号卡；获得提示；开箱时浮起的奖励；插画；静止机关的预警计时
+  let hazards=[],loot=[],gateK=0,sealK=0,bossCardT=0,gainT=0,revealC=null,sceneA='',sceneB='',sceneT=0,traps=[],signs={},panelView='menu',saveMode='journey',awaitingFirstStage=false,secrets=[],arm={};   // 首领的落石 / 腐水 / 灵枪；飞向主角的道具图；铁闸；首领名号卡；获得提示；开箱时浮起的奖励；插画；静止机关的预警计时
   let keys={},held={},score=0,messageT=0,ac=null,best=0,muted=false,hudKey='',unlocked=1,deathWhy='受到了攻击',shakeT=0,coachDone=false;
   try{coachDone=localStorage.getItem('ember:coach')==='1';}catch(e){}
   let bag={bomb:0,knife:0,frost:0},relics={},keepsakes={},sel='bomb',thrown=[],offers=[],chestC=null,talk=null,flags={},run={},runSeed=1,shopRelic='',bagTab='bag',introSeen=false;
@@ -619,7 +619,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function clearHeld(){inputQueue.clear();held={};document.querySelectorAll('[data-action]').forEach(b=>b.classList.remove('held'));stickEnd();}
   // 新的一局：从第一层开始
   // ch：角色（不给就沿用当前角色，默认小引灯人）。第一次玩：开场旁白 → 焚炉底层的教程 → 监牢
-  function reset(boot,ch){if(passage&&!passage.changed){passage=null;document.getElementById('scene-fade').hidden=true;}const C=CHARS[ch||(p&&p.char)||'lamp']||CHARS.lamp;
+  function reset(boot,ch){if(passage&&!passage.changed)cancelPassage();const C=CHARS[ch||(p&&p.char)||'lamp']||CHARS.lamp;
     p={x:120,y:FLOOR-52,w:26,h:52,vx:0,vy:0,face:1,hp:C.hp*LIFE,max:C.hp*LIFE,char:C.id,jumps:0,ground:true,coyote:.1,buffer:0,roll:0,rollCd:0,attack:0,atkCd:0,combo:0,comboT:0,plateHits:0,leechKills:0,slash:'side',atkFace:1,pogo:false,inv:0,damage:C.dmg,hit:new Set(),potions:C.id==='lamp'?1:2,soul:0,castCd:0,drop:null,skills:{swift:0,reach:0,dash:0,vigor:0,spring:0,flame:0},walk:0,hurtT:0,landT:0,trail:[],trailT:0,cape:null,safeX:120,safeY:FLOOR-52,dash:0,dashHit:null,ringT:0,domeT:0,on:null};
     kills=0;score=0;embers=0;bag={bomb:0,knife:C.id==='bow'?3:0,frost:0};relics={};keepsakes={};sel=C.id==='bow'?'knife':'bomb';run={time:0,deaths:0};runSeed=1+Math.floor(Math.random()*1e6);loadStage(0,boot===true);applyBoons();
     if(boot===true)return;try{localStorage.setItem('ember:char',C.id);}catch(e){}
@@ -635,7 +635,8 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function completeTutorial(){tutorialDone=true;try{localStorage.setItem('ember:tutorial','1');}catch(e){}
     tutorialMenu=false;const ch=p.char;reset(true,ch);beep(440,.3);beginPrisonJourney();}
   function beginPrisonJourney(){
-    run.awakened=0;run.guided=!window.emberExhibit;hudKey='';run.chapter1=true;try{run.lessonMask=Number(localStorage.getItem('ember:road-lessons'))||0;}catch(e){}saveRun();
+    // The quiet stage loaded before the prologue is not a playable save point.
+    awaitingFirstStage=false;run.awakened=0;run.guided=!window.emberExhibit;hudKey='';run.chapter1=true;try{run.lessonMask=Number(localStorage.getItem('ember:road-lessons'))||0;}catch(e){}saveRun();
     startTalk(CHAPTERS[0].story);
   }
   const prisonLessons=[
@@ -700,10 +701,11 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function unlockChapter(n){if(n<=unlocked)return;unlocked=Math.min(4,n);try{localStorage.setItem('ember:unlocked',String(unlocked));}catch(e){}updateChapterButtons();}
   function startChapter(n){if(n>unlocked)return;const ch=lastChar(),C=CHARS[ch];if(n===1){reset(true,ch);run.chapter1=true;saveRun();startTalk(CHAPTERS[0].story);return;}reset(true,ch);p.damage=C.dmg+(n-1)*9;p.max=(C.hp+n-1)*LIFE;p.hp=p.max;p.potions=2;p.soul=3;gain('bomb',2,true);gain('knife',2,true);['key','glass','ribbon'].slice(0,n-1).forEach(id=>gain(id,1,true));sel='bomb';const idx=STAGES.findIndex(q=>q.chapterStart&&q.chapter===n);loadStage(idx);run['chapter'+n]=true;startTalk(CHAPTERS[n-1].story);}
   let passage=null;
+  function cancelPassage(){passage=null;const fade=document.getElementById('scene-fade');fade.hidden=true;fade.style.opacity=0;fade.style.visibility='';}
   function scenePass(fn){if(passage)return;keys={};clearHeld();passage={t:0,changed:false,fn:fn};document.getElementById('scene-fade').hidden=false;}
   function nextStage(){scenePass(enterNextStage);}
   function finishTutorial(){scenePass(completeTutorial);}
-  function passageTick(dt){const q=passage;q.t+=dt;const a=q.t<.32?q.t/.32:q.t<.46?1:Math.max(0,1-(q.t-.46)/.42);document.getElementById('scene-fade').style.opacity=a;if(!q.changed&&q.t>=.32){q.changed=true;q.fn();keys={};clearHeld();}if(q.t>=.88){passage=null;document.getElementById('scene-fade').hidden=true;}}
+  function passageTick(dt){const q=passage;q.t+=dt;const a=q.t<.32?q.t/.32:q.t<.46?1:Math.max(0,1-(q.t-.46)/.42);document.getElementById('scene-fade').style.opacity=a;if(!q.changed&&q.t>=.32){q.changed=true;q.fn();keys={};clearHeld();}if(q.t>=.88)cancelPassage();}
   function enterNextStage(){if(L.tutorial){completeTutorial();return;}if(stage>=STAGES.length-1)return;loadStage(stage+1);beep(440,.3);if(L.chapterStart&&L.chapter>1&&!run['chapter'+L.chapter]){run['chapter'+L.chapter]=true;startTalk(CHAPTERS[L.chapter-1].story);return;}
     say(L.rest?'篝火可休息一次 · 烛叟用余烬换补给\n'+(coarse()?'走到他身边点「商店」':'走到他身边按 E'):L.intro||L.name,4);}
   function retryStage(){const s=entry;p.shards=s.shards||0;run.found=Object.assign({},s.found||{});run.maps=Object.assign({},s.maps||{});p.max=s.max;p.hp=Math.max(s.hp,Math.ceil(s.max/(2*LIFE))*LIFE);p.plateHits=s.plateHits;p.leechKills=s.leechKills;p.damage=s.damage;p.potions=s.potions;p.skills=Object.assign({},s.skills);p.soul=s.soul;embers=s.embers;score=s.score;kills=s.kills;bag=Object.assign({},s.bag);relics=Object.assign({},s.relics);keepsakes=Object.assign({},s.keep);loadStage(stage);say(L.name+' · 再来一次',2.5);}
@@ -804,7 +806,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   document.getElementById('pause').onclick=togglePause;muteBtn.onclick=()=>setMuted(!muted);
   {const skip=document.getElementById('coach-skip');if(skip)skip.onclick=()=>{run.coachSkip=true;coachDone=true;skip.hidden=true;try{localStorage.setItem('ember:coach','1');}catch(e){}say('引导已跳过',1.4);};}
   function togglePause(){if(state!=='play')return;paused=!paused;keys={};clearHeld();if(paused)showPause();else{panel.hidden=true;panelView='';rebinding=null;}}
-  function showPause(){panel.classList.remove('late');panelView='pause';const alts=[{label:'设置',fn:()=>renderSettings('pause')},{label:'回到开始界面',fn:()=>{saveRun();showMenu();}}];if(L.tutorial)alts.unshift({label:'进入第一关',fn:()=>{paused=false;finishTutorial();}});
+  function showPause(){if(passage)document.getElementById('scene-fade').style.visibility='hidden';panel.classList.remove('late');panelView='pause';const alts=[{label:'设置',fn:()=>renderSettings('pause')},{label:'回到开始界面',fn:()=>{saveRun();showMenu();}}];if(L.tutorial)alts.unshift({label:'进入第一关',fn:()=>{paused=false;finishTutorial();}});
     showPanel('余火未熄',L.tutorial?'这里是焚炉底层的教程，随时可以跳过。':'歇一会儿，再继续前行。','继续探索',()=>{paused=false;panel.hidden=true;panelView='';},alts);focusFirst();}
   // ---- 开始界面：继续旅程 / 新的旅程（选角色和周目）/ 教程 / 章节挑战 / 图鉴与传说 / 设置 ----
   const EMBLEM='<svg viewBox="0 0 96 96"><circle cx="48" cy="48" r="43"/><path d="M31 59h34l-5-8V37a12 12 0 0 0-24 0v14zM43 64a5 5 0 0 0 10 0M48 19v6M21 48h-7m68 0h-7"/><path class="ember" d="M48 37c-7 8-5 16 0 19 6-3 7-11 0-19z"/></svg>';
@@ -812,9 +814,9 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function loadSave(mode){try{const data=JSON.parse(localStorage.getItem(saveKey(mode))||'null');return data&&Number.isInteger(data.stage)&&STAGES[data.stage]&&data.e?data:null;}catch(e){return null;}}
   function bossPhase(e){return Math.max(e.phase||0,e.hp<=e.max*.33?2:e.hp<=e.max*.66?1:0);}
   function bossSnap(){const b=enemies.find(e=>e.type==='boss'&&!e.dead);if(!b)return null;const phase=bossPhase(b);return {hp:b.hp,phase:phase,rage:phase>=1,phase3:phase>=2};}
-  function saveRun(){if(saveMode==='practice'||!L||!p||L.tutorial||state==='menu'||!entry)return;try{localStorage.setItem(saveKey(saveMode),JSON.stringify({v:2,stage:stage,char:p.char,cycle:cycle,checkX:p.checkX,boss:bossSnap(),e:entry,run:{guided:!!run.guided,awakened:run.awakened||0,lessonMask:run.lessonMask||0,keeper:!!run.keeper,c2:!!run.chapter2,c3:!!run.chapter3,c4:!!run.chapter4,seen:run.seen||{},maps:run.maps||{},found:run.found||{},visited:run.visited||{},inkMet:!!run.inkMet,firstElite:!!run.firstElite,time:run.time||0,deaths:run.deaths||0,shortcut:!!run.shortcut,coach:!!run.coachSkip}}));}catch(e){}}
-  function clearSave(){if(saveMode==='practice')return;try{localStorage.removeItem(saveKey(saveMode));}catch(e){}}
-  function showMenu(){panel.classList.remove('late');state='menu';paused=false;talk=null;talkBox.hidden=true;credits=null;cine=null;rebinding=null;hud.hidden=true;touch.hidden=true;hint.hidden=true;gainBox.hidden=true;notice.style.opacity=0;messageT=0;titleT=0;sceneA=sceneB='';keys={};clearHeld();renderMenu();}
+  function saveRun(){if(awaitingFirstStage||saveMode==='practice'||!L||!p||L.tutorial||state==='menu'||!entry)return;try{localStorage.setItem(saveKey(saveMode),JSON.stringify({v:2,stage:stage,char:p.char,cycle:cycle,checkX:p.checkX,boss:bossSnap(),e:entry,run:{guided:!!run.guided,awakened:run.awakened||0,lessonMask:run.lessonMask||0,keeper:!!run.keeper,c2:!!run.chapter2,c3:!!run.chapter3,c4:!!run.chapter4,seen:run.seen||{},maps:run.maps||{},found:run.found||{},visited:run.visited||{},inkMet:!!run.inkMet,firstElite:!!run.firstElite,time:run.time||0,deaths:run.deaths||0,shortcut:!!run.shortcut,coach:!!run.coachSkip}}));}catch(e){}}
+  function clearSave(){if(awaitingFirstStage||saveMode==='practice')return;try{localStorage.removeItem(saveKey(saveMode));}catch(e){}}
+  function showMenu(){cancelPassage();awaitingFirstStage=false;panel.classList.remove('late');state='menu';paused=false;talk=null;talkBox.hidden=true;credits=null;cine=null;rebinding=null;hud.hidden=true;touch.hidden=true;hint.hidden=true;gainBox.hidden=true;notice.style.opacity=0;messageT=0;titleT=0;sceneA=sceneB='';keys={};clearHeld();renderMenu();}
   function focusFirst(){try{const b=panel.querySelector('button:not([disabled])');if(b&&!coarse())b.focus();}catch(e){}}
   function bindBack(){panel.querySelectorAll('[data-back]').forEach(b=>b.onclick=menuBack);}
   function menuBack(){rebinding=null;beep(420,.05,'sine');if(panelView==='confirm-journey'){renderChars();return;}if(panelView==='settings'&&menuFrom==='pause'&&state==='play'){showPause();return;}if(state==='menu')renderMenu();}
@@ -831,7 +833,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(fires.includes(s.checkX)){p.checkX=s.checkX;checkpoint=true;p.x=s.checkX+20;p.y=FLOOR-p.h;p.safeX=p.x;p.hp=p.max;p.potions=Math.max(p.potions,1);p.soul=3;cam=clamp(p.x-W*.35,0,Math.max(0,WORLD-W));}
     if(s.boss){const b=enemies.find(e=>e.type==='boss'&&!e.dead);if(b){b.hp=Math.min(b.max,s.boss.hp);b.phase=s.boss.phase||0;b.rage=!!s.boss.rage;b.phase3=!!s.boss.phase3;}}
     saveRun();say('继续上次的旅程 · '+(checkpoint?'从钟火':'')+(L.rest?L.name:L.n+' · '+L.name),3);}
-  function startJourney(ch,cyc){if(!clears)cyc=0;if(!CHARS[ch])ch='lamp';saveMode='journey';cycle=cyc||0;reset(true,ch);try{localStorage.setItem('ember:char',p.char);}catch(e){}introSeen=true;startTalk(TALK.prologue,()=>{note('lore','prologue');scenePass(enterAfterPrologue);});}
+  function startJourney(ch,cyc){if(!clears)cyc=0;if(!CHARS[ch])ch='lamp';saveMode='journey';awaitingFirstStage=true;cycle=cyc||0;reset(true,ch);try{localStorage.setItem('ember:char',p.char);}catch(e){}introSeen=true;startTalk(TALK.prologue,()=>{note('lore','prologue');scenePass(enterAfterPrologue);});}
   function confirmJourney(ch,cyc){
     if(!loadSave('journey')){startJourney(ch,cyc);return;}
     panelView='confirm-journey';
@@ -1496,7 +1498,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       if(p.x+p.w>x-12&&p.x<x+18&&p.y<bot&&p.y+p.h>top+8){p.vy=D.u?-220:150;p.ground=false;p.jumps=1;p.on=null;p.x+=(x-8-p.x)*Math.min(1,dt*10);if(Math.random()<dt*8)ember(x,p.y+20,1,'#ffd7a4');break;}}}
   function currentBand(){if(!L||!L.bands)return null;const x=(p&&p.x)||cam;let b=L.bands[0];for(const q of L.bands)if(x>=q[0])b=q;return b;}
   function noteBand(){const b=currentBand();if(!b||state!=='play')return;if(!bandId){bandId=b[2];return;}if(b[2]!==bandId){bandId=b[2];say(b[1],2.2);}}
-  function step(dt){if(passage){if(!rotationBlocked){passageTick(dt);musicTick();}return;}if(rotationBlocked){stopBattleMusic(.8);return;}const rdt=dt;if(cine&&cine.slow&&cine.t<cine.slow)dt*=.3;if(slowMo>0){slowMo-=rdt;dt*=.35;}time+=dt;if(messageT>0){messageT-=rdt;notice.style.opacity=messageT>0?1:0;}if(gainT>0){gainT-=rdt;if(gainT<=0){gainBox.hidden=true;if(toastQ.length)toastNow(toastQ.shift());}}if(flashT>0)flashT=Math.max(0,flashT-rdt);if(state==='dead'&&deathT<9)deathT+=rdt;
+  function step(dt){if(passage){if(!rotationBlocked){if(!paused){document.getElementById('scene-fade').style.visibility='';passageTick(dt);}musicTick();}return;}if(rotationBlocked){stopBattleMusic(.8);return;}const rdt=dt;if(cine&&cine.slow&&cine.t<cine.slow)dt*=.3;if(slowMo>0){slowMo-=rdt;dt*=.35;}time+=dt;if(messageT>0){messageT-=rdt;notice.style.opacity=messageT>0?1:0;}if(gainT>0){gainT-=rdt;if(gainT<=0){gainBox.hidden=true;if(toastQ.length)toastNow(toastQ.shift());}}if(flashT>0)flashT=Math.max(0,flashT-rdt);if(state==='dead'&&deathT<9)deathT+=rdt;
     musicTick(rdt);
     if(credits){credits.t+=rdt;if(credits.t>credits.dur)endCredits();return;}
     if(paused||state==='upgrade'||state==='shop'||state==='bag'||state==='map')return;

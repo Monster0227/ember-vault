@@ -13,7 +13,7 @@ function node(id) {
   });
 }
 const sandbox = {
-  document:{getElementById:node, querySelectorAll:() => [], addEventListener:noop},
+  document:{getElementById:node, querySelectorAll:() => [], addEventListener:(event,fn) => listeners['document:'+event]=fn},
   innerWidth:1100, innerHeight:620, devicePixelRatio:1,
   localStorage:{getItem:k => storage[k], setItem:(k,v) => storage[k]=v, removeItem:k => delete storage[k]},
   addEventListener:(event,fn) => listeners[event]=fn,
@@ -371,7 +371,7 @@ test('pickups show up as drawn items with a count, never as written names',()=>{
   t.reset();t.player.x=t.L.npc-13;t.player.y=428;advance(.02);t.action('interact');finishTalk();assert(t.loot.some(o=>o.id==='bomb'),'the bellkeeper\'s fire flask flies over as a picture');
 });
 test('procedural music schedules different notes for exploration and boss combat',()=>{
-  const notes=[];function FakeAudio(){this.state='running';this.currentTime=10;this.destination={};this.resume=()=>Promise.resolve();this.createBuffer=()=>({});this.createBufferSource=()=>({connect:noop,start:noop});this.createGain=()=>({gain:{setValueAtTime:noop,exponentialRampToValueAtTime:noop},connect:noop});this.createOscillator=()=>({frequency:{setValueAtTime:v=>notes.push(v),exponentialRampToValueAtTime:noop},connect:noop,start:noop,stop:noop});}
+  const notes=[];function FakeAudio(){this.state='running';this.currentTime=10;this.destination={};this.resume=()=>Promise.resolve();this.suspend=()=>Promise.resolve();this.createBuffer=()=>({});this.createBufferSource=()=>({connect:noop,start:noop});this.createGain=()=>({gain:{setValueAtTime:noop,exponentialRampToValueAtTime:noop},connect:noop});this.createOscillator=()=>({frequency:{setValueAtTime:v=>notes.push(v),exponentialRampToValueAtTime:noop},connect:noop,start:noop,stop:noop});}
   sandbox.AudioContext=FakeAudio;t.reset();press('KeyD');release('KeyD');advance(.6);assert(notes.length>0,'exploration music starts after gesture');notes.length=0;t.loadStage(t.STAGES.findIndex(s=>s.bossKind==='brood'));t.flags.boss=true;advance(.3);assert(notes.length>=2,'boss theme has multiple layers');assert(notes.some(n=>Math.abs(n-55)<.01),'boss rhythm uses its own bass');
 });
 test('boss unlock persists even after gameplay panels replaced the menu',()=>{
@@ -532,6 +532,33 @@ test('new journey requires confirmation and keeps the old save until the new run
   assert.equal(t.state,'talk');assert.equal(storage['ember:save'],original);
   finishTalk();advance(1);finishTalk();
   const next=JSON.parse(storage['ember:save']);assert.equal(next.char,'bow');assert.equal(next.stage,0);
+});
+test('leaving during the prologue fade keeps the old save and cancels the pending scene',()=>{
+  for(const completed of [false,true]){
+    t.reset(true,'lamp');t.loadStage(stageOf('sewers'));const original=storage['ember:save'];t.showMenu();t.tutorialDone=completed;
+    t.confirmJourney('bow',0);node('replace-journey').onclick();
+    press('Escape');advance(.12);press('Escape');
+    assert(sandbox.EmberGame.paused);assert(nodes.panel.innerHTML.includes('回到开始界面'));
+    node('alt-1').onclick();
+    assert.equal(storage['ember:save'],original);
+    assert.equal(nodes['scene-fade'].hidden,true);
+    advance(1);assert.equal(t.state,'menu');assert.equal(storage['ember:save'],original);
+    t.continueRun();assert.equal(t.stage,stageOf('sewers'));assert.equal(t.player.char,JSON.parse(original).char);
+  }
+});
+test('focus loss freezes entry until resume and only the first level replaces the old save',()=>{
+  for(const event of ['blur','document:visibilitychange']){
+    t.reset(true,'lamp');t.loadStage(stageOf('sewers'));const original=storage['ember:save'];t.showMenu();t.tutorialDone=false;
+    t.confirmJourney('bow',0);node('replace-journey').onclick();press('Escape');
+    sandbox.document.hidden=true;listeners[event]();advance(1);
+    assert(sandbox.EmberGame.paused);assert.equal(storage['ember:save'],original);
+    assert.equal(nodes['scene-fade'].style.visibility,'hidden','the pause controls are not covered');
+    sandbox.document.hidden=false;node('main-action').onclick();advance(1);
+    assert(t.L.tutorial);assert.equal(storage['ember:save'],original);
+    t.finishTutorial();advance(.2);assert.equal(storage['ember:save'],original);
+    advance(.8);const next=JSON.parse(storage['ember:save']);assert.equal(next.stage,0);assert.equal(next.char,'bow');
+  }
+  t.tutorialDone=true;
 });
 test('challenge progression, reload, and victory never overwrite or clear the main journey',()=>{
   t.loadStage(stageOf('sewers'));const original=storage['ember:save'],clears=t.clears;
