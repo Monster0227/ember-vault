@@ -323,6 +323,37 @@ test('raised terrain blocks walking through its side and can be jumped onto',()=
 test('enemies and caches start outside the new solid terrain',()=>{
   for(const i of ['prison','sewers','ramparts','ossuary','tower'].map(stageOf)){t.loadStage(i);for(const e of t.enemies)for(const a of t.platforms.filter(q=>q.solid))assert(!(e.floor>a.y&&e.origin+e.w>a.x&&e.origin<a.x+a.w),t.L.name+' enemy starts inside a solid');for(const b of t.breakables)for(const a of t.platforms.filter(q=>q.solid))assert(!(b.x>a.x-13&&b.x<a.x+a.w+13),t.L.name+' urn starts inside a solid');}
 });
+test('ground rolls stop at exposed banks and platform ends in both directions; a jump can leave them',()=>{
+  for(const hero of ['lamp','bell','bow'])for(const direction of [-1,1]){
+    for(const raised of [false,true]){
+      t.reset(true,hero);t.enemies.forEach(e=>e.dead=true);
+      const p=t.player,top=raised?370:480;
+      const deck={x:1900,y:top,w:240,h:raised?22:160,groundBlock:!raised};
+      t.platforms.splice(0,t.platforms.length,deck);
+      p.x=direction>0?deck.x+deck.w-p.w-20:deck.x+20;
+      p.y=top-p.h;p.ground=true;p.face=hero==='bow'?-direction:direction;
+      const start=p.x;t.action('roll');advance(.65);
+      assert((p.x-start)*direction>10,'roll advanced');
+      assert(p.ground&&Math.abs(p.y+p.h-top)<.01,'still supported');
+      assert(p.x+p.w/2>deck.x&&p.x+p.w/2<deck.x+deck.w,'stops over the edge');
+      const code=direction>0?'KeyD':'KeyA';press(code);t.action('jump');advance(.65);release(code);
+      assert(direction>0?p.x>deck.x+deck.w:p.x+p.w<deck.x,'deliberate jump clears the edge');
+    }
+  }
+});
+test('real prison trench has solid banks and can be rolled through from either side',()=>{
+  for(const [hero,x,face,direction] of [['lamp',2118,1,1],['bow',2118,-1,1],['bell',2242,-1,-1]]){
+    t.reset(true,hero);t.enemies.forEach(e=>e.dead=true);
+    const p=t.player;Object.assign(p,{x,y:480-p.h,face,ground:true,inv:3});
+    t.action('roll');
+    for(let i=0;i<72;i++){
+      t.step(1/60);
+      assert(p.y+p.h<=506.01,'feet never sink below trench floor');
+    }
+    assert((p.x-x)*direction>90,'crossed the bank');assert(p.ground);
+  }
+  t.reset(true,'lamp');
+});
 test('a ground enemy cannot walk into an elevated stone ledge',()=>{
   const e=t.enemies[0],a=t.platforms.find(q=>q.solid);t.player.x=a.x+80;t.player.inv=100;advance(5);assert(e.x+e.w<=a.x+.01);
 });
@@ -418,7 +449,8 @@ test('completed tutorial leads to progressive skills',()=>{t.tutorialDone=true;
   t.loadStage(stageOf('sewers'));advance(.05);assert.equal(t.run.awakened,2);
   t.loadStage(stageOf('ramparts'));advance(.05);assert.equal(t.run.awakened,3);
 });
-test('the tutorial cannot kill you and, opened from the title screen, flows into the first level',()=>{
+test('the tutorial cannot kill you and, opened without a saved journey, flows into the first level',()=>{
+  delete storage['ember:save'];
   t.startTutorial(true);assert(t.L.tutorial);
   for (const id of ['knife','bomb','frost']) {
     t.sel=id;const before=t.bag[id];assert(before>0);
@@ -550,6 +582,16 @@ test('the ramparts shortcut carries a relit ember and a continued run remembers 
   delete saved.run.guideX;storage['ember:save']=JSON.stringify(saved);
   t.showMenu();t.continueRun();assert.equal(t.run.guideX,saved.checkX);
 });
+test('the prison starts on an open path and the first guard waits for a hit',()=>{
+  const first=t.enemies[0],start=t.run.guideX;
+  assert(!t.L.lesson.door);assert(t.L.lesson.practiceX>first.origin);
+  assert(t.traps.every(q=>q.x==null||q.x>=t.L.lesson.practiceX));
+  press('KeyD');advance(1.3);release('KeyD');
+  assert(t.player.x>400);assert(t.run.guideX>start);assert.equal(t.player.hp,t.player.max);
+  t.player.x=first.x-28;t.player.y=428;advance(1.7);
+  assert(first.waitingForHit);assert.equal(first.wind,0);assert.equal(t.player.hp,t.player.max);
+  t.player.face=1;t.action('attack');advance(.13);assert(!first.waitingForHit);
+});
 test('fresh journeys have safe training spikes and a gradual first patrol',()=>{
   const practice=t.traps.find(q=>q.teach);
   t.player.x=practice.x;t.player.hp=20;advance(2);assert.equal(t.player.hp,20);
@@ -573,6 +615,17 @@ test('free selection can enter every map with a new profile and keeps the journe
   t.showMenu();t.continueRun(true);assert.equal(t.L.theme,'tower');
   t.showWinPanel();assert.equal(t.clears,beforeClears);
   t.showMenu();t.continueRun();assert.equal(t.stage,0);
+});
+test('first walk introduces three actions without mandatory hazards; full practice stays available',()=>{
+  t.startTutorial(false);
+  assert(t.L.brief && t.L.exit<t.TUTORIAL.exit);
+  assert.equal(t.traps.length+t.L.spikes.length+t.L.gaps.length,0);
+  assert(t.enemies.length===1 && t.enemies[0].type==='dummy');
+  assert.deepEqual(Array.from(t.L.signs,s=>s.keys[0]),['right','jump','attack','right']);
+  t.loadStage(stageOf('sewers'));const journey=storage['ember:save'];
+  t.startTutorial(true);assert.equal(t.L,t.TUTORIAL);
+  assert(t.traps.length>0 && t.L.signs.length>4);
+  t.finishTutorial();advance(1);assert.equal(t.state,'menu');assert.equal(storage['ember:save'],journey);
 });
 console.log('All '+passed+' gameplay checks passed.');
 

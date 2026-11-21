@@ -7,4 +7,14 @@ p.x=0;p.y=0;p.vy=2000;const ledge={x:0,y:80,w:100,h:8,solid:false};ph.move(p,0,3
 p.y=120;p.vy=-2000;ph.move(p,0,-200,[ledge],480);assert.equal(p.y,-80);p.y=0;p.drop=ledge;ph.move(p,0,300,[ledge],480);assert.equal(p.y,300);
 p.drop=null;p.x=0;p.y=0;p.vx=1000;p.vy=1000;ph.move(p,100,100,[wall,{x:-100,y:90,w:300,h:10,solid:true}],480);assert.equal(p.x,40);assert.equal(p.y,80);
 console.log('PASS pool saturation/reuse, 200ms queue, animation events/cancel, sweep wall/corner/landing/fall-through');
+// A roll or a jump which reaches a bank below the top must hit its side, not enter the floor.
+const bank={x:100,y:480,w:120,h:160,groundBlock:true};
+const rolling={x:60,y:438,w:26,h:52,vx:900,vy:300,ground:false};
+ph.move(rolling,80,7,[bank],480);
+assert.equal(rolling.y+rolling.h,480,'a shallow lip is stepped up');
+Object.assign(rolling,{x:60,y:464,vx:900,vy:300});
+ph.move(rolling,80,7,[bank],480);
+assert.equal(rolling.x,74,'a deep bank blocks the side');
+assert(rolling.y>464&&!rolling.ground,'gravity still acts in the pit');
+console.log('PASS shallow bank exit and deep pit wall');
 let order='';const nodes={root:{parent:null,handle:()=>{order+='bubble';return true;}},ground:{parent:'root',exit:()=>order+='leave-ground;'},air:{parent:'root',enter:()=>order+='enter-air;'},idle:{parent:'ground',exit:()=>order+='leave-idle;'},rise:{parent:'air',enter:()=>order+='enter-rise;'}};const hierarchy=new global.EmberCore.HierarchicalFSM(nodes,'idle');hierarchy.transition('rise');assert.equal(order,'leave-idle;leave-ground;enter-air;enter-rise;');assert(hierarchy.isIn('root'));assert(hierarchy.dispatch(1));assert(order.endsWith('bubble'));console.log('PASS hierarchical common-ancestor transitions and parent event bubbling');

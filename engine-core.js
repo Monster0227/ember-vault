@@ -40,10 +40,21 @@ function sweepAABB(b,dx,dy,t,out){out.time=1;out.nx=0;out.ny=0;if((dx<=0&&b.x+b.
 }
 class Physics {
   constructor(){this.hit={time:1,nx:0,ny:0};this.box={x:0,y:0,w:0,h:0};this.landed=null;}
+  limitGroundRoll(p,dx,platforms){
+    // Follow shallow steps, but keep the centre of a grounded roll over a reachable surface.
+    const centre=p.x+p.w/2,feet=p.y+p.h;
+    let edge=centre;
+    for(const a of platforms){
+      if(a.off||a===p.drop||a.y<feet-16||a.y>feet+32)continue;
+      if(dx>0&&a.x<=p.x+p.w&&a.x+a.w>centre)edge=Math.max(edge,a.x+a.w-2);
+      if(dx<0&&a.x+a.w>=p.x&&a.x<centre)edge=Math.min(edge,a.x+2);
+    }
+    return dx>0?Math.min(dx,edge-centre):Math.max(dx,edge-centre);
+  }
   move(p,dx,dy,platforms,floor){this.landed=null;p.ground=false;
     for(let iteration=0;iteration<4&&(dx!==0||dy!==0);iteration++){let best=1,nx=0,ny=0,target=null;
       for(let i=0;i<platforms.length;i++){const a=platforms[i];if(a.off||a===p.drop)continue;
-        if(!a.solid){if(dy<=0||p.y+p.h>a.y+3)continue;const t=(a.y-p.y-p.h)/dy,x=p.x+dx*Math.max(0,t);if(t>=-.01&&t<=best&&x+p.w>a.x&&x<a.x+a.w){best=Math.max(0,t);nx=0;ny=-1;target=a;}}
+        if(!a.solid&&!a.groundBlock){if(dy<=0||p.y+p.h>a.y+3)continue;const t=(a.y-p.y-p.h)/dy,x=p.x+dx*Math.max(0,t);if(t>=-.01&&t<=best&&x+p.w>a.x&&x<a.x+a.w){best=Math.max(0,t);nx=0;ny=-1;target=a;}}
         else{this.box.x=a.x;this.box.y=a.y;this.box.w=a.w;this.box.h=a.h||floor-a.y;if(sweepAABB(p,dx,dy,this.box,this.hit)&&this.hit.time<=best){best=this.hit.time;nx=this.hit.nx;ny=this.hit.ny;target=a;}}
       }
       p.x+=dx*best;p.y+=dy*best;if(!target)break;dx*=1-best;dy*=1-best;
