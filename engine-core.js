@@ -26,7 +26,7 @@ class HeroFSM extends HierarchicalFSM {
   constructor(event){super(HERO_NODES,'idle');this.parent='ground';this.frame=0;this.elapsed=0;this.duration=0;this.hitbox=false;this.fired=false;this.event=event;}
   enter(state,parent,duration=0){if(this.state===state&&state!=='attack')return;this.transition(state);this.parent=parent;this.elapsed=0;this.duration=duration;this.frame=0;this.hitbox=false;this.fired=false;}
   tick(dt,p){if(p.hurtT>0){this.enter('hurt','control');return;}if(p.dash>0){this.enter('dash','control');return;}if(p.roll>0){this.enter('roll','control');return;}
-    if(this.state==='attack'&&p.attack>0){this.elapsed=Math.max(this.elapsed+dt,this.duration-p.attack);this.frame=Math.floor(this.elapsed*60);if(!this.fired&&this.frame>=2){this.fired=true;this.event();}this.hitbox=this.fired&&p.attack>.1;return;}
+    if(this.state==='attack'&&p.attack>0){this.elapsed=Math.max(this.elapsed+dt,this.duration-p.attack);this.frame=Math.floor(this.elapsed*60);if(!this.fired&&this.frame>=4){this.fired=true;this.event();}this.hitbox=this.frame>=4&&this.frame<7;return;}
     this.enter(p.ground?(Math.abs(p.vx)>10?'run':'idle'):(p.vy<0?'rise':'fall'),p.ground?'ground':'air');this.elapsed+=dt;this.frame=Math.floor(this.elapsed*12)%8;
   }
   canCancel(){return this.state!=='attack'||this.elapsed>=this.duration*.65;}
