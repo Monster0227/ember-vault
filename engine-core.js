@@ -32,7 +32,8 @@ class HeroFSM extends HierarchicalFSM {
   canCancel(){return this.state!=='attack'||this.elapsed>=this.duration*.65;}
 }
 // Slab ray against Minkowski-expanded box. Writes caller-owned output.
-function sweepAABB(b,dx,dy,t,out){out.time=1;out.nx=0;out.ny=0;if(dx===0&&(b.x+b.w<=t.x||b.x>=t.x+t.w))return false;if(dy===0&&(b.y+b.h<=t.y||b.y>=t.y+t.h))return false;
+function sweepAABB(b,dx,dy,t,out){out.time=1;out.nx=0;out.ny=0;if((dx<=0&&b.x+b.w<=t.x)||(dx>=0&&b.x>=t.x+t.w))return false;
+  if((dy<=0&&b.y+b.h<=t.y)||(dy>=0&&b.y>=t.y+t.h))return false;
   const xe=dx>0?(t.x-b.x-b.w)/dx:dx<0?(t.x+t.w-b.x)/dx:-Infinity,xx=dx>0?(t.x+t.w-b.x)/dx:dx<0?(t.x-b.x-b.w)/dx:Infinity;
   const ye=dy>0?(t.y-b.y-b.h)/dy:dy<0?(t.y+t.h-b.y)/dy:-Infinity,yx=dy>0?(t.y+t.h-b.y)/dy:dy<0?(t.y-b.y-b.h)/dy:Infinity;
   const enter=Math.max(xe,ye),exit=Math.min(xx,yx);if(enter<0||enter>1||enter>exit)return false;out.time=enter;if(xe>ye)out.nx=dx>0?-1:1;else out.ny=dy>0?-1:1;return true;

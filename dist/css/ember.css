@@ -374,7 +374,7 @@ h1{font:700 clamp(42px,6vw,78px)/1.2 Georgia,"SimSun",serif;letter-spacing:9px;m
 #touch .t3{right:22px;bottom:96px}
 @media(orientation:portrait){#touch .t1{right:150px;bottom:96px}#touch .t2{right:96px;bottom:140px}#touch .t3{right:30px;bottom:178px}#touch .chest{left:max(16px,env(safe-area-inset-left));bottom:240px}}
 @media(max-height:500px){.title-screen.menu{padding:6px 0}.menu-item{padding:7px 14px;margin-bottom:4px}.menu-item b{font-size:15px}.char-card .portrait{width:64px;height:64px}.char-card{padding:6px 8px}.sk-row{min-height:36px}.sk-row img{width:34px;height:34px}}
-@media(max-width:600px){.char-card{flex-basis:calc(33% - 10px);padding:6px}.char-card .portrait{width:64px;height:64px}.char-card .role,.bars{display:none}.keymap{grid-template-columns:1fr}.menu-item small{display:none}}
+@media(max-width:600px){.char-card{flex-basis:calc(33% - 10px);padding:6px}.char-card .portrait{width:64px;height:64px}.char-card .role{line-height:1.45}.keymap{grid-template-columns:1fr}.menu-item small{display:none}}
 
 #rotate-screen{position:fixed;top:0;right:0;bottom:0;left:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;background:radial-gradient(ellipse at center,#203839,#0b111a 75%);color:#eadfc9}
 #rotate-screen[hidden]{display:none}
@@ -543,6 +543,22 @@ html,body,#stage{max-width:100%;overflow-x:hidden}
   #pad{width:84px;height:84px}
   #touch .heal,#touch .item{width:44px;height:44px}
   #touch .chest{width:84px;height:40px;min-height:40px}
+}
+
+/* Reserve the full button box for the finger; size the artwork independently. */
+#touch :is(.heal,.item,.jump,.roll){width:64px;height:64px;min-width:64px;min-height:64px;display:grid;place-items:center}
+#touch :is(.heal,.jump,.roll) svg,#touch #item-name{width:48px;height:48px}
+@media (orientation:landscape){
+  #touch .item{left:calc(max(10px,env(safe-area-inset-left)) + 180px)}
+  #touch .chest{bottom:calc(max(10px,env(safe-area-inset-bottom)) + 72px)}
+}
+@media (orientation:portrait){
+  #touch .item{left:calc(max(12px,env(safe-area-inset-left)) + 72px)}
+  #touch .chest{left:max(12px,env(safe-area-inset-left));bottom:calc(max(16px,env(safe-area-inset-bottom)) + 210px)}
+  #touch .heal,#touch .item{bottom:calc(max(16px,env(safe-area-inset-bottom)) + 140px)}
+  #touch .t1{right:0;bottom:172px}
+  #touch .t2{right:72px;bottom:212px}
+  #touch .t3{right:0;bottom:244px}
 }
 
 /* Desktop look stays intact: coarse/pointer rules above do not apply to fine pointers on wide screens */

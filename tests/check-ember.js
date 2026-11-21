@@ -19,6 +19,12 @@ const sandbox = {
   addEventListener:(event,fn) => listeners[event]=fn,
   requestAnimationFrame:noop, console, Math, Set
 };
+const routeCheck = typeof process !== 'undefined' && process.argv.includes('--routes');
+if (routeCheck) {
+  let seed = 3571;
+  sandbox.Math = Object.create(Math);
+  sandbox.Math.random = () => ((seed = (Math.imul(seed,1664525)+1013904223) >>> 0) / 4294967296);
+}
 sandbox.window=sandbox;
 sandbox.matchMedia=() => ({matches:false});
 let code=fs.readFileSync(require('path').join(__dirname,'../dist/js/ember.js'),'utf8');
@@ -32,6 +38,10 @@ function release(code) { listeners.keyup({code}); }
 function finishTalk() { for(let i=0;i<60&&t.state==='talk';i++)press('KeyE'); }
 function finishCine() { for(let i=0;i<600&&t.state==='cine';i++)t.step(1/60); }
 const FINAL=t.STAGES.length-1, stageOf=theme=>t.STAGES.findIndex(s=>s.theme===theme&&!s.arena&&!s.rest),firstRest=()=>t.STAGES.findIndex(s=>s.rest&&s.restNo===0);
+if (routeCheck) {
+  require('./check-routes.cjs')({t,press,release,stageOf,finishTalk});
+  return;
+}
 let passed=0;
 function test(name,fn) { t.reset();fn();passed++;console.log('PASS '+name); }
 test('movement, landing, double jump and no third jump',()=>{
@@ -178,7 +188,8 @@ test('four chapters contain five maps, four dedicated boss arenas and four wayst
     const floor=t.platforms.filter(a=>a.h>100&&!a.solid).reduce((n,a)=>n+a.w,0),gaps=s.gaps.reduce((n,g)=>n+g[1]-g[0],0);assert.equal(floor+gaps,s.w);});
 });
 test('the exit leads to a boss arena, then a waystation and the next chapter with stats kept',()=>{
-  t.player.damage=40;t.player.potions=2;t.embers=55;t.player.x=t.L.exit+20;t.player.y=428;advance(1);
+  t.player.x=t.L.exit+20;t.player.y=428;advance(1);assert(!t.L.arena,'the east door needs its travelling ember');
+  t.run.guideX=t.L.exit;t.player.damage=40;t.player.potions=2;t.embers=55;t.player.x=t.L.exit+20;t.player.y=428;advance(1);
   assert(t.L.arena);assert.equal(t.player.damage,40);assert.equal(t.embers,55);
   t.enemies.find(e=>e.type==='boss').dead=true;t.player.x=t.L.seal+20;advance(1);assert(t.L.rest);
   t.player.x=t.L.exit+20;t.player.y=428;advance(1);finishTalk();assert.equal(t.L.name,'腐水下水道');assert.equal(t.player.potions,2);assert.equal(t.embers,55);
@@ -456,9 +467,9 @@ test('lifts carry you, crumbling bridges drop away and grow back, vents lift you
   t.loadStage(stageOf('sewers'));const v=t.traps.find(q=>q.k==='vent');v.t=v.per*.5;t.player.x=v.x-13;t.player.y=428;t.player.vy=0;advance(.4);assert(t.player.y<380,'the steam carries you up');
   t.loadStage(stageOf('prison'));t.enemies.forEach(e=>e.dead=true);const s=t.traps.find(q=>q.k==='tspike');t.player.x=s.x+20;t.player.y=428;t.player.inv=0;t.player.hp=t.player.max;s.t=s.per*.2;advance(.1);assert.equal(t.player.hp,100,'spikes down');s.t=s.per*.6;advance(.05);assert(t.player.hp<100,'spikes up');
 });
-test('every map is longer, has its own traps and the new enemies',()=>{
+test('five main routes keep their signature obstacles and an accessible exit',()=>{
   const kinds={prison:['tspike','pendulum'],sewers:['spout','vent'],ramparts:['wind','ballista'],ossuary:['jet'],tower:['piston','pendulum','vent']};
-  for(const th of Object.keys(kinds)){const s=t.STAGES[stageOf(th)];assert(s.w>=7000,th+' is longer');const have=new Set(s.traps.map(q=>q.k));kinds[th].forEach(k=>assert(have.has(k),th+' has '+k));}
+  for(const th of Object.keys(kinds)){const s=t.STAGES[stageOf(th)];assert(s.exit>=5900&&s.exit<=6600,th+' main route');assert(s.ens.every(e=>e[0]<s.exit),th+' encounter before exit');const have=new Set(s.traps.map(q=>q.k));kinds[th].forEach(k=>assert(have.has(k),th+' has '+k));}
   assert(t.STAGES[stageOf('prison')].movers.length&&t.STAGES[stageOf('ramparts')].crumbles.length&&t.STAGES[stageOf('ossuary')].dark,'lifts, crumbling bridges and darkness');
   const foes=new Set();t.STAGES.forEach(s=>s.ens.forEach(e=>foes.add(e[2])));['flyer','shield','caster','bomber'].forEach(k=>assert(foes.has(k),k+' appears'));
   ['lock','brood','standard','warden'].forEach(k=>assert(t.SONGS[k]&&t.SONGS[k+'2']&&t.SONGS[k].bpm<t.SONGS[k+'2'].bpm,k+' has a faster second phase theme'));
@@ -519,7 +530,27 @@ test('every boss leaves a lantern shard behind',()=>{
 });test('rolling through an attack at the last instant slows time and charges soul',()=>{
   const e=t.enemies[0];e.cd=99;t.player.x=e.x-60;t.player.y=428;t.player.soul=0;t.action('roll');assert.equal(t.strike({struck:false,x:e.x,w:30},0,0,9999,9999,14),false);assert.equal(t.player.soul,1,'a perfect dodge feeds soul');assert.equal(t.player.hp,100);
   t.strike({struck:false,x:e.x,w:30},0,0,9999,9999,14);assert.equal(t.player.soul,1,'once per roll');
-});console.log('All '+passed+' gameplay checks passed.');
+});
+test('a fatal moth dive names the attack in the result panel',()=>{
+  const f=t.enemies.filter(e=>e.type==='flyer')[1];
+  t.enemies.forEach(e=>{if(e!==f)e.dead=true;});
+  t.player.x=f.origin-150;t.player.hp=20;t.cam=f.origin-500;
+  advance(.05);f.cd=0;advance(1.5);
+  assert.equal(t.state,'dead');assert(nodes.panel.innerHTML.includes('被囚灯蛾俯冲击中'));
+});
+test('the ramparts shortcut carries a relit ember and a continued run remembers it',()=>{
+  t.loadStage(stageOf('ramparts'));const wall=t.L.shortcut;
+  t.player.x=wall.open+20;advance(.1);assert(!t.run.shortcut);
+  t.run.guideX=wall.dest;advance(.1);assert(t.run.shortcut);
+  t.retryStage();t.player.x=wall.door-13;advance(.05);
+  assert(t.player.x>=wall.dest-10);assert(t.run.guideX>=wall.dest);
+  t.player.x=t.L.checks.at(-1)-13;t.player.y=428;advance(.05);
+  const saved=JSON.parse(storage['ember:save']);assert(saved.run.guideX>=wall.dest);
+  t.showMenu();t.continueRun();assert.equal(t.run.guideX,saved.run.guideX);
+  delete saved.run.guideX;storage['ember:save']=JSON.stringify(saved);
+  t.showMenu();t.continueRun();assert.equal(t.run.guideX,saved.checkX);
+});
+console.log('All '+passed+' gameplay checks passed.');
 
 
 
