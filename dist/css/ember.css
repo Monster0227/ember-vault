@@ -293,6 +293,17 @@ h1{font:700 clamp(42px,6vw,78px)/1.2 Georgia,"SimSun",serif;letter-spacing:9px;m
 
 /* 选角色：三张卡，没解锁的是剪影；下面是技能说明和周目 */
 .sheet.chars{max-width:760px}
+.journey-actions{display:flex;gap:8px;align-items:stretch}
+.journey-actions button{margin:0;min-width:0;min-height:44px}
+.journey-actions .primary{flex:1}
+.journey-actions .secondary{width:auto}
+.journey-details,.keyboard-options{margin-top:10px;border-top:1px solid #43515a;color:#cebd9d}
+.journey-details summary,.keyboard-options summary{padding:12px 2px;cursor:pointer;font-size:14px}
+.journey-details summary:focus-visible,.keyboard-options summary:focus-visible{outline:2px solid #d8bf90;outline-offset:2px}
+.keyboard-options p{font-size:13px;color:#aeb6ba}
+.keyboard-options .secondary{margin-bottom:12px}
+.menu-sub .menu-item[data-level]{min-height:44px;display:grid;justify-content:start;gap:3px}
+.menu-sub .menu-item[data-level] small{display:block;margin:0;color:#aebac0;text-align:left}
 .char-cards{display:flex;flex-wrap:wrap;margin:14px 0 6px}
 .char-card{position:relative;flex:1 1 180px;max-width:230px;margin:0 10px 10px 0;padding:10px 12px 12px;background:linear-gradient(180deg,#1d2a35f2,#121a22f2);border:1px solid #445462;border-radius:8px;text-align:center;color:#eadfc9;transition:border-color .15s,transform .15s}
 .char-card:hover:not(:disabled){border-color:#a8946e;transform:translateY(-2px)}
@@ -359,7 +370,6 @@ h1{font:700 clamp(42px,6vw,78px)/1.2 Georgia,"SimSun",serif;letter-spacing:9px;m
 .progress{width:150px;height:3px;margin-top:7px;background:#ffffff1a;border-radius:2px;overflow:hidden}
 .progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,#8a7350,#e6c078);transition:width .3s}
 .progress[hidden]{display:none}
-@media(pointer:coarse){.skills{display:none}}
 
 /* 触屏：三个技能键排成一道弧，围在攻击键上方 */
 #touch .sk{width:64px;height:64px;min-width:64px;min-height:64px;padding:8px;border-radius:50%;opacity:.55;background:#203038b8;border-color:#8bdac980}
@@ -374,13 +384,6 @@ h1{font:700 clamp(42px,6vw,78px)/1.2 Georgia,"SimSun",serif;letter-spacing:9px;m
 @media(max-height:500px){.title-screen.menu{padding:6px 0}.menu-item{padding:7px 14px;margin-bottom:4px}.menu-item b{font-size:15px}.char-card .portrait{width:64px;height:64px}.char-card{padding:6px 8px}.sk-row{min-height:36px}.sk-row img{width:34px;height:34px}}
 @media(max-width:600px){.char-card{flex-basis:calc(33% - 10px);padding:6px}.char-card .portrait{width:64px;height:64px}.char-card .role{line-height:1.45}.keymap{grid-template-columns:1fr}.menu-item small{display:none}}
 
-#rotate-screen{position:fixed;top:0;right:0;bottom:0;left:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;background:radial-gradient(ellipse at center,#203839,#0b111a 75%);color:#eadfc9}
-#rotate-screen[hidden]{display:none}
-#rotate-screen svg{width:120px;height:100px;fill:none;stroke:#9ed8c6;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
-#rotate-screen h1{font-size:23px;margin:24px 0 10px}
-#rotate-screen p{font-size:14px;line-height:1.9;color:#aebdbb}
-#rotate-screen button{margin:20px 0;padding:13px 32px;border:1px solid #9ed8c6;border-radius:8px;background:#294b48;font-size:16px}
-#rotate-screen small{max-width:290px;line-height:1.8;color:#829994}
 
 #scene-fade{position:fixed;top:0;right:0;bottom:0;left:0;background:#090f16;z-index:900;pointer-events:auto;opacity:0}
 #scene-fade[hidden]{display:none}
@@ -467,17 +470,14 @@ h1{font:700 clamp(42px,6vw,78px)/1.2 Georgia,"SimSun",serif;letter-spacing:9px;m
 @keyframes veillate{from{opacity:0;visibility:hidden}to{opacity:1;visibility:visible}}
 
 #world{touch-action:none;image-rendering:pixelated;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
-/* Landscape controls occupy a reserved 132px strip below the world canvas. */
-@media(orientation:landscape){#touch{background:linear-gradient(transparent calc(100% - 132px),#101b28 calc(100% - 132px));}#pad{width:96px;height:96px;bottom:12px}#touch .heal{left:124px;bottom:12px;width:42px;height:42px}#touch .item{left:176px;bottom:12px;width:42px;height:42px}#touch .chest{left:124px;bottom:66px;width:94px;height:42px}.actions{bottom:10px;width:224px;height:70px}#touch .attack{width:64px;height:64px}#touch .jump{right:78px;bottom:2px;width:60px;height:60px}#touch .roll{right:152px;bottom:6px;width:52px;height:52px}#touch .sk{width:64px;height:64px;min-width:64px;min-height:64px}#touch .t1{right:152px;bottom:84px}#touch .t2{right:88px;bottom:84px}#touch .t3{right:24px;bottom:84px}}
 @media(orientation:landscape) and (max-height:500px){#hud{top:6px;left:12px;right:12px}#hud b{font-size:17px}#zone{font-size:10px}.hud-buttons button{width:34px;height:34px}#minimap{max-height:40px}.health{transform:scale(.8);transform-origin:left center}#notice{top:70px;font-size:12px}}
 @media(orientation:landscape) and (max-height:500px){#hud>div:first-child{padding-top:0;width:auto}#hud>div:first-child>b,#hud .skills,#hud .hud-row{display:none}#zone{margin:0;display:block;max-width:260px}#hud .health{margin-top:3px;min-height:18px;height:18px;width:auto;transform:none}.life-ghost{width:15px;height:18px}#soul-meter{margin-top:2px;height:18px}#soul-meter svg{width:15px;height:18px}#minimap{display:none}#notice{top:62px}}
 
 
 /* ===== mobile-adapt-5.6: phone layout, safe areas, no overlap, >=44px taps ===== */
 html,body,#stage{max-width:100%;overflow:hidden}
-#panel,.veil,.sheet,h1,.intro,#talk p,#talk b,#notice,.menu-item b,.menu-item small,.char-card b,.footnote,.keys,.chapter,#rotate-screen h1,#rotate-screen p,#rotate-screen small,#gain b,#gain small{overflow-wrap:anywhere;word-break:break-word}
-.hud-buttons button,#mute,#pause,#bag-btn,#map-btn,.quick-item,#talk-skip,#landscape-go,.menu-item,.primary,.secondary,.tabs button,#panel .choices button,#touch button,#pad{min-width:44px;min-height:44px}
-#rotate-screen{padding:max(24px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left))}
+#panel,.veil,.sheet,h1,.intro,#talk p,#talk b,#notice,.menu-item b,.menu-item small,.char-card b,.footnote,.keys,.chapter,#gain b,#gain small{overflow-wrap:anywhere;word-break:break-word}
+.hud-buttons button,#mute,#pause,#bag-btn,#map-btn,.quick-item,#talk-skip,.menu-item,.primary,.secondary,.tabs button,#panel .choices button,#touch button,#pad{min-width:44px;min-height:44px}
 #hint{bottom:max(12px,env(safe-area-inset-bottom));padding:0 12px}
 
 /* Narrow phones 360-430: HUD and panels */
@@ -499,64 +499,76 @@ html,body,#stage{max-width:100%;overflow:hidden}
   #gain{max-width:calc(100% - 24px)}
 }
 
-/* Portrait touch: two-row layout, no overlap, 44px+ */
-@media (pointer:coarse) and (orientation:portrait){
-  #pad{width:120px;height:120px;left:max(12px,env(safe-area-inset-left));bottom:max(16px,env(safe-area-inset-bottom))}
-  #touch .heal{left:max(12px,env(safe-area-inset-left));bottom:calc(max(16px,env(safe-area-inset-bottom)) + 132px);width:48px;height:48px;min-width:48px;min-height:48px}
-  #touch .item{left:calc(max(12px,env(safe-area-inset-left)) + 56px);bottom:calc(max(16px,env(safe-area-inset-bottom)) + 132px);width:48px;height:48px;min-width:48px;min-height:48px}
-  #touch .chest{left:calc(max(12px,env(safe-area-inset-left)) + 112px);bottom:calc(max(16px,env(safe-area-inset-bottom)) + 132px);width:72px;height:48px;min-width:72px;min-height:48px;border-radius:24px}
-  .actions{right:max(12px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));width:228px;height:248px}
-  #touch .attack{right:0;bottom:0;width:80px;height:80px;min-width:80px;min-height:80px}
-  #touch .jump{right:92px;bottom:8px;width:68px;height:68px;min-width:68px;min-height:68px}
-  #touch .roll{right:18px;bottom:96px;width:60px;height:60px;min-width:60px;min-height:60px}
-  #touch .sk{width:64px;height:64px;min-width:64px;min-height:64px}
-  #touch .t1{right:152px;bottom:96px}
-  #touch .t2{right:96px;bottom:140px}
-  #touch .t3{right:28px;bottom:176px}
+/* Only the playable HUD is compacted. The map and inventory each keep their own entry. */
+.touch-layout #hud :is(#skills,#quick-item,#mute,.hud-row),
+.touch-layout #hud>div:first-child>b,
+.touch-layout #touch .sk:not(.ready),
+.touch-layout #touch .sk[hidden]{display:none}
+.touch-layout #hud{inset:max(6px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) auto max(10px,env(safe-area-inset-left))}
+.touch-layout #hud>div:first-child{width:calc(100% - 150px);max-width:340px;padding-top:0}
+.touch-layout #zone{display:block;margin:0;font-size:11px;line-height:1.4;color:#e2e5d9;text-shadow:0 1px 3px #121925}
+.touch-layout #hud .health{width:auto;height:auto;min-height:18px;margin-top:3px}
+.touch-layout .hud-buttons{position:absolute;right:0;top:0;display:flex;gap:4px;flex-wrap:nowrap;max-width:none}
+.touch-layout .hud-buttons button{margin:0;width:44px;height:44px;min-width:44px;min-height:44px;padding:0}
+.touch-layout .hud-buttons svg{margin:auto}
+.touch-layout #touch{
+  --edge-l:max(10px,env(safe-area-inset-left));
+  --edge-r:max(10px,env(safe-area-inset-right));
+  --edge-b:max(8px,env(safe-area-inset-bottom));
+  --cluster-width:288px;
+  --cluster-height:224px;
+  --inward:max(0px,calc((100% - var(--cluster-width) - var(--edge-l) - var(--edge-r) - 8px)/2));
+  --outward:max(0px,calc(6px - max(env(safe-area-inset-left),env(safe-area-inset-right))));
+  --offset:clamp(calc(-1 * var(--inward)),var(--touch-x,0px),var(--outward));
+  --lift:clamp(0px,calc(100vh - var(--cluster-height) - 56px - var(--edge-b)),60px);
+  --drop:max(0px,calc(var(--edge-b) - max(4px,env(safe-area-inset-bottom))));
+  background:none;
+  bottom:calc(-1 * clamp(calc(-1 * var(--lift)),var(--touch-y,0px),var(--drop)));
 }
-
-/* Landscape touch on phones: reserved strip, no overlap, restore 44px targets + safe areas */
-@media (pointer:coarse) and (orientation:landscape){
-  #pad{width:96px;height:96px;left:max(10px,env(safe-area-inset-left));bottom:max(10px,env(safe-area-inset-bottom))}
-  #touch .heal{left:calc(max(10px,env(safe-area-inset-left)) + 108px);bottom:max(10px,env(safe-area-inset-bottom));width:44px;height:44px;min-width:44px;min-height:44px}
-  #touch .item{left:calc(max(10px,env(safe-area-inset-left)) + 158px);bottom:max(10px,env(safe-area-inset-bottom));width:44px;height:44px;min-width:44px;min-height:44px}
-  #touch .chest{left:calc(max(10px,env(safe-area-inset-left)) + 108px);bottom:calc(max(10px,env(safe-area-inset-bottom)) + 52px);width:94px;height:44px;min-width:94px;min-height:44px;border-radius:22px}
-  .actions{right:max(10px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom));width:230px;height:150px}
-  #touch .attack{right:0;bottom:0;width:64px;height:64px;min-width:64px;min-height:64px}
-  #touch .jump{right:74px;bottom:2px;width:56px;height:56px;min-width:56px;min-height:56px}
-  #touch .roll{right:140px;bottom:6px;width:52px;height:52px;min-width:52px;min-height:52px}
-  #touch .sk{width:64px;height:64px;min-width:64px;min-height:64px}
-  #touch .t1{right:156px;bottom:76px}
-  #touch .t2{right:84px;bottom:76px}
-  #touch .t3{right:12px;bottom:76px}
-  .hud-buttons button,.hud-buttons .quick-item{min-width:44px;min-height:44px;width:44px;height:44px}
+.touch-layout #touch :is(#pad,.heal,.item,.chest){translate:none;margin-left:calc(-1 * var(--offset))}
+.touch-layout #touch .actions{translate:none;margin-right:calc(-1 * var(--offset))}
+.touch-layout #pad{left:var(--edge-l);bottom:var(--edge-b)}
+.touch-layout #touch .actions{right:var(--edge-r);bottom:var(--edge-b);width:0;height:0}
+.touch-layout #touch :is(.heal,.item,.jump,.roll){width:64px;height:64px;min-width:64px;min-height:64px;display:grid;place-items:center}
+.touch-layout #touch :is(.heal,.jump,.roll) svg,.touch-layout #touch #item-name{width:48px;height:48px}
+.touch-layout #touch .attack{right:0;bottom:0;width:72px;height:72px}
+.touch-layout #touch .attack svg{width:48px;height:48px}
+.touch-layout #touch .sk{height:64px;width:64px}
+.touch-layout #touch .sk i{display:block;top:2px;left:2px;background:#2c4848;color:#dcfff0;border:1px solid #6c9b90;font:600 10px/14px system-ui}
+.touch-layout #touch .sk em{bottom:0}
+.touch-layout :is(#bag-close,#map-close){position:sticky;bottom:0;z-index:1;background:#253542}
+.touch-layout .footnote:empty{display:none}
+.touch-layout #touch .chest{left:var(--edge-l);min-width:74px;min-height:44px;width:auto;height:44px;padding:0 8px}
+@media (orientation:portrait),(max-width:479px){
+  .touch-layout #pad{width:96px;height:96px}
+  .touch-layout #touch .heal,.touch-layout #touch .item{bottom:calc(var(--edge-b) + 108px)}
+  .touch-layout #touch .heal{left:var(--edge-l)}
+  .touch-layout #touch .item{left:calc(var(--edge-l) + 72px)}
+  .touch-layout #touch .chest{bottom:calc(var(--edge-b) + 180px)}
+  .touch-layout #touch .jump{right:80px;bottom:0}
+  .touch-layout #touch .roll{right:0;bottom:80px}
+  .touch-layout #touch .t1{right:72px;bottom:80px}
+  .touch-layout #touch .t2{right:0;bottom:152px}
+  .touch-layout #touch .t3{right:72px;bottom:152px}
 }
-
-/* Very short landscape phones */
-#touch button{min-width:64px;min-height:64px}
-#touch button svg{width:48px;height:48px;max-width:48px;max-height:48px}
-@media (pointer:coarse) and (orientation:landscape) and (max-height:420px){
-  #hud{top:max(4px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right))}
-  #minimap{display:none}
-  #pad{width:84px;height:84px}
-  #touch .heal,#touch .item{width:44px;height:44px}
-  #touch .chest{width:84px;height:40px;min-height:40px}
+@media (orientation:landscape) and (min-width:480px){
+  .touch-layout #touch{--cluster-width:452px;--cluster-height:136px}
+  .touch-layout #pad{width:82px;height:82px}
+  .touch-layout #touch .heal,.touch-layout #touch .item{bottom:var(--edge-b)}
+  .touch-layout #touch .heal{left:calc(var(--edge-l) + 92px)}
+  .touch-layout #touch .item{left:calc(var(--edge-l) + 164px)}
+  .touch-layout #touch .chest{left:calc(var(--edge-l) + 92px);bottom:calc(var(--edge-b) + 70px)}
+  .touch-layout #touch .jump{right:80px;bottom:0}
+  .touch-layout #touch .roll{right:152px;bottom:0}
+  .touch-layout #touch .t1{right:152px;bottom:72px}
+  .touch-layout #touch .t2{right:80px;bottom:72px}
+  .touch-layout #touch .t3{right:8px;bottom:72px}
 }
-
-/* Reserve the full button box for the finger; size the artwork independently. */
-#touch :is(.heal,.item,.jump,.roll){width:64px;height:64px;min-width:64px;min-height:64px;display:grid;place-items:center}
-#touch :is(.heal,.jump,.roll) svg,#touch #item-name{width:48px;height:48px}
-@media (orientation:landscape){
-  #touch .item{left:calc(max(10px,env(safe-area-inset-left)) + 180px)}
-  #touch .chest{bottom:calc(max(10px,env(safe-area-inset-bottom)) + 72px)}
-}
-@media (orientation:portrait){
-  #touch .item{left:calc(max(12px,env(safe-area-inset-left)) + 72px)}
-  #touch .chest{left:max(12px,env(safe-area-inset-left));bottom:calc(max(16px,env(safe-area-inset-bottom)) + 210px)}
-  #touch .heal,#touch .item{bottom:calc(max(16px,env(safe-area-inset-bottom)) + 140px)}
-  #touch .t1{right:0;bottom:172px}
-  #touch .t2{right:72px;bottom:212px}
-  #touch .t3{right:0;bottom:244px}
+@media (orientation:landscape) and (min-width:740px){
+  .touch-layout #touch{--cluster-width:660px;--cluster-height:114px}
+  .touch-layout #touch .t1{right:224px;bottom:0}
+  .touch-layout #touch .t2{right:296px;bottom:0}
+  .touch-layout #touch .t3{right:368px;bottom:0}
 }
 
 /* Desktop look stays intact: coarse/pointer rules above do not apply to fine pointers on wide screens */
@@ -625,6 +637,23 @@ html,body,#stage{max-width:100%;overflow:hidden}
   .home-record{margin:0}
 }
 
-/* The first walk introduces movement, jumping and the selected weapon. */
-.first-walk :is(#skills,#soul-meter,#quick-item,#bag-btn,#map-btn,#chips,#stats),
-.first-walk #touch .sk{display:none}
+
+@media(max-width:600px){
+  .chars .char-cards{display:grid;gap:6px;margin:10px 0}
+  .chars .char-card{display:grid;grid-template-columns:50px minmax(0,1fr);column-gap:10px;
+    align-items:center;width:100%;max-width:none;margin:0;padding:9px 10px;text-align:left}
+  .chars .char-card .portrait{grid-row:1/4;width:50px;height:50px;margin:0}
+  .chars .char-card b{font-size:15px;letter-spacing:1px}
+  .chars .char-card .role{margin:2px 0 5px}
+  .chars .bars{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+  .chars .bar{margin:0}
+  .chars .bar em{width:auto;margin-right:3px}
+}
+@media(orientation:landscape) and (max-height:500px){
+  .chars .char-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:6px 0}
+  .chars .char-card{display:block;width:100%;max-width:none;min-width:0;margin:0;padding:5px 7px;text-align:center}
+  .chars .char-card .portrait{width:40px;height:40px;margin:0 auto}
+  .chars .bars{display:block}
+  .chars .bar em{width:28px;text-align:left}
+  .chars h1{font-size:28px;margin:0 0 6px}
+}

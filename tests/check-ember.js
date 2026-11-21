@@ -29,7 +29,7 @@ sandbox.window=sandbox;
 sandbox.matchMedia=() => ({matches:false});
 let code=fs.readFileSync(require('path').join(__dirname,'../dist/js/ember.js'),'utf8');
 // Instrument only this VM instance; no test controls are shipped in the browser.
-code=code.replace(/\}\)\(\);\s*$/, 'window.test={step,action,selectLevel,renderChapters,showWinPanel,hurt,strike,killEnemy,startChapter,finish,reset,respawn,loadStage,retryStage,STAGES,TALK,get bag(){return bag},get relics(){return relics},get keepsakes(){return keepsakes},get sel(){return sel},set sel(v){sel=v},get offers(){return offers},get flags(){return flags},get run(){return run},get codex(){return codex},get thrown(){return thrown},get breakables(){return breakables},get hazards(){return hazards},get loot(){return loot},get floats(){return floats},get gateK(){return gateK},get talk(){return talk},set introSeen(v){introSeen=v},get player(){return p},get enemies(){return enemies},get shots(){return shots},get waves(){return waves},get orbs(){return orbs},get fx(){return fx},get chunks(){return chunks},get platforms(){return platforms},get chests(){return chests},get state(){return state},get score(){return score},get stage(){return stage},get unlocked(){return unlocked},set unlocked(v){unlocked=v},get L(){return L},get embers(){return embers},set embers(v){embers=v},get checkpoint(){return checkpoint},get credits(){return credits},get cine(){return cine},get traps(){return traps},get lamps(){return lamps},get clears(){return clears},set clears(v){clears=v},get cycle(){return cycle},set cycle(v){cycle=v},useSkill,get secrets(){return secrets},hasMap,parseLine,relicPool,gainShard,gainBlueprint,startTutorial,finishTutorial,TUTORIAL,CHARS,SKILLS,showMenu,startJourney,continueRun,finishRebind,SONGS,set tutorialDone(v){tutorialDone=v},get settings(){return settings},get BIND(){return BIND},set rebinding(v){rebinding=v},get cam(){return cam},set cam(v){cam=v}};})();');
+code=code.replace(/\}\)\(\);\s*$/, 'window.test={step,action,selectLevel,renderChapters,showWinPanel,hurt,strike,killEnemy,startChapter,finish,reset,respawn,loadStage,retryStage,STAGES,TALK,get bag(){return bag},get relics(){return relics},get keepsakes(){return keepsakes},get sel(){return sel},set sel(v){sel=v},get offers(){return offers},get flags(){return flags},get run(){return run},get codex(){return codex},get thrown(){return thrown},get breakables(){return breakables},get hazards(){return hazards},get loot(){return loot},get floats(){return floats},get gateK(){return gateK},get talk(){return talk},set introSeen(v){introSeen=v},get player(){return p},get enemies(){return enemies},get shots(){return shots},get waves(){return waves},get orbs(){return orbs},get fx(){return fx},get chunks(){return chunks},get platforms(){return platforms},get chests(){return chests},get state(){return state},get score(){return score},get stage(){return stage},get unlocked(){return unlocked},set unlocked(v){unlocked=v},get L(){return L},get embers(){return embers},set embers(v){embers=v},get checkpoint(){return checkpoint},get credits(){return credits},get cine(){return cine},get traps(){return traps},get lamps(){return lamps},get clears(){return clears},set clears(v){clears=v},get cycle(){return cycle},set cycle(v){cycle=v},useSkill,get secrets(){return secrets},hasMap,parseLine,relicPool,gainShard,gainBlueprint,startTutorial,finishTutorial,TUTORIAL,CHARS,SKILLS,showMenu,startJourney,continueRun,finishRebind,SONGS,get settings(){return settings},get BIND(){return BIND},set rebinding(v){rebinding=v},get cam(){return cam},set cam(v){cam=v}};})();');
 vm.runInNewContext(code,sandbox);
 const t=sandbox.test;
 function advance(seconds) { for(let i=0;i<Math.ceil(seconds*120);i++)t.step(1/120); }
@@ -39,7 +39,7 @@ function finishTalk() { for(let i=0;i<60&&t.state==='talk';i++)press('KeyE'); }
 function finishCine() { for(let i=0;i<600&&t.state==='cine';i++)t.step(1/60); }
 const FINAL=t.STAGES.length-1, stageOf=theme=>t.STAGES.findIndex(s=>s.theme===theme&&!s.arena&&!s.rest),firstRest=()=>t.STAGES.findIndex(s=>s.rest&&s.restNo===0);
 if (routeCheck) {
-  require('./check-routes.cjs')({t,press,release,stageOf,finishTalk});
+  require('./check-routes.cjs')({t,press,release,stageOf,finishTalk,storage});
   return;
 }
 let passed=0;
@@ -56,7 +56,7 @@ test('platform collision and landing above ground',()=>{
   assert.equal(t.player.y,370-t.player.h);assert(t.player.ground);
 });
 test('one hit per enemy per swing, combo and kill reward',()=>{
-  const e=t.enemies[0];e.cd=99;t.player.inv=100;t.player.face=1;const dmg=t.player.damage;
+  const e=t.enemies.find(e=>e.type==='guard'&&e.max===72);assert(e);e.cd=99;t.player.y=e.floor-t.player.h;t.player.inv=100;t.player.face=1;const dmg=t.player.damage;
   t.player.x=e.x-40;t.action('attack');advance(.15);assert.equal(e.hp,72-dmg);
   t.player.x=e.x-40;advance(.15);t.action('attack');advance(.2);assert.equal(e.hp,72-dmg*2);
   let n=2;while(!e.dead&&n<8){t.player.x=e.x-40;t.player.face=1;advance(.2);t.action('attack');advance(.2);n++;}
@@ -155,20 +155,20 @@ test('chest rewards mix an upgrade, an item and usually a relic, picked with 1 /
 });
 test('holding up turns the swing into an up slash that reaches a guard above',()=>{
   const e=t.enemies[3];t.player.x=e.x+1;t.player.y=428;t.player.vy=0;t.player.face=1;t.player.inv=100;advance(.02);
-  press('KeyW');t.action('attack');advance(.12);release('KeyW');assert.equal(e.hp,72-t.player.damage);
-  advance(.4);t.action('attack');advance(.12);assert.equal(e.hp,72-t.player.damage,'a side slash cannot reach the platform above');
+  press('KeyW');t.action('attack');advance(.12);release('KeyW');assert.equal(e.hp,e.max-t.player.damage);
+  advance(.4);t.action('attack');advance(.12);assert.equal(e.hp,e.max-t.player.damage,'a side slash cannot reach the platform above');
 });
 test('down slash in the air hits a guard below and bounces off it',()=>{
   const e=t.enemies[2];e.cd=99;t.player.x=e.x+1;t.player.y=340;t.player.vy=0;t.player.ground=false;t.player.inv=100;
-  press('KeyS');t.action('attack');advance(.12);release('KeyS');assert.equal(e.hp,72-t.player.damage);assert(t.player.vy<-300,'bounced, vy='+t.player.vy);
+  press('KeyS');t.action('attack');advance(.12);release('KeyS');assert.equal(e.hp,e.max-t.player.damage);assert(t.player.vy<-300,'bounced, vy='+t.player.vy);
 });
 test('down slash bounces off spikes instead of landing on them',()=>{
-  t.player.x=1530;t.player.y=390;t.player.vy=200;t.player.ground=false;t.player.inv=0;
+  t.player.x=t.L.spikes[0][0]+30;t.player.y=390;t.player.vy=200;t.player.ground=false;t.player.inv=0;
   press('KeyS');t.action('attack');advance(.12);release('KeyS');assert(t.player.vy<0,'bounced');advance(.2);assert.equal(t.player.hp,100);
 });
 test('side slash only reaches as far as the drawn arc',()=>{
-  const e=t.enemies[0];e.cd=99;t.player.face=1;t.player.inv=100;t.player.y=428;t.player.x=e.x-100-13;t.action('attack');advance(.12);assert.equal(e.hp,72,'100 away is out of reach');
-  advance(.4);t.player.x=e.x-80-13;t.action('attack');advance(.12);assert(e.hp<72,'80 away is inside the arc');
+  const e=t.enemies[0];e.cd=99;t.player.face=1;t.player.inv=100;t.player.y=428;t.player.x=e.x-100-13;t.action('attack');advance(.12);assert.equal(e.hp,e.max,'100 away is out of reach');
+  advance(.4);t.player.x=e.x-80-13;t.action('attack');advance(.12);assert(e.hp<e.max,'80 away is inside the arc');
 });
 test('a slash cuts arrows out of the air',()=>{
   t.player.x=1800;t.player.y=428;t.player.face=-1;t.player.inv=0;advance(.05);
@@ -183,7 +183,7 @@ test('four chapters contain five maps, four dedicated boss arenas and four wayst
   const maps=t.STAGES.filter(s=>!s.rest&&!s.arena),rests=t.STAGES.filter(s=>s.rest),arenas=t.STAGES.filter(s=>s.arena);
   assert.equal(maps.length,5);assert.equal(rests.length,4);assert.equal(arenas.length,4);assert.equal(new Set(arenas.map(s=>s.chapter)).size,4);
   t.STAGES.forEach((s,i)=>{t.loadStage(i);assert.equal(t.state,'play');assert.equal(t.player.x,120);
-    if(s.rest)assert.equal(t.enemies.length,0);else if(s.arena)assert.equal(t.enemies.filter(e=>e.type==='boss').length,1);else assert(t.enemies.length>=9,s.name+' has enemies');
+    if(s.rest)assert.equal(t.enemies.length,0);else if(s.arena)assert.equal(t.enemies.filter(e=>e.type==='boss').length,1);else assert(t.enemies.length>=8,s.name+' has enemies');
     assert(s.arena?s.seal<s.w-100:s.exit<s.w-100,s.name+' has a way out');
     const floor=t.platforms.filter(a=>a.h>100&&!a.solid).reduce((n,a)=>n+a.w,0),gaps=s.gaps.reduce((n,g)=>n+g[1]-g[0],0);assert.equal(floor+gaps,s.w);});
 });
@@ -265,9 +265,9 @@ test('each floor hides a keepsake that unlocks a page of lore',()=>{
   advance(.02);assert.equal(nodes['chest-btn'].hidden,true,'nothing left to read here');
 });
 test('fire flasks burst on enemies, knives fly straight, the frost bell freezes',()=>{
-  const e=t.enemies[0];e.cd=99;t.player.inv=100;t.player.face=1;t.player.x=e.x-240;t.bag.bomb=1;t.sel='bomb';press('KeyU');release('KeyU');assert.equal(t.thrown.length,1);assert.equal(t.bag.bomb,0);
+  const e=t.enemies[0];e.cd=99;t.player.inv=100;t.player.face=1;t.player.x=e.x-240;e.max=e.hp=72;t.bag.bomb=1;t.sel='bomb';press('KeyU');release('KeyU');assert.equal(t.thrown.length,1);assert.equal(t.bag.bomb,0);
   advance(.9);assert.equal(t.thrown.length,0);assert.equal(e.hp,72-55);
-  t.reset();const g=t.enemies[0];g.cd=99;t.player.inv=100;t.player.face=1;t.player.x=g.x-200;t.bag.knife=2;t.sel='knife';press('KeyU');release('KeyU');advance(.4);assert.equal(g.hp,72-30);assert.equal(t.bag.knife,1);
+  t.reset();const g=t.enemies[0];g.cd=99;t.player.inv=100;t.player.face=1;t.player.x=g.x-200;g.max=g.hp=72;t.bag.knife=2;t.sel='knife';press('KeyU');release('KeyU');advance(.4);assert.equal(g.hp,72-30);assert.equal(t.bag.knife,1);
   t.reset();const f=t.enemies[0];t.player.face=1;t.player.x=f.x-60;t.player.inv=0;t.bag.frost=1;t.sel='frost';press('KeyU');release('KeyU');assert(f.frozen>2.5);
   const fx0=f.x;advance(1.5);assert.equal(f.x,fx0,'frozen enemies stand still');assert.equal(t.player.hp,100,'and cannot attack');advance(2);assert.equal(f.frozen,0);
 });
@@ -406,7 +406,7 @@ test('the warden tolls his bell in phase two; the ring is too tall to jump but c
   ground();t.waves.push({x:t.player.x+13+60,dir:-1,life:1,k:'toll',h:150,v:330,d:20});t.action('roll');advance(.4);assert.equal(t.player.hp,100,'rolling through it does');
 });
 test('cutting one of the warden\'s soul-flames frees it and gives back a soul charge',()=>{
-  t.loadStage(FINAL);t.player.x=600;t.player.y=428;t.player.face=1;t.player.inv=100;advance(.02);t.player.soul=0;t.shots.push({k:'flame',flame:true,x:t.player.x+13+50,y:t.player.y+20,vx:-200,vy:0,life:2,d:10});
+  t.loadStage(FINAL);t.player.x=t.L.trigger-100;t.player.y=428;t.player.face=1;t.player.inv=100;advance(.02);t.player.soul=0;t.shots.push({k:'flame',flame:true,x:t.player.x+13+50,y:t.player.y+20,vx:-200,vy:0,life:2,d:10});
   t.action('attack');advance(.12);assert.equal(t.shots.length,0);assert.equal(t.player.soul,1);
 });
 test('an iron gate drops behind you when a boss fight starts and lifts once the boss falls',()=>{
@@ -456,9 +456,9 @@ test('heavy swing damage is rounded consistently and tassel boosts it by forty p
 test('inventory and shop display ghost counts rather than internal life units',()=>{
   t.player.hp=20;t.action('bag');assert(nodes.panel.innerHTML.includes('>1 / 5</b>'));press('Escape');t.loadStage(firstRest());t.player.hp=40;t.player.x=t.L.shop-13;t.action('interact');finishTalk();assert.equal(t.state,'shop');assert(nodes.panel.innerHTML.includes('>2 / 5</b>'));
 });
-test('completed tutorial leads to progressive skills',()=>{t.tutorialDone=true;
+test('first-map skills unlock after the basic actions',()=>{
   t.startJourney('lamp',0);assert.equal(t.talk.lines,t.TALK.prologue);finishTalk();advance(1);finishTalk();assert.equal(t.stage,0);assert(t.run.guided);assert.equal(t.run.awakened,0);
-  t.player.soul=3;t.useSkill(1);assert.equal(t.player.soul,3);t.player.x=660;advance(.05);assert.equal(t.run.awakened,1);
+  t.player.soul=3;t.useSkill(1);assert.equal(t.player.soul,3);t.player.x=660;advance(.05);assert.equal(t.run.awakened,0);t.player.x=1460;advance(.05);assert.equal(t.run.awakened,1);
   t.loadStage(stageOf('sewers'));advance(.05);assert.equal(t.run.awakened,2);
   t.loadStage(stageOf('ramparts'));advance(.05);assert.equal(t.run.awakened,3);
 });
@@ -487,7 +487,11 @@ test('the bell apprentice hits slow and heavy; the archer shoots arrows that als
   t.action('attack');advance(.1);assert.equal(500-e.hp,36);t.player.soul=1;advance(.5);press('Digit1');release('Digit1');assert.equal(t.player.soul,0);assert.equal(t.thrown.filter(o=>o.k==='pwave').length,2,'a quake runs both ways');
   t.reset(false,'bow');assert.equal(t.player.max,80);const a=t.enemies[0];a.cd=99;a.hp=a.max=500;t.player.inv=100;t.player.x=a.x-200;t.player.face=1;t.player.soul=0;
   t.action('attack');advance(.12);assert(t.thrown.some(o=>o.k==='arrow'),'an arrow flies');advance(.5);assert(a.hp<500,'and lands');assert.equal(t.player.soul,1,'arrows charge soul too');
-  advance(.4);press('Digit1');release('Digit1');assert.equal(t.thrown.filter(o=>o.k==='arrow').length,5,'a fan of five');t.reset(false,'lamp');
+  advance(.4);press('Digit1');release('Digit1');assert.equal(t.thrown.filter(o=>o.k==='arrow').length,5,'a fan of five');
+  t.reset(false,'bow');press('KeyJ');advance(.14);assert(t.player.charge>0);release('KeyJ');advance(.02);
+  assert(t.thrown.some(o=>o.k==='arrow'&&!o.heavy),'release early for a light arrow');
+  advance(.2);press('KeyJ');advance(.47);
+  assert(t.thrown.some(o=>o.k==='arrow'&&o.heavy),'a full draw fires a piercing arrow while held');release('KeyJ');t.reset(false,'lamp');
 });
 test('keys can be rebound in the settings and work at once',()=>{
   t.rebinding={a:'attack',i:0};t.finishRebind('KeyX');assert.equal(t.BIND.attack[0],'KeyX');assert(JSON.parse(storage['ember:settings']).keys.attack.includes('KeyX'),'saved');
@@ -514,13 +518,13 @@ test('lifts carry you, crumbling bridges drop away and grow back, vents lift you
 });
 test('five main routes keep their signature obstacles and an accessible exit',()=>{
   const kinds={prison:['tspike','pendulum'],sewers:['spout','vent'],ramparts:['wind','ballista'],ossuary:['jet'],tower:['piston','pendulum','vent']};
-  for(const th of Object.keys(kinds)){const s=t.STAGES[stageOf(th)];assert(s.exit>=5900&&s.exit<=6600,th+' main route');assert(s.ens.every(e=>e[0]<s.exit),th+' encounter before exit');const have=new Set(s.traps.map(q=>q.k));kinds[th].forEach(k=>assert(have.has(k),th+' has '+k));}
+  for(const th of Object.keys(kinds)){const s=t.STAGES[stageOf(th)];assert(s.exit>=3200&&s.exit<=4100,th+' main route');assert(s.ens.every(e=>e[0]<s.exit),th+' encounter before exit');const have=new Set(s.traps.map(q=>q.k));kinds[th].forEach(k=>assert(have.has(k),th+' has '+k));}
   assert(t.STAGES[stageOf('prison')].movers.length&&t.STAGES[stageOf('ramparts')].crumbles.length&&t.STAGES[stageOf('ossuary')].dark,'lifts, crumbling bridges and darkness');
   const foes=new Set();t.STAGES.forEach(s=>s.ens.forEach(e=>foes.add(e[2])));['flyer','shield','caster','bomber'].forEach(k=>assert(foes.has(k),k+' appears'));
   ['lock','brood','standard','warden'].forEach(k=>assert(t.SONGS[k]&&t.SONGS[k+'2']&&t.SONGS[k].bpm<t.SONGS[k+'2'].bpm,k+' has a faster second phase theme'));
 });
 test('a new cycle makes enemies tougher and can start with an unlocked character',()=>{
-  t.clears=2;t.tutorialDone=true;t.startJourney('bow',2);finishTalk();advance(1);assert.equal(t.player.char,'bow');assert.equal(t.cycle,2);assert(!t.L.tutorial);finishTalk();assert.equal(t.enemies[0].max,Math.round(72*(1+.35*2)));assert(t.enemies.some(q=>q.elite),'some jailers are elites now');
+  t.clears=2;t.startJourney('bow',2);finishTalk();advance(1);assert.equal(t.player.char,'bow');assert.equal(t.cycle,2);assert(!t.L.tutorial);finishTalk();assert.equal(t.enemies[0].max,Math.round(72*(1+.35*2)));assert(t.enemies.some(q=>q.elite),'some jailers are elites now');
   t.cycle=0;t.clears=0;t.reset(false,'lamp');
 });
 test('the journey is saved at every door and can be continued from the title screen',()=>{
@@ -532,10 +536,16 @@ test('dialogue types with pauses at punctuation, and auto mode turns the pages i
   for(let i=0;i<2000&&t.talk.shown<=comma;i++)t.step(1/120);const at=t.talk.shown;assert.equal(at,comma+1);t.step(.05);assert.equal(t.talk.shown,at,'it pauses after a comma');
   press('KeyE');assert.equal(t.talk.shown,line.length,'a press shows the whole line');
   t.settings.autoTalk=true;const i0=t.talk.i;advance(5);assert(!t.talk||t.talk.i>i0,'auto mode turns the page');t.settings.autoTalk=false;finishTalk();
-});test('chapter one challenge does not force the first-run tutorial',()=>{t.tutorialDone=false;t.startChapter(1);assert.equal(JSON.parse(storage['ember:save']).stage,0);assert.equal(t.stage,0);assert(!t.L.tutorial);assert.equal(t.state,'talk');finishTalk();assert.equal(t.state,'play');t.tutorialDone=true;});
-test('portrait touch screen blocks combat and rotation resumes the same run',()=>{const x=t.player.x;t.settings.touch='show';sandbox.innerWidth=375;sandbox.innerHeight=812;listeners.resize();assert.equal(nodes['rotate-screen'].hidden,false);press('KeyD');advance(.5);t.action('attack');assert.equal(t.player.x,x);assert.equal(t.player.attack,0);release('KeyD');sandbox.innerWidth=812;sandbox.innerHeight=375;listeners.resize();assert.equal(nodes['rotate-screen'].hidden,true);press('KeyD');advance(.2);release('KeyD');assert(t.player.x>x);t.settings.touch='auto';sandbox.innerWidth=1100;sandbox.innerHeight=620;listeners.resize();});
-test('first journey keeps the chosen bearer, stays on cycle one, and enters the furnace before level one',()=>{t.clears=0;t.tutorialDone=false;t.startJourney('bow',2);assert.equal(t.player.char,'bow');assert.equal(t.cycle,0);assert.equal(t.talk.lines,t.TALK.prologue);finishTalk();advance(1);assert(t.L.tutorial);t.finishTutorial();advance(1);assert.equal(t.stage,0);assert(t.run.guided);finishTalk();assert.equal(t.state,'play');});
-test('later journeys retain prologue and skip the completed tutorial',()=>{t.tutorialDone=true;t.startJourney('lamp',0);assert.equal(t.talk.lines,t.TALK.prologue);finishTalk();advance(1);assert.equal(t.stage,0);assert(!t.L.tutorial);assert.equal(t.state,'talk');finishTalk();assert.equal(t.state,'play');});
+});test('chapter one challenge does not force the first-run tutorial',()=>{t.startChapter(1);assert.equal(JSON.parse(storage['ember:save']).stage,0);assert.equal(t.stage,0);assert(!t.L.tutorial);assert.equal(t.state,'talk');finishTalk();assert.equal(t.state,'play');});
+test('portrait starts playing immediately and rotation preserves the run',()=>{
+  const x=t.player.x;t.settings.touch='show';sandbox.innerWidth=375;sandbox.innerHeight=812;listeners.resize();
+  press('KeyD');advance(.5);release('KeyD');t.action('attack');assert(t.player.attack>0);assert(t.player.x>x);
+  const portraitX=t.player.x;sandbox.innerWidth=812;sandbox.innerHeight=375;listeners.resize();assert.equal(t.player.x,portraitX);
+  press('KeyD');advance(.2);release('KeyD');assert(t.player.x>portraitX);
+  t.settings.touch='auto';sandbox.innerWidth=1100;sandbox.innerHeight=620;listeners.resize();
+});
+test('the prologue leads straight into a playable prison with the chosen bearer',()=>{delete storage['ember:tutorial'];t.clears=0;t.startJourney('bow',2);assert.equal(t.player.char,'bow');assert.equal(t.cycle,0);assert.equal(t.talk.lines,t.TALK.prologue);finishTalk();advance(1);assert.equal(t.stage,0);assert(t.run.guided);assert.equal(t.state,'play');assert(!t.L.tutorial);const x=t.player.x;press('KeyD');advance(.25);release('KeyD');assert(t.player.x>x);});
+test('existing players keep their prologue and go straight to play too',()=>{storage['ember:tutorial']='1';t.startJourney('lamp',0);assert.equal(t.talk.lines,t.TALK.prologue);finishTalk();advance(1);assert.equal(t.stage,0);assert(!t.L.tutorial);assert.equal(t.state,'play');});
 test('the map opens with M, fills in as you explore, and the cartographer sells the whole floor',()=>{
   advance(.1);assert(t.run.seen&&t.run.seen.s0,'exploration is recorded');const seen0=t.run.seen.s0.reduce((a,b)=>a+b,0);t.player.inv=100;
   t.player.x=1500;t.player.y=428;advance(.8);assert(t.run.seen.s0.reduce((a,b)=>a+b,0)>seen0,'walking reveals more');
@@ -608,9 +618,23 @@ test('the prison starts on an open path and the first guard waits for a hit',()=
   assert(first.waitingForHit);assert.equal(first.wind,0);assert.equal(t.player.hp,t.player.max);
   t.player.face=1;t.action('attack');advance(.13);assert(!first.waitingForHit);
 });
+test('prison coaching gives one contextual prompt and survives a first-floor restart',()=>{
+  delete storage['ember:road-lessons'];
+  t.startJourney('bow',0);finishTalk();advance(1);
+  assert(nodes.notice.textContent.includes('东门'));
+  t.player.x=260;advance(.05);
+  assert(nodes.notice.textContent.includes('跳上矮台'));assert.equal(t.run.lessonMask,2);
+  t.player.x=500;advance(.05);
+  assert(nodes.notice.textContent.includes('蓄满自动射，松手可提前出箭'));assert.equal(t.run.lessonMask,6);
+  t.reset(false);assert(t.run.guided);assert.equal(t.run.lessonMask,6);
+  t.player.x=1140;advance(.05);
+  assert(nodes.notice.textContent.includes('翻滚'));assert.equal(t.run.lessonMask,14);
+});
 test('fresh journeys have safe training spikes and a gradual first patrol',()=>{
   const practice=t.traps.find(q=>q.teach);
   t.player.x=practice.x;t.player.hp=20;advance(2);assert.equal(t.player.hp,20);
+  assert.equal(t.enemies[0].max,28,'the sparring guard falls to two light knife hits');
+  assert.equal(t.enemies.find(e=>e.origin===1280).max,54,'the second ground guard ramps up');
   assert.equal(t.enemies[0].trainingPace,1.9);
   assert.equal(t.enemies.find(e=>e.origin>=1000&&e.origin<1800).trainingPace,1.4);
   assert.equal(t.enemies.find(e=>e.origin>=1800).trainingPace,1);
@@ -632,12 +656,7 @@ test('free selection can enter every map with a new profile and keeps the journe
   t.showWinPanel();assert.equal(t.clears,beforeClears);
   t.showMenu();t.continueRun();assert.equal(t.stage,0);
 });
-test('first walk introduces three actions without mandatory hazards; full practice stays available',()=>{
-  t.startTutorial(false);
-  assert(t.L.brief && t.L.exit<t.TUTORIAL.exit);
-  assert.equal(t.traps.length+t.L.spikes.length+t.L.gaps.length,0);
-  assert(t.enemies.length===1 && t.enemies[0].type==='dummy');
-  assert.deepEqual(Array.from(t.L.signs,s=>s.keys[0]),['right','jump','attack','right']);
+test('optional full practice is available from the title screen and protects the active journey',()=>{
   t.loadStage(stageOf('sewers'));const journey=storage['ember:save'];
   t.startTutorial(true);assert.equal(t.L,t.TUTORIAL);
   assert(t.traps.length>0 && t.L.signs.length>4);

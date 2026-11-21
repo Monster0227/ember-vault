@@ -113,8 +113,8 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function keyName(c){if(!c)return '—';if(/^Key/.test(c))return c.slice(3);if(/^Digit/.test(c))return c.slice(5);if(/^Numpad\d/.test(c))return '小键盘'+c.slice(6);return {Space:'空格',ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',ShiftLeft:'Shift',ShiftRight:'右 Shift',ControlLeft:'Ctrl',ControlRight:'右 Ctrl',AltLeft:'Alt',AltRight:'右 Alt',Enter:'回车',Tab:'Tab',Backspace:'退格',Comma:',',Period:'.',Slash:'/',Semicolon:';',Quote:"'",BracketLeft:'[',BracketRight:']',Minus:'-',Equal:'=',Backquote:'`',Backslash:'\\'}[c]||c;}
   const K=a=>keyName((BIND[a]||[])[0]);   // 提示文字里显示玩家现在用的按键
   // 角色和周目：通关一次解锁钟锤学徒，通关两次解锁拾灯弓手；周目越高敌人越硬
-  let clears=0,cycle=0,credits=null,cine=null,flashT=0,menuFrom='',tutorialDone=false,tutorialMenu=false,lamps=[],signAt=-1;
-  try{clears=Number(localStorage.getItem('ember:clears'))||0;tutorialDone=localStorage.getItem('ember:tutorial')==='1';}catch(e){}
+  let clears=0,cycle=0,credits=null,cine=null,flashT=0,menuFrom='',lamps=[],signAt=-1;
+  try{clears=Number(localStorage.getItem('ember:clears'))||0;}catch(e){}
   const UPS=[{id:'blade',name:'磨砺刀锋',info:'攻击伤害 +12'},{id:'heart',name:'重铸心火',info:'生命上限 +1 个小幽灵，并回满'},{id:'flask',name:'温热药瓶',info:'获得 2 次治疗'},{id:'swift',name:'迅捷剑术',info:'挥刀间隔缩短，最多 3 级'},{id:'reach',name:'延展刀锋',info:'挥刀范围扩大，最多 3 级'},{id:'dash',name:'影步',info:'翻滚冷却缩短，最多 3 级'},{id:'vigor',name:'余火疗愈',info:'每级多恢复 1 个小幽灵，最多 3 级'},{id:'spring',name:'轻盈跃动',info:'跳跃更高，最多 3 级'},{id:'flame',name:'魂火共鸣',info:'魂火弹伤害提升，并可穿透更多敌人，最多 3 级'}];
   // 道具：消耗品按 U 使用选中的那种（Q 切换）；护符拿到就一直生效；珍藏是剧情遗物，记在图鉴的传说里。每样东西都有一张手绘图（ART），界面和场景里都画图，不写字
   const ITEMS={
@@ -223,52 +223,71 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       props:['torch','banner','gear','gear','door','crack'],floorProps:['stone','stone','bone','pot','skull'],fore:['chain','chain'],lantern:true,bell:true,
       guard:{tabard:'#7b4a2f',tabardDark:'#4f2c1d'},archer:{cloak:'#4b3a2c',cloakDark:'#33271d',hood:'#5b4634'}}};
   // 关卡数据：平台 [x, y, 宽]，敌人 [x, 脚下高度, 类型, 选项]，宝箱 [x, y]，尖刺 [x, 根数]，毒水 [x, 宽]，断崖 [起, 止]
-  const REST={theme:'rest',n:'歇脚',name:'篝火驿站',en:'Campfire Waystation',w:1500,seed:777,rest:true,hpK:1,dmgK:1,exit:1330,fire:520,shop:860,plats:[],ens:[],chests:[],spikes:[],acid:[],gaps:[]};
-  const STAGES=[
-    {theme:'prison',n:'第一层',name:'沉钟监牢',en:'Bellward Prison',w:3900,seed:20261101,hpK:1,dmgK:1,exit:3720,npc:60,lore:{x:3530,id:'carving'},
-      plats:[[440,370,230],[800,295,205],[1180,355,270],[1650,370,180],[1900,280,260],[2490,350,230],[2900,280,240],[3290,365,220]],
-      ens:[[590,480,'guard',{sparring:true}],[900,295,'archer'],[1280,480,'guard'],[1740,370,'guard'],[2020,280,'archer'],[2240,480,'lurker'],[2650,350,'archer'],[3000,480,'spear'],[3390,365,'guard']],
-      chests:[[600,370],[2050,280],[3000,280]],spikes:[[1500,5],[2800,4]],acid:[],gaps:[[1050,1120],[2350,2430]]},
-    REST,
-    {theme:'sewers',n:'第二层',name:'腐水下水道',en:'Rotwater Sewers',w:4300,seed:4242,hpK:1.35,dmgK:1.15,exit:4120,lore:{x:2100,id:'shade'},intro:'污水漫过旧路 · 小心守卫突进和地上的毒水',
-      plats:[[380,360,200],[700,290,180],[1000,360,220],[1440,300,220],[1820,365,200],[2160,285,220],[2520,355,260],[2960,300,200],[3320,360,240],[3680,290,200]],
-      ens:[[520,480,'guard'],[840,290,'archer'],[1100,360,'guard'],[1560,300,'archer'],[1700,480,'guard'],[1960,365,'guard'],[2640,355,'guard'],[2860,480,'lurker'],[3120,300,'archer'],[3420,360,'guard'],[3700,480,'spear']],
-      chests:[[470,360],[2270,285]],spikes:[],acid:[[1260,120],[2420,110],[3200,130]],gaps:[]},
-    REST,
-    {theme:'ramparts',n:'第三层',name:'落日城墙',en:'Sunset Ramparts',w:4500,seed:9090,hpK:1.7,dmgK:1.3,exit:4320,lore:{x:3150,id:'flag'},intro:'风从城垛间灌进来 · 小心断崖与散射箭',
-      plats:[[420,360,200],[760,290,200],[1150,355,220],[1500,285,200],[1760,350,170],[2150,300,240],[2550,360,200],[2900,280,220],[3250,350,220],[3600,290,200]],
-      ens:[[600,480,'guard'],[850,290,'archer'],[1250,355,'guard'],[1720,480,'spear'],[1600,285,'archer'],[2250,300,'archer'],[2320,480,'lurker'],[2700,360,'guard'],[3050,280,'archer'],[3350,350,'guard'],[3950,480,'guard',{elite:true}]],
-      chests:[[500,360],[3680,290]],spikes:[],acid:[],gaps:[[900,1030],[1900,2040],[2840,2970],[3500,3630]]},
-    REST,
-    {theme:'ossuary',n:'第四层',name:'骸骨墓窟',en:'Bone Crypt',w:4500,seed:6161,hpK:2.05,dmgK:1.45,exit:4320,lore:{x:1300,id:'beads'},intro:'骨龛里的蜡烛仍在燃烧 · 跳过守卫的地面冲击',
-      plats:[[400,355,220],[780,280,200],[1080,360,160],[1400,300,220],[1800,365,200],[2100,285,200],[2450,350,240],[2850,290,220],[3250,360,200],[3600,285,220],[3950,350,200]],
-      ens:[[560,480,'guard'],[860,280,'archer'],[1500,300,'guard'],[1880,480,'lurker'],[2180,285,'archer'],[2320,480,'spear'],[2660,350,'guard'],[2950,290,'archer'],[3330,360,'guard'],[3700,285,'archer'],[3920,480,'guard',{elite:true}]],
-      chests:[[470,355],[4030,350]],spikes:[[1100,5],[2000,4],[2900,6],[3450,4]],acid:[],gaps:[]},
-    REST,
-    {theme:'tower',n:'第五层',name:'沉钟之巅',en:'Bell Spire',w:4400,seed:3131,hpK:2.4,dmgK:1.6,seal:4240,checkpoint:CHECKPOINT,bell:3990,lore:{x:3450,id:'journal'},intro:'齿轮在头顶转动 · 小心钟楼弓手的双箭',
-      plats:[[380,350,200],[700,280,180],[980,350,200],[1300,290,220],[1650,360,200],[1980,285,240],[2350,355,220],[2700,290,200],[3050,360,220]],
-      ens:[[560,480,'guard'],[760,280,'archer'],[1060,350,'guard'],[1680,480,'lurker'],[1380,290,'archer'],[1920,480,'spear'],[2120,285,'archer'],[2450,355,'guard'],[3040,480,'guard'],[2780,290,'archer'],[3180,360,'guard'],[3820,480,'boss']],
-      chests:[[470,350],[1750,360]],spikes:[[1150,4],[2150,5]],acid:[],gaps:[]}];
-  // 实心高台改变地面轮廓；悬空跳台与断口提供可下穿的上下路线。
-  STAGES[0].terrain=[[690,80,424],[1340,100,432],[3160,120,418]];
-  STAGES[2].terrain=[[710,90,426],[1960,120,420],[3840,100,430]];
-  STAGES[4].terrain=[[700,90,426],[1440,95,430],[4020,120,414]];
-  STAGES[6].terrain=[[650,95,426],[1750,100,430],[4050,120,414]];
-  STAGES[8].terrain=[[650,100,428],[1520,100,424],[3200,120,414]];
-  // 各生态区增加不同高度和宽度的分支落脚点。
-  STAGES[2].gaps.push([2260,2340]);STAGES[6].gaps.push([2640,2720]);STAGES[8].gaps.push([2530,2610]);
-  STAGES[0].plats.push([320,450,85],[415,420,85],[850,446,94],[930,412,120],[1050,494,70],[1010,405,150],[2315,405,160],[1480,260,115],[2750,205,110],[3400,270,110]);
-  STAGES[2].plats.push([2225,405,150]);STAGES[6].plats.push([2605,405,150]);STAGES[8].plats.push([2495,405,150]);
-  STAGES[2].plats.push([1260,225,120],[2380,210,125],[3440,245,110]);
-  STAGES[4].plats.push([920,220,120],[1900,215,140],[3490,205,135]);
-  STAGES[6].plats.push([1210,225,110],[1910,230,110],[3450,205,115]);
-  STAGES[8].plats.push([1130,205,115],[2200,215,115],[2900,190,115]);
-  // 每关前半段再加一层高台，进门不久就能看见高度差，不必走到地图尽头。
-  STAGES[0].plats.push([2060,210,130],[2240,300,130],[2860,200,110]);STAGES[0].ens.push([3480,480,'crawler']);
-  STAGES[2].plats.push([860,164,110],[1680,148,100]);STAGES[2].ens.push([2140,480,'crawler']);
-  STAGES[4].plats.push([980,156,120],[1680,142,100]);STAGES[4].ens.push([2050,480,'hanger']);
-  STAGES[6].plats.push([900,152,110],[2100,146,110]);STAGES[6].ens.push([1880,480,'crawler']);
-  STAGES[8].plats.push([860,148,110],[1880,138,110]);STAGES[8].ens.push([1760,480,'hanger']);
+  const REST={theme:'rest',n:'歇脚',name:'篝火驿站',en:'Campfire Waystation',w:1020,seed:777,rest:true,hpK:1,dmgK:1,exit:720,fire:250,shop:470,plats:[],ens:[],chests:[],spikes:[],acid:[],gaps:[]};
+  // Each route has three landmarks. Keep the entrance, one signature obstacle and a short exit approach.
+  const mainLevels=[
+    {theme:'prison',chapter:1,chapterStart:true,name:'沉钟监牢',en:'Bellward Prison',w:3560,exit:3380,seed:20261101,hpK:1,dmgK:1,
+      npc:60,ink:1580,lore:{x:3210,id:'carving'},bands:[[0,'监房','cells'],[1250,'钟井','well'],[2480,'祷堂','chapel']],
+      plats:[[320,450,85],[415,420,85],[440,370,230],[800,295,205],[850,446,94],[930,412,120],[1010,405,150],[1050,494,70],
+        [1180,355,270],[1480,260,115],[1650,370,180],[1900,280,260],[2030,195,105],[2250,300,130],
+        [2500,420,100],[2595,405,145],[2720,380,115],[2900,280,240],[3070,197,95]],
+      terrain:[[690,80,424],[1340,100,432]],steps:[[1900,466,44],[1948,452,44],[1996,438,48],[2048,424,56]],
+      trenches:[[2140,90,26]],slopes:[[1900,210,480,424]],broken:[[2124,70]],gaps:[[1050,1120],[2530,2760]],
+      movers:[[2510,375,90,155,0,4.2,0]],climbs:[[3000,195,465]],springs:[[2950,280,42]],
+      ens:[[590,480,'guard',{sparring:true}],[900,295,'archer'],[1280,480,'guard'],[1740,370,'guard'],[2310,480,'shield'],
+        [2550,405,'flyer'],[2840,480,'crawler'],[3160,480,'flyer']],
+      traps:[{k:'tspike',x:1810,n:3,per:3,ph:.3},{k:'pendulum',x:2720,top:40,len:360,amp:.42,per:3.3,ph:0}],
+      chests:[[600,370],[2050,280],[3000,280]],caches:[360,1460,2470],secrets:[[1630,FLOOR,'shard'],[3115,197,'embers']],
+      spikes:[[2400,3]],acid:[],checks:[900,1550,2280,2910]},
+    {theme:'sewers',chapter:2,chapterStart:true,name:'腐水下水道',en:'Rotwater Sewers',w:3730,exit:3550,seed:4242,hpK:1.35,dmgK:1.15,
+      intro:'污水漫过旧路 · 看准喷口间歇，借浮台过水',ink:980,lore:{x:2100,id:'shade'},bands:[[0,'暗渠','drain'],[1240,'蓄水池','cistern'],[2490,'灯坟','nest']],
+      plats:[[380,360,200],[700,290,180],[860,173,100],[1000,360,220],[1250,385,150],[1450,305,185],[1720,395,135],
+        [1950,310,210],[2220,370,160],[2510,438,105],[2690,426,110],[2840,448,120],[3060,355,195],[3170,245,135]],
+      terrain:[[710,90,426],[1820,95,430]],steps:[[2240,465,52],[2292,449,54],[2346,436,66]],slopes:[[2240,172,480,436]],
+      trenches:[[2110,88,22]],broken:[[2100,108]],gaps:[[2460,2950,'acid']],spikes:[],acid:[[1280,90],[1980,90]],
+      movers:[[2465,414,105,145,0,4.2,0],[2685,397,110,145,0,4.2,.5]],climbs:[[3210,244,454]],springs:[[3100,355,42]],
+      ens:[[520,480,'guard'],[820,290,'archer'],[1130,360,'guard'],[1510,305,'archer'],[1690,480,'lurker'],[2030,310,'bomber'],
+        [2430,480,'flyer'],[3040,480,'spear'],[3130,355,'guard']],
+      traps:[{k:'spout',x:1415,per:3.4,ph:.2,h:170},{k:'vent',x:2990,w:65,per:3,ph:0,h:210},{k:'spout',x:3290,per:3.2,ph:.5,h:180}],
+      chests:[[470,360],[2010,310],[3240,245]],caches:[585,1425,1640,3090],secrets:[[1560,FLOOR,'blue'],[3280,245,'shard']],checks:[1060,1930,3030]},
+    {theme:'ramparts',chapter:3,chapterStart:true,name:'落日城墙',en:'Sunset Ramparts',w:3930,exit:3750,seed:9090,hpK:1.7,dmgK:1.3,
+      intro:'风从城垛间灌进来 · 小心断崖与弩箭',ink:1370,lore:{x:3060,id:'flag'},bands:[[0,'城门','gate'],[1390,'城垛','wall'],[2700,'残塔','tower']],
+      plats:[[420,360,200],[760,290,200],[920,212,105],[1150,355,215],[1490,285,170],[1760,360,165],[1920,285,115],
+        [2240,335,120],[2680,355,160],[2780,239,105],[3090,330,190],[3310,265,165]],
+      terrain:[[700,90,426],[1510,95,432]],steps:[[1940,465,52],[1992,448,56],[2048,432,68]],slopes:[[1940,176,480,432]],
+      trenches:[[2140,72,24]],broken:[[2128,94]],gaps:[[940,1040],[2260,2630]],spikes:[],acid:[],
+      crumbles:[[2275,424,95],[2390,405,100],[2515,418,98]],climbs:[[2805,238,448]],springs:[[2710,355,42]],
+      ens:[[600,480,'guard'],[850,290,'archer'],[1200,355,'guard'],[1640,480,'spear'],[1800,360,'archer'],[2310,480,'flyer'],
+        [2740,355,'shield'],[2980,480,'guard',{elite:true}],[3360,265,'archer'],[3480,480,'hanger']],
+      traps:[{k:'wind',x0:2200,x1:2615,dir:-1,per:5.5,ph:0},{k:'ballista',x:3150,y:330,dir:-1,per:3.6,ph:.5}],
+      chests:[[500,360],[3420,265]],caches:[675,1410,2880,3440],secrets:[[1620,FLOOR,'relic'],[3550,FLOOR,'shard']],
+      shortcut:{open:2850,door:520,dest:2660},checks:[1130,1740,2670,3260]},
+    {theme:'ossuary',chapter:3,name:'骸骨墓窟',en:'Bone Crypt',w:4000,exit:3820,seed:6161,hpK:2.05,dmgK:1.45,
+      intro:'骨龛里的蜡烛仍在燃烧 · 沿灯穿过暗室',ink:1620,lore:{x:1310,id:'beads'},bands:[[0,'骨廊','oss'],[1440,'龛室','niche'],[2600,'夜殿','nave']],
+      plats:[[400,355,220],[780,280,200],[900,155,108],[1080,360,160],[1400,300,220],[1780,360,200],[1970,255,110],
+        [2320,335,170],[2680,350,170],[2910,275,140],[3280,332,175],[3380,217,118]],
+      terrain:[[650,95,426],[1740,85,434]],steps:[[2110,466,44],[2154,450,53],[2207,436,65]],slopes:[[2110,162,480,436]],
+      trenches:[[2300,85,22]],broken:[[2288,106]],gaps:[[2500,2560]],spikes:[[1110,4],[2770,6]],acid:[],dark:[2150,4000],lamps:[2220,2620,3090,3580],
+      crumbles:[[2480,418,110],[2765,411,92],[2870,399,80]],climbs:[[3408,216,450]],springs:[[3310,332,42]],
+      ens:[[560,480,'guard'],[860,280,'archer'],[1440,300,'guard'],[1870,480,'lurker'],[2050,480,'spear'],
+        [2350,335,'archer'],[2680,480,'caster'],[3000,480,'crawler'],[3330,332,'caster'],[3520,480,'guard',{elite:true}]],
+      traps:[{k:'jet',x:1510,y:FLOOR-24,dir:1,len:105,per:3,ph:0},{k:'jet',x:2700,y:FLOOR-24,dir:1,len:150,per:3,ph:.5},
+        {k:'jet',x:3430,y:FLOOR-24,dir:-1,len:150,per:3,ph:0}],
+      chests:[[470,355],[3430,217]],caches:[600,1380,2420,3230],secrets:[[1430,FLOOR,'shard'],[3170,FLOOR,'blue']],checks:[990,1840,2600,3560]},
+    {theme:'tower',chapter:4,chapterStart:true,name:'沉钟之巅',en:'Bell Spire',w:4100,exit:3920,seed:3131,hpK:2.4,dmgK:1.6,
+      intro:'齿轮在头顶转动 · 找准落锤的节拍',ink:1630,lore:{x:3420,id:'journal'},bands:[[0,'齿轮廊','gears'],[1460,'钟腹','belly'],[2800,'钟舌','tongue']],
+      plats:[[380,350,200],[700,280,180],[860,162,102],[980,350,200],[1300,290,220],[1650,360,200],[1880,232,110],
+        [2010,305,190],[2270,370,152],[2530,444,100],[2700,453,105],[2825,424,102],[3100,350,175],[3260,235,130]],
+      terrain:[[650,100,428],[1510,95,430]],steps:[[2060,464,50],[2110,448,56],[2166,435,62]],slopes:[[2060,168,480,435]],
+      trenches:[[2280,86,24]],broken:[[2270,110]],gaps:[[2470,2920]],spikes:[[1130,4],[1940,4]],acid:[],
+      movers:[[2465,418,100,0,-100,3.6,0],[2600,357,98,145,0,4.2,0],[2825,362,95,0,-76,3.6,.5]],
+      climbs:[[3290,234,455]],springs:[[3130,350,42]],
+      ens:[[555,480,'guard'],[765,280,'archer'],[1040,350,'guard'],[1340,290,'archer'],[1760,480,'lurker'],[1910,480,'spear'],
+        [2070,305,'archer'],[2330,370,'guard'],[3030,480,'hanger'],[3300,235,'archer'],[3470,480,'shield']],
+      traps:[{k:'piston',x:1420,w:72,per:3.4,ph:0},{k:'piston',x:3020,w:75,per:3.2,ph:.25},
+        {k:'vent',x:3220,w:64,per:3,ph:0,h:200},{k:'pendulum',x:3610,top:40,len:360,amp:.42,per:3,ph:0}],
+      chests:[[470,350],[2150,305],[3350,235]],caches:[605,1370,2400,3500],secrets:[[1680,FLOOR,'shard'],[3360,FLOOR,'relic']],checks:[980,1660,2400,3420]}
+  ];
   const CHAPTERS=[
     {name:'第一章 · 灰烬囚牢',story:[['守钟人','牢门后面是守锁兽，它守着离开牢狱的路。','cells'],['守钟人','它曾替我看门。别恨它，它早就忘了自己在守什么。']]},
     {name:'第二章 · 沉入腐水',story:[['','旧钥匙系在了围巾上。牢门外，污水漫过旧路，水面漂着一盏盏空灯。','cistern'],['小幽灵','（每一盏空灯，原本都有一团火。有人把它们倒进了水里。）'],['','水声深处，有什么东西在吞灯。']]},
@@ -291,69 +310,30 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       down:[['无名旗手','我想起来了……我守的，是{g:他们回家的路}。'],['无名旗手','钟楼……还在等。替我……把旗带过去。'],['','旗手松开旗杆。你撕下一条布系在围巾上，它朝着钟楼的方向飘。']]},
     warden:{name:'沉钟典狱长',title:'沉钟典狱长',sub:'锁住钟声的人',color:'#ffb16f',tint:'96,48,14',drop:'chain',rage:'典狱长敲响了头顶的钟',intro:TALK.boss,again:TALK.boss2,down:TALK.bossDown}
   };
-  // 首领房：钟火在 245，走过 800 触发登场；开打后身后 gate 处落下铁闸、东侧 seal 封住，打倒首领才都打开
-  function bossRoom(kind,chapter,theme,hpK,dmgK,seed,name,en){return{theme:theme,n:'第'+['一','二','三','四'][chapter-1]+'章 · 首领',chapter:chapter,arena:true,bossKind:kind,name:name,en:en,w:1800,seed:seed,hpK:hpK,dmgK:dmgK,checkpoint:245,trigger:800,gate:600,seal:1650,bell:kind==='warden'?1180:null,plats:[[380,370,150],[730,362,130],[1300,362,140]],ens:[[1100,480,'boss']],chests:[],spikes:[],acid:[],gaps:[]};}
-  const oldStages=STAGES.slice();
-  oldStages[0].n='第一章';oldStages[0].chapter=1;oldStages[0].chapterStart=true;
-  oldStages[2].n='第二章';oldStages[2].chapter=2;oldStages[2].chapterStart=true;
-  oldStages[4].n='第三章';oldStages[4].chapter=3;oldStages[4].chapterStart=true;
-  oldStages[6].n='第三章';oldStages[6].chapter=3;
-  oldStages[8].n='第四章';oldStages[8].chapter=4;oldStages[8].chapterStart=true;oldStages[8].exit=4240;delete oldStages[8].seal;delete oldStages[8].checkpoint;delete oldStages[8].bell;oldStages[8].ens=oldStages[8].ens.filter(a=>a[2]!=='boss');
+  // 首领房：钟火在 245，走过 500 触发登场；开打后身后 gate 处落下铁闸、东侧 seal 封住，打倒首领才都打开
+  function bossRoom(kind,chapter,theme,hpK,dmgK,seed,name,en){return{theme:theme,n:'第'+['一','二','三','四'][chapter-1]+'章 · 首领',chapter:chapter,arena:true,bossKind:kind,name:name,en:en,w:1500,seed:seed,hpK:hpK,dmgK:dmgK,checkpoint:245,trigger:500,gate:300,seal:1350,bell:kind==='warden'?880:null,plats:[[360,362,130],[1000,362,140]],ens:[[800,480,'boss']],chests:[],spikes:[],acid:[],gaps:[]};}
   let visitedCrypt=false;try{visitedCrypt=localStorage.getItem('ember:visited-crypt')==='1';}catch(e){}
   const way=i=>Object.assign({},REST,{restNo:i,chapter:Math.min(4,i+1)});
-  STAGES.splice(0,STAGES.length,oldStages[0],bossRoom('lock',1,'prison',1,1,8101,'锁门兽庭','The Gatekeeper'),way(0),oldStages[2],bossRoom('brood',2,'sewers',1.35,1.15,8102,'溺灯蓄水池','The Drowned Nest'),way(1),oldStages[4],way(2),oldStages[6],bossRoom('standard',3,'ossuary',2.05,1.45,8103,'无名者祭场','The Last Standard'),way(3),oldStages[8],bossRoom('warden',4,'tower',2.4,1.6,8104,'沉钟之心','The Silent Bell'));
-  const mainLevels=STAGES.filter(room=>!room.arena&&!room.rest);
+  const [prison,sewers,ramparts,ossuary,tower]=mainLevels;
+  const STAGES=[
+    prison,bossRoom('lock',1,'prison',1,1,8101,'锁门兽庭','The Gatekeeper'),way(0),
+    sewers,bossRoom('brood',2,'sewers',1.35,1.15,8102,'溺灯蓄水池','The Drowned Nest'),way(1),
+    ramparts,way(2),ossuary,bossRoom('standard',3,'ossuary',2.05,1.45,8103,'无名者祭场','The Last Standard'),way(3),
+    tower,bossRoom('warden',4,'tower',2.4,1.6,8104,'沉钟之心','The Silent Bell')
+  ];
   let currentLevel=0;
   for(const room of STAGES){
     if(mainLevels.includes(room)){currentLevel++;room.n='第'+'一二三四五'[currentLevel-1]+'关';}
     room.levelNo=currentLevel;
   }
 
-  // ---- 每张地图往东延长约 3000，每个生态区有自己的机关（v4.0）----
-  // traps：tspike 定时地刺、pendulum 摆刃、spout 喷泉（腐水 / 炉火）、vent 蒸汽上升气流、wind 阵风、ballista 弩炮、jet 骷髅喷火、piston 落锤
-  // movers 会动的平台 [x, y, 宽, dx, dy, 周期, 相位]；crumbles 踩上去会塌的平台 [x, y, 宽]；gaps 的第三项 'acid' 是腐水深潭；dark 是没有光的区段，lamps 是沿路能点亮的灵灯
-  {const S=th=>STAGES.find(s=>s.theme===th&&!s.arena&&!s.rest),ext=(s,o)=>{['plats','ens','chests','spikes','acid','gaps','terrain','traps','movers','crumbles','moreCaches','lamps','climbs','springs'].forEach(k=>{if(o[k])s[k]=(s[k]||[]).concat(o[k]);});s.w=o.w;s.exit=o.exit;if(o.dark)s.dark=o.dark;};
-    ext(S('prison'),{w:6180,exit:6000,gaps:[[4760,5400]],terrain:[[5820,90,430]],
-      plats:[[4754,500,650],[5360,486,50],[4950,448,100],[5150,448,120],[5320,448,80],[3830,335,140],[4070,300,130],[4180,210,90],[4330,255,120],[4295,150,80],[5650,205,170],[5725,130,80],[5960,300,160],[5810,330,150]],
-      climbs:[[4216,148,430],[5740,128,468]],springs:[[4358,255,40],[5678,205,48]],
-      movers:[[4780,410,110,220,0,4.2,0],[5070,380,110,220,0,4.2,.5],[5480,440,100,0,-235,5,0]],
-      traps:[{k:'tspike',x:2130,n:4,per:2.6,ph:.3},{k:'tspike',x:3740,n:5,per:2.4,ph:0},{k:'tspike',x:3960,n:5,per:2.4,ph:.5},{k:'pendulum',x:4300,top:40,len:375,amp:.5,per:2.7,ph:0},{k:'pendulum',x:4540,top:40,len:375,amp:.5,per:2.7,ph:.5}],
-      ens:[[3880,335,'archer'],[4300,480,'guard'],[4650,480,'shield'],[4950,480,'flyer'],[5560,480,'lurker'],[5770,480,'flyer']],
-      chests:[[5730,205]],moreCaches:[5540,5930]});
-    ext(S('sewers'),{w:6560,exit:6380,gaps:[[4260,4980,'acid']],terrain:[[5300,120,290]],acid:[[6200,120]],
-      plats:[[4475,453,100],[4705,448,86],[4800,452,118],[5180,410,100],[5240,350,80],[5480,300,140],[5560,190,90],[5850,330,160],[6100,320,150],[6180,200,80]],
-      climbs:[[5588,188,455],[6204,198,450]],springs:[[5510,300,44],[6124,320,40]],
-      movers:[[4280,440,120,200,0,4.6,0],[4560,430,120,200,0,4.6,.5]],
-      traps:[{k:'spout',x:3560,per:3.4,ph:0,h:200},{k:'spout',x:5100,per:3.2,ph:0,h:210},{k:'vent',x:5230,w:64,per:3,ph:0,h:200},{k:'spout',x:5760,per:3.2,ph:.5,h:210}],
-      ens:[[4700,480,'flyer'],[5620,480,'lurker'],[5860,480,'spear'],[6000,330,'bomber'],[6240,480,'guard']],
-      chests:[[5540,300]],moreCaches:[5020,6020]});
-    ext(S('ramparts'),{w:6770,exit:6590,gaps:[[4450,5250]],
-      crumbles:[[4470,420,90],[4600,400,90],[4730,410,90],[4860,392,90],[4990,405,90],[5120,415,90]],
-      plats:[[5400,310,150],[5488,200,90],[5600,300,170],[5710,155,80],[5900,360,140]],
-      climbs:[[5510,152,445],[5736,150,430]],springs:[[5432,310,42]],
-      traps:[{k:'wind',x0:1850,x1:2100,dir:-1,per:5.5,ph:.5},{k:'wind',x0:4450,x1:5250,dir:-1,per:5.5,ph:0},{k:'ballista',x:5740,y:300,dir:-1,per:3.6,ph:.5},{k:'ballista',x:6120,y:FLOOR,dir:-1,per:3.2,ph:0},{k:'wind',x0:6300,x1:6500,dir:1,per:5,ph:.3}],
-      ens:[[5320,480,'flyer'],[5560,480,'shield'],[5800,480,'lurker'],[5980,360,'archer'],[6220,480,'hanger'],[6440,480,'spear']],
-      chests:[[5640,300]],moreCaches:[5300,6380]});
-    ext(S('ossuary'),{w:6470,exit:6290,dark:[4380,6470],lamps:[4460,5060,5700,6210],
-      terrain:[[2620,40,410],[4500,50,400],[4880,50,330],[6150,50,400]],spikes:[[5400,12]],
-      crumbles:[[5400,400,80],[5520,378,80],[5640,400,80]],plats:[[5850,300,150],[5920,175,85]],
-      climbs:[[5944,172,450]],springs:[[5880,300,42]],
-      traps:[{k:'jet',x:2660,y:FLOOR-24,dir:1,len:140,per:3,ph:0},{k:'jet',x:4550,y:FLOOR-24,dir:1,len:170,per:2.8,ph:0},{k:'jet',x:4880,y:FLOOR-70,dir:-1,len:170,per:2.8,ph:.5},{k:'jet',x:6150,y:FLOOR-24,dir:-1,len:160,per:3,ph:0},{k:'jet',x:6610,y:FLOOR-24,dir:1,len:150,per:3,ph:.5}],
-      ens:[[4700,480,'flyer'],[5040,480,'caster'],[5280,480,'spear'],[5520,480,'crawler'],[5760,480,'shield'],[6000,300,'caster']],
-      chests:[[5960,175]],moreCaches:[4420,6090]});
-    ext(S('tower'),{w:6540,exit:6360,gaps:[[4300,5000]],
-      movers:[[4320,420,100,0,-120,3.6,0],[4480,330,100,180,0,4,0],[4800,300,100,0,110,3.6,.5]],plats:[[5750,320,150],[5840,190,90]],
-      climbs:[[5868,186,450]],springs:[[5784,320,42]],
-      traps:[{k:'piston',x:1900,w:80,per:3.4,ph:0},{k:'piston',x:5200,w:80,per:3.2,ph:0},{k:'piston',x:5380,w:80,per:3.2,ph:.33},{k:'piston',x:5560,w:80,per:3.2,ph:.66},{k:'pendulum',x:6250,top:40,len:375,amp:.5,per:2.8,ph:0},{k:'vent',x:6040,w:64,per:3,ph:0,h:210}],
-      ens:[[5660,480,'lurker'],[5900,480,'spear'],[6140,480,'shield']],
-      chests:[[5870,190]],moreCaches:[5080,6060]});}
   // 第一关从安全步道出发；后续关卡在入口先展示这层的新机关。
   const routePace={
-    prison:{checkpoint:900,trapPeriod:1.25,brief:'入门 · 在矮台练跳跃，向守卫试第一击'},
-    sewers:{checkpoint:1050,trapPeriod:1.16,brief:'起步 · 看准喷口间歇，借浮台过水'},
-    ramparts:{checkpoint:1180,trapPeriod:1.08,brief:'进阶 · 顶风躲箭，越过会塌的城垛'},
-    ossuary:{checkpoint:1300,trapPeriod:1,brief:'深入 · 沿灯穿过暗室，留心骨巫的灵枪'},
-    tower:{checkpoint:1420,trapPeriod:.94,brief:'终关 · 找准落锤节拍，穿过摆刃'}
+    prison:{oldExit:6000,trapPeriod:1.25,brief:'入门 · 在矮台练跳跃，向守卫试第一击'},
+    sewers:{oldExit:6380,trapPeriod:1.16,brief:'起步 · 看准喷口间歇，借浮台过水'},
+    ramparts:{oldExit:6590,trapPeriod:1.08,brief:'进阶 · 顶风躲箭，越过会塌的城垛'},
+    ossuary:{oldExit:6290,trapPeriod:1,brief:'深入 · 沿灯穿过暗室，留心骨巫的灵枪'},
+    tower:{oldExit:6360,trapPeriod:.94,brief:'终关 · 找准落锤节拍，穿过摆刃'}
   };
   {const S=th=>STAGES.find(s=>s.theme===th&&!s.arena&&!s.rest);
     const room=(th,trap,hint)=>{const s=S(th);if(!s)return;s.traps=(s.traps||[]).filter(t=>!t.teach);s.traps.unshift(Object.assign({teach:1},trap));s.lesson={door:400,hint:hint};};
@@ -364,36 +344,14 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     room('ramparts',{k:'ballista',x:280,y:210,dir:1,per:2.8,ph:.15},'这间屋子只有弩炮。它朝东射。站在左边看它拉满、射出。石门随后打开。');
     room('ossuary',{k:'jet',x:250,y:FLOOR-24,dir:1,len:90,per:2.6,ph:0},'这间屋子只有喷火骷髅。眼里先聚紫火，再吐火舌。看完一轮，石门打开。');
     room('tower',{k:'piston',x:236,w:64,per:2.8,ph:0},'这间屋子只有落锤。它先在顶上发抖，再砸下来。看完一轮，石门打开。');
-    // 按火种的行进速度安排钟火，避开深坑、尖刺和墙体。
-    const pace=th=>{const s=S(th);if(!s)return;const span=s.exit||s.w,bad=x=>(s.gaps||[]).some(g=>x>g[0]-60&&x<g[1]+60)||(s.spikes||[]).some(sp=>x>sp[0]-30&&x<sp[0]+sp[1]*20+30)||(s.acid||[]).some(a=>x>a[0]-30&&x<a[0]+a[1]+30)||(s.terrain||[]).some(t=>x>t[0]-20&&x<t[0]+t[1]+20)||x<520;
-      const interval=routePace[th].checkpoint,checks=[];for(let x=interval;x<span-480;x+=interval){let spot=x;for(let i=0;i<24&&bad(spot);i++)spot+=60;if(!bad(spot)&&spot<span-240&&(!checks.length||spot-checks[checks.length-1]>interval*.58))checks.push(Math.round(spot));}if(checks.length)s.checks=checks;};
-    ['prison','sewers','ramparts','ossuary','tower'].forEach(pace);
-    const wall=S('ramparts');if(wall)wall.shortcut={open:5400,door:520,dest:5280};}
-  // 同一层地面上挨得太近的小怪拉开，避免挤成一团。平台上的和首领不动。
-  STAGES.forEach(s=>{if(s.arena||s.rest||!s.ens)return;const gaps=s.gaps||[],limit=(s.exit||s.w)-150;
-    const ground=s.ens.filter(e=>e[1]>=460&&e[2]!=='boss'&&e[2]!=='dummy').sort((a,b)=>a[0]-b[0]);
-    const pit=x=>gaps.some(g=>x>g[0]-36&&x<g[1]+36);
-    for(let i=1;i<ground.length;i++){if(ground[i][0]-ground[i-1][0]>=220)continue;let nx=ground[i-1][0]+220;const g=gaps.find(q=>nx>q[0]-36&&nx<q[1]+36);if(g)nx=g[1]+40;if(nx<=limit&&!pit(nx)&&nx>ground[i][0])ground[i][0]=nx;}});
-  // ---- v5.0：每张地图有一位制图人墨翁（卖这一层的地图）和两处暗格（假墙，砍三下就塌） ----
-  {const S=th=>STAGES.find(s=>s.theme===th&&!s.arena&&!s.rest),D={prison:{ink:2600,secrets:[[3080,FLOOR,'shard'],[4420,255,'embers']]},sewers:{ink:980,secrets:[[2180,FLOOR,'blue'],[6215,320,'shard']]},ramparts:{ink:1720,secrets:[[2560,FLOOR,'relic'],[6420,FLOOR,'shard']]},ossuary:{ink:3150,secrets:[[3620,FLOOR,'shard'],[5300,FLOOR,'blue']]},tower:{ink:2350,secrets:[[1680,FLOOR,'shard'],[6150,FLOOR,'relic']]}};
-    Object.keys(D).forEach(th=>{const s=S(th);if(s){s.ink=D[th].ink;s.secrets=D[th].secrets;}});
-    const bands={prison:[[0,'监房','cells'],[2200,'钟井','well'],[4600,'祷堂','chapel']],sewers:[[0,'暗渠','drain'],[2500,'蓄水池','cistern'],[5200,'灯坟','nest']],ramparts:[[0,'城门','gate'],[2500,'城垛','wall'],[5300,'残塔','tower']],ossuary:[[0,'骨廊','oss'],[2800,'龛室','niche'],[5200,'夜殿','nave']],tower:[[0,'齿轮廊','gears'],[2500,'钟腹','belly'],[5200,'钟舌','tongue']]};
-    Object.keys(bands).forEach(th=>{const s=S(th);if(s)s.bands=bands[th];});
-    const ground={
-      prison:{steps:[[1900,466,44],[1948,452,44],[1996,438,48],[2048,424,56]],trenches:[[2140,90,26]],slopes:[[1900,210,480,424]],broken:[[2124,70]]},
-      sewers:{steps:[[3000,466,48],[3052,452,48],[3104,438,56],[3160,438,64]],trenches:[[3260,100,22]],slopes:[[3000,220,480,438]],broken:[[3248,130]]},
-      ramparts:{steps:[[2500,466,50],[2554,450,50],[2608,434,60],[2668,434,70]],trenches:[[2760,90,24]],slopes:[[2500,238,480,434]],broken:[[2748,120]]},
-      ossuary:{steps:[[2400,468,40],[2444,454,40],[2488,440,46],[2534,440,60]],trenches:[[2620,100,20]],slopes:[[2400,194,480,440]],broken:[[2608,120]]},
-      tower:{steps:[[3480,466,44],[3528,452,44],[3572,438,50],[3622,438,64]],trenches:[[3720,96,24]],slopes:[[3480,206,480,438]],broken:[[3708,120]]}
-    };
-    Object.keys(ground).forEach(th=>{const s=S(th);if(!s)return;s.steps=ground[th].steps;s.trenches=ground[th].trenches;s.slopes=ground[th].slopes;s.broken=ground[th].broken;});}
+  }
   // ---- 教程：焚炉底层。石碑上画着按键（跟着设置里的改键变），走近时下方也会说明 ----
   THEMES.furnace={sky:[[0,'#0d0705'],[.5,'#1d0f09'],[.8,'#2a150b'],[1,'#120905']],farKind:'tunnel',far:'#1f120b',win:'255,150,70',mist:'50,22,10',mid:'arches',arch:'#22140d',shaft:['255,170,100','255,130,60'],banner:['#5b2a1c','#6b4a2f'],
     wall:['#2a1d17','#30211a','#261a14','#140d09'],stone:['#43322a','#3d2d25','#4a382e','#1f150f'],floor:['#3a2a22','#33251e','#3f2f26','#1a110c'],top:['#8a6a4a','#4d3a2a'],ledge:['#a07a54','#5a4232'],pil:'#3a2a20',moss:['#5a3a1c','#6a4a24'],fog:'230,140,80',light:'#ff9a4a',
     props:['torch','torch','crack','door','pipe'],floorProps:['stone','stone','bone','skull','pot'],fore:['chain','chain'],lantern:true};
   function controlLabel(action){
     if(!coarse())return K(action);
-    return {left:'摇杆左',right:'摇杆右',down:'摇杆向下',jump:'跳跃',attack:'攻击',roll:'翻滚',map:'地图',skill1:'技能一',skill2:'技能二',skill3:'技能三'}[action]||KEY_LABEL[action];
+    return {left:'摇杆向左',right:'摇杆向右',up:'摇杆向上',down:'摇杆向下',use:'道具'}[action]||KEY_LABEL[action];
   }
   function practiceSign(x, slot){
     const key='skill'+slot;
@@ -407,17 +365,17 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     plats:[[870,345,150],[1080,262,140],[1250,365,210],[1890,350,130]],terrain:[[690,90,420]],
     ens:[[1660,480,'dummy'],[1780,480,'dummy'],[1950,350,'dummy'],[2980,480,'dummy'],[3100,480,'dummy'],[3370,480,'dummy'],[3850,480,'dummy'],[3940,480,'dummy']],
     chests:[],spikes:[[2140,9]],acid:[],gaps:[],caches:[2880],traps:[{k:'spout',x:2600,per:2.6,ph:0,h:170,fire:true}],
-    signs:[{x:250,keys:['left','right'],t:()=>K('left')+' / '+K('right')+' 左右移动 · 练习场内道具、药瓶和魂火无限'},
-      {x:560,keys:['jump'],t:()=>'按'+controlLabel('jump')+'跳跃。'+(p.char==='lamp'?'空中再按一次可以二段跳。':'按得越久，跳得越高。')},
-      {x:1330,keys:['down','jump'],t:()=>'站在悬空平台上：按住 '+K('down')+' 再按 '+K('jump')+'，可以穿下去'},
-      {x:1530,keys:['attack'],t:()=>K('attack')+' 攻击 · 按住 '+K('up')+' 上挑 · 空中按住 '+K('down')+' 下劈\n连砍三下，第三下是重劈'},
-      {x:2040,keys:['down','attack'],t:()=>'空中按住 '+K('down')+' + '+K('attack')+'：劈中尖刺或敌人会弹起来\n可以踩着尖刺跳过去'},
-      {x:2440,keys:['roll'],t:()=>K('roll')+' 翻滚：翻滚途中不会受伤，能从炉火里穿过去'},
+    signs:[{x:250,keys:['left','right'],t:()=>(coarse()?'左右推摇杆移动':K('left')+' / '+K('right')+' 左右移动')+'。这里的药瓶、道具和魂火用不完。'},
+      {x:560,keys:['jump'],t:()=>(coarse()?'点「跳跃」':'按 '+K('jump')+' 起跳')+'。'+(p.char==='lamp'?'空中再按一次可以二段跳。':'按得越久，跳得越高。')},
+      {x:1330,keys:['down','jump'],t:()=>(coarse()?'摇杆向下推住，同时点「跳跃」':'按住 '+K('down')+' 再按 '+K('jump'))+'，就能穿过脚下的悬空平台。'},
+      {x:1530,keys:['attack'],t:()=>(coarse()?'点「攻击」挥刀。摇杆上推时上挑，空中下推时下劈。':K('attack')+' 攻击，按住 '+K('up')+' 上挑，空中按住 '+K('down')+' 下劈。')+'\n连砍三下，第三下是重劈。'},
+      {x:2040,keys:['down','attack'],t:()=>(coarse()?'空中向下推住摇杆，再点「攻击」。':'空中按住 '+K('down')+' 再按 '+K('attack')+'。')+'\n下劈击中尖刺或敌人就会弹起。'},
+      {x:2440,keys:['roll'],t:()=>(coarse()?'点「翻滚」':K('roll')+' 翻滚')+'可以避开伤害，穿过前面的炉火。'},
       practiceSign(2800,1),
       practiceSign(3260,2),
       practiceSign(3670,3),
-      {x:4040,keys:['heal','use','bag'],t:()=>K('heal')+' 喝药治疗 · '+K('use')+' 扔道具 · '+K('bag')+' 打开行囊',gift:true},
-      {x:4340,keys:['attack','map'],t:()=>'墙上有裂纹的地方，多砍几下——后面也许藏着东西\n'+K('map')+' 打开地图 · 前面就是出口'}]};
+      {x:4040,keys:['heal','use','bag'],t:()=>coarse()?'点药瓶治疗，点旁边的道具使用。\n右上角的行囊可以换道具。':K('heal')+' 喝药治疗 · '+K('use')+' 使用道具 · '+K('bag')+' 打开行囊',gift:true},
+      {x:4340,keys:['attack','map'],t:()=>'有裂纹的墙可以打破。\n'+(coarse()?'点右上角的地图查看出口。':'按 '+K('map')+' 打开地图。前面就是出口。')}]};
   try{unlocked=clamp(Number(localStorage.getItem('ember:unlocked'))||1,1,4);best=Number(localStorage.getItem('ember:best'))||0;muted=localStorage.getItem('ember:muted')==='1';introSeen=localStorage.getItem('ember:intro-v3')==='1';const c=JSON.parse(localStorage.getItem('ember:codex')||'null');if(c)['seen','kills','items','lore','blue'].forEach(k=>{if(c[k])codex[k]=c[k];});if(codex.seen.boss)codex.seen.warden=1;if(codex.kills.boss&&!codex.kills.warden)codex.kills.warden=codex.kills.boss;}catch(e){}
   function saveCodex(){try{localStorage.setItem('ember:codex',JSON.stringify(codex));}catch(e){}}
   // 图鉴记录：第一次见到 / 得到 / 读到时提示一下；击倒数只累加
@@ -447,9 +405,9 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function prep(t){if(t.ready)return;t.ready=true;const a=t.arch,q=t.pil;t.archC=[tint(a,1.2),tint(a,1.45),tint(a,1.32),tint(a,.58)];t.pilC=[tint(q,1.1),tint(q,1.5),tint(q,.72),tint(q,1.42),tint(q,.62),tint(q,1.27),tint(q,1.8)];
     t.farEdge=tint(t.far,1.45);t.towerC=tint(t.far,.82);t.towerIn=tint(t.far,.45);t.winA=['rgba('+t.win+',.22)','rgba('+t.win+',.55)'];t.spikeC=t.spike?[t.spike,tint(t.spike,.7)]:['#9ea4a6','#6b7276'];}
   // 竖屏：视野至少 560 宽，地面放在 60% 高度，下方留给触屏按键；横屏触屏：画面上移，按键只压住地面以下
-  let portraitAccepted=false,rotationBlocked=false,resizePending=false;
+  let resizePending=false;
   function queueResize(){if(resizePending)return;resizePending=true;requestAnimationFrame(()=>{resizePending=false;resize();});}
-  function resize(){const viewport=window.visualViewport,vw=viewport?viewport.width:innerWidth,vh=viewport?viewport.height:innerHeight;if(!Number.isFinite(vw)||!Number.isFinite(vh)||vw<1||vh<1){queueResize();return;}const d=Math.max(1,Math.min(devicePixelRatio||1,2)),playH=vh>vw||!coarse()?vh:Math.max(120,vh-132),cw=Math.max(1,Math.round(vw*d)),ch=Math.max(1,Math.round(playH*d));if(canvas.width!==cw||canvas.height!==ch){canvas.width=cw;canvas.height=ch;keys={};clearHeld();}canvas.style.width=vw+'px';canvas.style.height=playH+'px';document.getElementById('stage').style.width=vw+'px';document.getElementById('stage').style.height=vh+'px';ctx.imageSmoothingEnabled=false;tall=vh>vw;rotationBlocked=tall&&!portraitAccepted&&(window.matchMedia('(any-pointer:coarse)').matches||settings.touch==='show');document.getElementById('rotate-screen').hidden=!rotationBlocked;if(rotationBlocked){keys={};clearHeld();}
+  function resize(){const viewport=window.visualViewport,vw=viewport?viewport.width:innerWidth,vh=viewport?viewport.height:innerHeight;if(!Number.isFinite(vw)||!Number.isFinite(vh)||vw<1||vh<1){queueResize();return;}const d=Math.max(1,Math.min(devicePixelRatio||1,2)),playH=vh>vw||!coarse()?vh:Math.max(120,vh-(vw>=740?92:104)),cw=Math.max(1,Math.round(vw*d)),ch=Math.max(1,Math.round(playH*d));if(canvas.width!==cw||canvas.height!==ch){canvas.width=cw;canvas.height=ch;keys={};clearHeld();}canvas.style.width=vw+'px';canvas.style.height=playH+'px';document.getElementById('stage').style.width=vw+'px';document.getElementById('stage').style.height=vh+'px';ctx.imageSmoothingEnabled=false;tall=vh>vw;document.getElementById('stage').classList[coarse()?'add':'remove']('touch-layout');
     if(tall){W=clamp(vw*1.5,560,900);scale=canvas.width/W;H=canvas.height/scale;viewY=FLOOR-H*.6;}else{H=coarse()?420:620;W=H*vw/playH;scale=canvas.height/H;viewY=coarse()?FLOOR-H*.8:0;}verticalBase=viewY;if(state==='map')paintMap();}
   addEventListener('resize',resize);addEventListener('orientationchange',()=>{queueResize();setTimeout(queueResize,150);setTimeout(queueResize,450);});
   if(window.visualViewport)window.visualViewport.addEventListener('resize',queueResize);
@@ -658,61 +616,45 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function say(t,s){notice.textContent=t;messageT=s||3;notice.style.opacity=1;}
   function clearHeld(){inputQueue.clear();held={};document.querySelectorAll('[data-action]').forEach(b=>b.classList.remove('held'));stickEnd();}
   // 新的一局：从第一层开始
-  // ch：角色（不给就沿用当前角色，默认小引灯人）。第一次玩：开场旁白 → 焚炉底层的教程 → 监牢
-  function reset(boot,ch){if(passage&&!passage.changed){passage=null;document.getElementById('scene-fade').hidden=true;}const C=CHARS[ch||(p&&p.char)||'lamp']||CHARS.lamp;
+  // ch：角色（不给就沿用当前角色，默认小引灯人）。第一次玩：开场旁白 → 监牢中的安全练习路段
+  function reset(boot,ch){const guideRestart=boot===false&&run&&run.guided;if(passage&&!passage.changed){passage=null;document.getElementById('scene-fade').hidden=true;}const C=CHARS[ch||(p&&p.char)||'lamp']||CHARS.lamp;
     p={x:120,y:FLOOR-52,w:26,h:52,vx:0,vy:0,face:1,hp:C.hp*LIFE,max:C.hp*LIFE,char:C.id,jumps:0,ground:true,coyote:.1,buffer:0,roll:0,rollFromGround:false,rollCd:0,attack:0,atkCd:0,combo:0,comboT:0,plateHits:0,leechKills:0,slash:'side',atkFace:1,pogo:false,inv:0,damage:C.dmg,hit:new Set(),potions:C.id==='lamp'?1:2,soul:0,castCd:0,drop:null,skills:{swift:0,reach:0,dash:0,vigor:0,spring:0,flame:0},walk:0,hurtT:0,landT:0,trail:[],trailT:0,cape:null,safeX:120,safeY:FLOOR-52,dash:0,dashHit:null,ringT:0,domeT:0,on:null};
     kills=0;score=0;embers=0;bag={bomb:0,knife:C.id==='bow'?3:0,frost:0};relics=C.id==='bow'?{veil:true}:{};keepsakes={};sel=C.id==='bow'?'knife':'bomb';run={time:0,deaths:0};runSeed=1+Math.floor(Math.random()*1e6);loadStage(0,boot===true);applyBoons();
     if(boot===true)return;try{localStorage.setItem('ember:char',C.id);}catch(e){}
-    if(!introSeen){introSeen=true;try{localStorage.setItem('ember:intro-v3','1');}catch(e){}startTalk(TALK.prologue,()=>{note('lore','prologue');enterAfterPrologue();});}
-    else say(startTip(),5);
+    if(!introSeen){introSeen=true;try{localStorage.setItem('ember:intro-v3','1');}catch(e){}startTalk(TALK.prologue,()=>{note('lore','prologue');beginPrisonJourney();});}
+    else if(guideRestart)beginPrisonJourney();else say(startTip(),3);
   }
-  // 教程：完整练习尊重已有旅程存档；首次出发的练习直接通往第一层
-  const firstWalk={...TUTORIAL,brief:true,w:1560,exit:1380,plats:[[535,415,130]],terrain:[[478,72,448]],
-    ens:[[920,FLOOR,'dummy']],secrets:[],caches:[],traps:[],spikes:[],
-    signs:[
-      {x:170,keys:['right'],t:()=>coarse()?'向右推摇杆，沿灯光走。':'按 '+K('right')+' 向右走。'},
-      {x:390,keys:['jump'],t:()=>'按'+controlLabel('jump')+'，跳上前面的矮台。'},
-      {x:840,keys:['attack'],t:()=>p.char==='bow'?'面向木偶，按住'+controlLabel('attack')+'蓄力射箭。':'面向木偶，按'+controlLabel('attack')+'试试手里的武器。'},
-      {x:1260,keys:['right'],t:()=>'穿过灯下的门，进入沉钟监牢。'}
-    ]};
-  function startTutorial(fromMenu){tutorialMenu=!!fromMenu;if(fromMenu)reset(true,lastChar());for(const id of USES)bag[id]=1;run.guided=false;p.soul=3;p.potions=Math.max(p.potions,1);loadStage(-1,false,fromMenu?TUTORIAL:firstWalk);say(L.signs[0].t(),4);}
-  function enterAfterPrologue(){
-    if(tutorialDone)beginPrisonJourney();
-    else startTutorial(false);
-  }
+  // The title-screen practice room is optional; new journeys learn on the prison path.
+  function startTutorial(){reset(true,lastChar());for(const id of USES)bag[id]=1;run.guided=false;p.soul=3;loadStage(-1);say(L.signs[0].t(),4);}
   function completeTutorial(){
-    if(tutorialMenu && loadSave()){tutorialMenu=false;showMenu();return;}
-    tutorialMenu=false;
-    tutorialDone=true;try{localStorage.setItem('ember:tutorial','1');}catch(e){}
-    const ch=p.char;reset(true,ch);beep(440,.3);beginPrisonJourney();}
+    if(loadSave()){showMenu();return;}
+    reset(true,p.char);beep(440,.3);beginPrisonJourney();
+  }
   function beginPrisonJourney(){
     run.awakened=0;run.guided=!window.emberExhibit;hudKey='';run.chapter1=true;try{run.lessonMask=Number(localStorage.getItem('ember:road-lessons'))||0;}catch(e){}saveRun();
-    startTalk(CHAPTERS[0].story);
+    say(startTip(),3);
   }
   const prisonLessons=[
-    [140,'left','right','向东走到出口就能过关，金色火种可以顺路护送'],
-    [255,'jump',null,'试着跳上矮台，也可以沿平地走'],
-    [485,'attack',null,'试着打第一下；守卫会在挨打后还手'],
-    [850,'roll',null,'翻滚穿过来袭的兵刃'],
-    [1180,'down','jump','站在薄平台上可以向下穿过'],
-    [1750,'map',null,'展开地图，墨迹会留下你走过的路']
+    {x:250,bit:2,action:'jump',tip:'跳上矮台，或沿平地走'},
+    {x:480,bit:4,action:'attack',tip:'向守卫出招，它会在挨打后还手'},
+    {x:1130,bit:8,action:'roll',tip:'下一名守卫会主动出招，看到刀光时翻滚'}
   ];
   function teachOnRoad(){
     if(!run.guided||L.tutorial)return;
     const chapter=L.chapter||1;
-    const unlocked=Math.min(3,chapter>1?chapter:(stage!==0||p.x>=610?1:0));
+    const unlocked=Math.min(3,chapter>1?chapter:(stage!==0||p.x>=1430?1:0));
     if(unlocked>run.awakened){
       run.awakened=unlocked;p.soul=Math.max(p.soul,unlocked);hudKey='';saveRun();
       const skill=SKILLS[CHARS[p.char].skills[unlocked-1]];
       say('余火苏醒 · '+skill.name+'　'+controlLabel('skill'+unlocked)+' 施放',4);return;
     }
-    if(stage!==0||messageT>1||coachDone||run.coachSkip)return;
-    let mask=run.lessonMask||0;
-    for(let i=0;i<prisonLessons.length;i++){
-      const lesson=prisonLessons[i];if(mask&(1<<i)||p.x<lesson[0]||p.x>lesson[0]+180)continue;
-      run.lessonMask=mask|(1<<i);try{localStorage.setItem('ember:road-lessons',String(run.lessonMask));}catch(e){}saveRun();
-      const action=lesson[1]==='left'&&lesson[2]==='right'?(coarse()?'左右推摇杆':K('left')+' / '+K('right')):controlLabel(lesson[1])+(lesson[2]?' + '+controlLabel(lesson[2]):'');
-      say(action+'　'+lesson[3],3.2);break;
+    if(stage!==0||coachDone||run.coachSkip)return;
+    const mask=run.lessonMask||0;
+    for(const lesson of prisonLessons){
+      if((mask&lesson.bit)||p.x<lesson.x||p.x>lesson.x+145)continue;
+      run.lessonMask=mask|lesson.bit;try{localStorage.setItem('ember:road-lessons',String(run.lessonMask));}catch(e){}saveRun();
+      const tip=lesson.action==='attack'&&p.char==='bow'?'对准守卫，蓄满自动射，松手可提前出箭':lesson.tip;
+      say(controlLabel(lesson.action)+'　'+tip,3);break;
     }
   }
   // 教学房：石门关着，直到这间屋里唯一的机关预警并触发过一次。人已经在门东边（存档、传送）则门算开过。
@@ -725,7 +667,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(trap){const u=trap.t/(trap.per||3);if(trap.warn||(trap.k==='ballista'&&u>.45)||(trap.k==='piston'&&u>.7))trap.sawWarn=true;const hot=!!(trap.up||trap.on||(trap.k==='ballista'&&trap.kick>0)||(trap.k==='piston'&&u>=.86&&u<.94));if(trap.sawWarn&&hot){run['les'+stage]=1;say('石门开了 · 向东走到出口就能过关',4);beep(520,.12,'sine');return;}}
     if(p.x+p.w>door-6&&p.x<door+40){p.x=door-p.w-8;if(p.vx>0)p.vx=0;}if(run.lessonSaid!==stage&&p.x<door){run.lessonSaid=stage;say(L.lesson.hint,4.2);}}
   // Each main map has one travelling ember. Keep it within sight to lead it to the exit.
-  const emberTravelSeconds={prison:178,sewers:184,ramparts:181,ossuary:188,tower:190};
+  const emberTravelSeconds={prison:80,sewers:88,ramparts:94,ossuary:100,tower:106};
   function guideTick(dt){
     if(!L.lesson||(L.lesson.door&&!run['les'+stage])||run.guideX>=L.exit)return;
     const distance=p.x+p.w/2-run.guideX;
@@ -748,7 +690,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     circle(x,y,11,'#ffbe6638');circle(x,y,5,'#ffc36c');circle(x,y-1,2.5,'#fff3ca');
     for(let i=0;i<3;i++){const t=(time*.7+i/3)%1;circle(x+Math.sin(t*5)*4,y-5-t*14,2*(1-t),'#f5c17c');}
   }
-  function startTip(){return coarse()?'左边摇杆移动 · 推着摇杆攻击 = 上挑 / 下劈\n右边三个技能键花魂火 · 左边那位老人好像有话要说'+(tall?'\n横过手机，视野更开阔':''):K('jump')+' 跳 · '+K('attack')+' 攻击 · '+K('up')+' / '+K('down')+' + '+K('attack')+' 上挑 / 下劈 · '+K('roll')+' 翻滚 · '+K('heal')+' 治疗 · '+K('skill1')+' / '+K('skill2')+' / '+K('skill3')+' 技能\n左边那位老人好像有话要说 · 按 '+K('interact')+' 交谈 · '+K('bag')+' 打开行囊';}
+  function startTip(){return coarse()?'向右推摇杆，沿路走到东门。':'按 '+K('right')+' 向东走，穿过东门进入下一关。';}
   // 进入第 n 段（地图或驿站）：带着现在的属性进门，进门时的属性记下来，倒下后可以从这一层重来
   // n = -1 是教程（焚炉底层）。地图里还有：会动的平台（movers）、会塌的平台（crumbles）、各区域的机关（traps）
   function layGround(){
@@ -767,7 +709,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     }
     for(const s of L.steps||[])platforms.push({x:s[0],y:s[1],w:s[2],h:Math.max(8,FLOOR-s[1]),solid:true,step:true});
   }
-  function loadStage(n,quiet,trainingRoom=TUTORIAL){stage=n;L=n<0?trainingRoom:STAGES[n];const stageBox=document.getElementById('stage');stageBox.classList[L.brief?'add':'remove']('first-walk');run.guideX=120;if(L.theme==='ossuary'&&!L.arena&&!visitedCrypt){visitedCrypt=true;try{localStorage.setItem('ember:visited-crypt','1');}catch(e){}}T=THEMES[L.theme];prep(T);WORLD=L.w;decor=makeDecor();PAL={guard:Object.assign({},GUARD,T.guard),archer:Object.assign({},ARCHER,T.archer)};PAL.elite=Object.assign({},PAL.guard,ELITE_TINT);{const F=FOE_THEME[L.theme]||{};PAL.flyer=Object.assign({},FLYER,F.flyer);PAL.shield=Object.assign({},PAL.guard,SHIELDP,F.shield);PAL.caster=Object.assign({},CASTER,F.caster);PAL.bomber=Object.assign({},BOMBER,F.bomber);PAL.crawler=Object.assign({},CRAWLER,F.crawler);PAL.hanger=Object.assign({},HANGER,F.hanger);PAL.lurker=LURKER;PAL.spear=SPEAR;}
+  function loadStage(n,quiet){stage=n;L=n<0?TUTORIAL:STAGES[n];run.guideX=120;if(L.theme==='ossuary'&&!L.arena&&!visitedCrypt){visitedCrypt=true;try{localStorage.setItem('ember:visited-crypt','1');}catch(e){}}T=THEMES[L.theme];prep(T);WORLD=L.w;decor=makeDecor();PAL={guard:Object.assign({},GUARD,T.guard),archer:Object.assign({},ARCHER,T.archer)};PAL.elite=Object.assign({},PAL.guard,ELITE_TINT);{const F=FOE_THEME[L.theme]||{};PAL.flyer=Object.assign({},FLYER,F.flyer);PAL.shield=Object.assign({},PAL.guard,SHIELDP,F.shield);PAL.caster=Object.assign({},CASTER,F.caster);PAL.bomber=Object.assign({},BOMBER,F.bomber);PAL.crawler=Object.assign({},CRAWLER,F.crawler);PAL.hanger=Object.assign({},HANGER,F.hanger);PAL.lurker=LURKER;PAL.spear=SPEAR;}
     platforms=[];let x0=0;L.gaps.concat([[L.w,L.w]]).forEach(g=>{platforms.push({x:x0,y:FLOOR,w:g[0]-x0,h:160,groundBlock:true});x0=g[1];});
     L.plats.forEach(a=>platforms.push({x:a[0],y:a[1],w:a[2],h:22}));(L.terrain||[]).forEach(a=>platforms.push({x:a[0],y:a[2],w:a[1],h:FLOOR-a[2],solid:true}));layGround();
     (L.movers||[]).forEach(m=>platforms.push({x:m[0],y:m[1],w:m[2],h:16,ddx:0,ddy:0,mv:{x0:m[0],y0:m[1],dx:m[3],dy:m[4],per:m[5],ph:m[6]||0}}));(L.crumbles||[]).forEach(c=>platforms.push({x:c[0],y:c[1],w:c[2],h:18,cr:{st:0,t:0,y0:c[1]}}));
@@ -789,7 +731,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function finishTutorial(){scenePass(completeTutorial);}
   function passageTick(dt){const q=passage;q.t+=dt;const a=q.t<.32?q.t/.32:q.t<.46?1:Math.max(0,1-(q.t-.46)/.42);document.getElementById('scene-fade').style.opacity=a;if(!q.changed&&q.t>=.32){q.changed=true;q.fn();keys={};clearHeld();}if(q.t>=.88){passage=null;document.getElementById('scene-fade').hidden=true;}}
   function enterNextStage(){if(L.tutorial){completeTutorial();return;}if(stage>=STAGES.length-1)return;loadStage(stage+1);beep(440,.3);if(L.chapterStart&&L.chapter>1&&!run['chapter'+L.chapter]){run['chapter'+L.chapter]=true;startTalk(CHAPTERS[L.chapter-1].story);return;}
-    say(L.rest?'篝火可休息一次 · 烛叟用余烬换补给\n'+(coarse()?'走到他身边点「商店」':'走到他身边按 E'):L.intro||L.name,4);}
+    say(L.rest?'篝火补给，烛叟卖货。穿过右侧的门继续。':L.intro||L.name,3);}
   function retryStage(){const s=entry;p.shards=s.shards||0;run.found=Object.assign({},s.found||{});run.maps=Object.assign({},s.maps||{});p.max=s.max;p.hp=Math.max(s.hp,Math.ceil(s.max/(2*LIFE))*LIFE);p.plateHits=s.plateHits;p.leechKills=s.leechKills;p.damage=s.damage;p.potions=s.potions;p.skills=Object.assign({},s.skills);p.soul=s.soul;embers=s.embers;score=s.score;kills=s.kills;bag=Object.assign({},s.bag);relics=Object.assign({},s.relics);keepsakes=Object.assign({},s.keep);loadStage(stage);say(L.name+' · 再来一次',2.5);}
   // ---- 对话：底部对话框，逐字显示；E / 空格 / J / 回车 / 点一下：先显示整句，再翻到下一句；Esc 跳过 ----
   // keep：不切到 talk 状态（结局旁白在 win 状态下播放）。说话人有头像就显示在对话框左边；句子带场景时铺插画
@@ -824,7 +766,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   const BOSS_SIZE={lock:[104,76],brood:[92,118],standard:[46,104],warden:[56,120]};
   // 新的小怪：游魂蝠（飞着俯冲）、持盾狱卒（正面挡刀，重击破防）、骨巫（远处施法、靠近就闪走）、投弹手（抛罐子）；教程里的稻草人打不坏
   const FOE_SIZE={flyer:[30,24],shield:[32,48],caster:[28,52],bomber:[30,44],dummy:[28,50],crawler:[36,22],hanger:[26,34],lurker:[32,34],spear:[26,54]},FOE_HP={flyer:.55,shield:1.35,caster:.8,bomber:.9,dummy:50,crawler:.72,hanger:.66,lurker:.7,spear:.95};
-  function enemy(x,floor,type,o){const b=type==='boss',el=!!(o&&o.elite),kind=b?(L.bossKind||'warden'):'',S=b?BOSS_SIZE[kind]:el?[38,62]:FOE_SIZE[type]||[28,46],hp=Math.round((b?330:el?260:72*(FOE_HP[type]||1))*L.hpK*(type==='dummy'?1:1+.35*cycle));
+  function enemy(x,floor,type,o){const b=type==='boss',el=!!(o&&o.elite),kind=b?(L.bossKind||'warden'):'',S=b?BOSS_SIZE[kind]:el?[38,62]:FOE_SIZE[type]||[28,46],baseHp=!cycle&&stage===0&&type==='guard'&&x<1500?(o?.sparring?28:54):72, hp=Math.round((b?330:el?260:baseHp*(FOE_HP[type]||1))*L.hpK*(type==='dummy'?1:1+.35*cycle));
     const trainingPace=stage===0&&cycle===0&&x<1800?(x<1000?1.9:1.4):1;
     const e={trainingPace,waitingForHit:!cycle&&!!o?.sparring,x:x,y:floor-S[1],w:S[0],h:S[1],floor:floor,type:type,kind:kind,elite:el,hp:hp,max:hp,face:-1,cd:.6,wind:0,flash:0,dead:false,dieT:0,rage:false,spell:false,spellCd:3.5,origin:x,walk:0,swing:0,kb:0,hitT:0,seed:Math.random()*TAU};
     if(type==='flyer')Object.assign(e,{y:floor-150-S[1]/2,fly:'hover',hx:x,dvx:0,dvy:0,ft:0,cd:1});
@@ -832,7 +774,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(type==='crawler')e.cd=.35;
     if(b)Object.assign(e,{move:'',act:0,at:0,rec:0,rt:0,vx:0,lift:0,under:0,combo:0,tollCd:3,mothCd:2,struck:false,stun:false,roar:false,surfacing:false});return e;}
   function down(a){return Object.keys(held).some(k=>held[k]===a);}
-  function action(a){if(state!=='play'||paused||rotationBlocked||passage)return;if(a==='jump')p.buffer=FEEL.buffer;if(a==='attack'){inputQueue.push(1);if(p.atkCd<=0&&p.roll<=0&&p.dash<=0){inputQueue.take(1);attack();}}if(a==='roll'){inputQueue.push(2);if(p.rollCd<=0&&(p.attack<=0||heroFSM.canCancel())){inputQueue.take(2);roll();}}if(a==='interact')interact();if(a==='use')useItem();if(a==='cast')castSoul();if(a==='skill1')useSkill(1);if(a==='skill2')useSkill(2);if(a==='skill3')useSkill(3);if(a==='cycle')cycleItem();if(a==='map')openMap();if(a==='bag')openBag();if(a==='heal'&&p.potions&&p.hp<p.max){const h=Math.min(p.max-p.hp,(3+p.skills.vigor)*LIFE);if(!L.tutorial)p.potions--;p.hp+=h;burst(p.x,p.y,'#91d6bd',22);pop(p.x+13,p.y-6,'+'+(h/LIFE),'#9be3c8');say('余火回温 · 恢复 '+(h/LIFE)+' 个小幽灵');beep(550,.25);syncHud();}}
+  function action(a){if(state!=='play'||paused||passage)return;if(a==='jump')p.buffer=FEEL.buffer;if(a==='attack'){inputQueue.push(1);if(p.atkCd<=0&&p.roll<=0&&p.dash<=0){inputQueue.take(1);attack();}}if(a==='roll'){inputQueue.push(2);if(p.rollCd<=0&&(p.attack<=0||heroFSM.canCancel())){inputQueue.take(2);roll();}}if(a==='interact')interact();if(a==='use')useItem();if(a==='cast')castSoul();if(a==='skill1')useSkill(1);if(a==='skill2')useSkill(2);if(a==='skill3')useSkill(3);if(a==='cycle')cycleItem();if(a==='map')openMap();if(a==='bag')openBag();if(a==='heal'&&p.potions&&p.hp<p.max){const h=Math.min(p.max-p.hp,(3+p.skills.vigor)*LIFE);if(!L.tutorial)p.potions--;p.hp+=h;burst(p.x,p.y,'#91d6bd',22);pop(p.x+13,p.y-6,'+'+(h/LIFE),'#9be3c8');say('余火回温 · 恢复 '+(h/LIFE)+' 个小幽灵');beep(550,.25);syncHud();}}
   function dirs(){return{l:!!(isKey('left')||stick.x<-FEEL.dead||down('left')),r:!!(isKey('right')||stick.x>FEEL.dead||down('right')),u:!!(isKey('up')||stick.y<-FEEL.dead),d:!!(isKey('down')||stick.y>FEEL.dead)};}
   // 挥刀（参考空洞骑士）：按住上 = 上挑；空中按住下 = 下劈，打中会弹起来；否则朝面向或按住的左右侧劈，侧劈第三下是重劈
   // 钟锤学徒出手慢、判定大，第三锤震出一道地波；拾灯弓手横着 / 向上是射箭，空中向下是下踢（和下劈一样能弹起来）
@@ -877,9 +819,9 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   document.querySelectorAll('[data-action]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();try{b.setPointerCapture(e.pointerId);}catch(err){}held[e.pointerId]=b.dataset.action;b.classList.add('held');action(b.dataset.action);});const release=e=>{if(held[e.pointerId]==='jump')jumpRelease();delete held[e.pointerId];b.classList.remove('held');};b.addEventListener('pointerup',release);b.addEventListener('pointercancel',release);b.addEventListener('lostpointercapture',release);});
   // 摇杆：左右移动；往上 / 往下推着挥刀 = 上挑 / 下劈。手指滑出摇杆也继续跟手
   const knob=document.getElementById('knob');let stickId=null;
-  function stickMove(e){const r=pad.getBoundingClientRect();if(r.width<=0||r.height<=0||rotationBlocked){stickEnd();return;}const rx=r.width/2,ry=r.height/2;let x=(e.clientX-r.left-rx)/rx,y=(e.clientY-r.top-ry)/ry;const d=Math.hypot(x,y);if(d>1){x/=d;y/=d;}if(d<FEEL.dead){x=0;y=0;}stick.x=x;stick.y=y;knob.style.transform='translate('+(x*(pad.clientWidth||r.width)*.25).toFixed(1)+'px,'+(y*(pad.clientHeight||r.height)*.25).toFixed(1)+'px)';}
+  function stickMove(e){const r=pad.getBoundingClientRect();if(r.width<=0||r.height<=0){stickEnd();return;}const rx=r.width/2,ry=r.height/2;let x=(e.clientX-r.left-rx)/rx,y=(e.clientY-r.top-ry)/ry;const d=Math.hypot(x,y);if(d>1){x/=d;y/=d;}if(d<FEEL.dead){x=0;y=0;}stick.x=x;stick.y=y;knob.style.transform='translate('+(x*(pad.clientWidth||r.width)*.25).toFixed(1)+'px,'+(y*(pad.clientHeight||r.height)*.25).toFixed(1)+'px)';}
   function stickEnd(){stickId=null;stick.x=0;stick.y=0;knob.style.transform='';}
-  pad.addEventListener('pointerdown',e=>{e.preventDefault();try{pad.setPointerCapture(e.pointerId);}catch(err){}stickId=e.pointerId;stickMove(e);});
+  pad.addEventListener('pointerdown',e=>{e.preventDefault();if(stickId!==null)return;try{pad.setPointerCapture(e.pointerId);}catch(err){}stickId=e.pointerId;stickMove(e);});
   pad.addEventListener('pointermove',e=>{if(e.pointerId===stickId)stickMove(e);});
   ['pointerup','pointercancel','lostpointercapture'].forEach(n=>pad.addEventListener(n,e=>{if(e.pointerId===stickId)stickEnd();}));
   document.getElementById('talk-skip').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();skipTalk();});talkBox.addEventListener('pointerdown',e=>{e.preventDefault();talkNext();});canvas.addEventListener('pointerdown',()=>{if(credits)endCredits();else if(talk)talkNext();});
@@ -888,7 +830,11 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   {const mb=document.getElementById('map-btn');if(mb)mb.onclick=()=>{if(state==='map')closeMap();else openMap();};}
   document.getElementById('pause').onclick=togglePause;muteBtn.onclick=()=>setMuted(!muted);
   function togglePause(){if(state!=='play')return;paused=!paused;keys={};clearHeld();if(paused)showPause();else{panel.hidden=true;panelView='';rebinding=null;}}
-  function showPause(){panel.classList.remove('late');panelView='pause';const alts=[{label:'自由选关',fn:renderChapters},{label:'设置',fn:()=>renderSettings('pause')},{label:'回到开始界面',fn:()=>{saveRun();showMenu();}}];if(run.guided&&stage===0&&!coachDone&&!run.coachSkip)alts.push({label:'关闭沿途操作提示',fn:()=>{coachDone=true;run.coachSkip=true;try{localStorage.setItem('ember:coach','1');}catch(e){}showPause();}});if(L.tutorial)alts.unshift({label:tutorialMenu&&loadSave()?'结束练习':'进入第一关',fn:()=>{paused=false;finishTutorial();}});
+  function showPause(){panel.classList.remove('late');panelView='pause';const alts=[{label:'自由选关',fn:renderChapters},{label:'设置',fn:()=>renderSettings('pause')},{label:'回到开始界面',fn:()=>{saveRun();showMenu();}}];if(run.guided&&stage===0&&!coachDone&&!run.coachSkip)alts.push({label:'关闭沿途操作提示',fn:()=>{coachDone=true;run.coachSkip=true;try{localStorage.setItem('ember:coach','1');}catch(e){}showPause();}});if(L.tutorial)alts.unshift({label:loadSave()?'结束练习':'进入第一关',fn:()=>{paused=false;finishTutorial();}});
+    if(coarse()){
+      alts.push({label:muted?'开启声音':'静音',fn:()=>{setMuted(!muted);showPause();}});
+      if(tall&&window.screen&&screen.orientation&&screen.orientation.lock)alts.push({label:'切换到横屏',fn:enterLandscape});
+    }
     showPanel('余火未熄',L.tutorial?'这里是焚炉底层的教程，随时可以跳过。':'歇一会儿，再继续前行。','继续探索',()=>{paused=false;panel.hidden=true;panelView='';},alts);focusFirst();}
   // ---- 开始界面：继续旅程 / 新的旅程（选角色和周目）/ 教程 / 章节挑战 / 图鉴与传说 / 设置 ----
   const EMBLEM='<svg viewBox="0 0 96 96"><circle cx="48" cy="48" r="43"/><path d="M31 59h34l-5-8V37a12 12 0 0 0-24 0v14zM43 64a5 5 0 0 0 10 0M48 19v6M21 48h-7m68 0h-7"/><path class="ember" d="M48 37c-7 8-5 16 0 19 6-3 7-11 0-19z"/></svg>';
@@ -896,7 +842,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   const saveSlot=selected=>selected?'ember:selected-save':'ember:save';
   function loadSave(selected=false){try{saveData=JSON.parse(localStorage.getItem(saveSlot(selected))||'null');}catch(e){saveData=null;}if(saveData&&!STAGES[saveData.stage])saveData=null;return saveData;}
   function bossSnap(){const b=enemies.find(e=>e.type==='boss'&&!e.dead);return b?{hp:b.hp,max:b.max,phase:b.phase||0,rage:!!b.rage,phase3:!!b.phase3}:null;}
-  function saveRun(){if(!L||!p||L.tutorial||state==='menu'||!entry)return;try{localStorage.setItem(saveSlot(selectedRoute),JSON.stringify({v:2,stage:stage,char:p.char,cycle:cycle,checkX:p.checkX,boss:bossSnap(),e:entry,run:{guideX:Math.floor(run.guideX),guided:!!run.guided,awakened:run.awakened||0,lessonMask:run.lessonMask||0,keeper:!!run.keeper,c2:!!run.chapter2,c3:!!run.chapter3,c4:!!run.chapter4,seen:run.seen||{},maps:run.maps||{},found:run.found||{},visited:run.visited||{},inkMet:!!run.inkMet,firstElite:!!run.firstElite,time:run.time||0,deaths:run.deaths||0,shortcut:!!run.shortcut,coach:!!run.coachSkip}}));}catch(e){}}
+  function saveRun(){if(!L||!p||L.tutorial||state==='menu'||!entry)return;try{localStorage.setItem(saveSlot(selectedRoute),JSON.stringify({v:3,stage:stage,char:p.char,cycle:cycle,checkX:p.checkX,boss:bossSnap(),e:entry,run:{guideX:Math.floor(run.guideX),guided:!!run.guided,awakened:run.awakened||0,lessonMask:run.lessonMask||0,keeper:!!run.keeper,c2:!!run.chapter2,c3:!!run.chapter3,c4:!!run.chapter4,seen:run.seen||{},maps:run.maps||{},found:run.found||{},visited:run.visited||{},inkMet:!!run.inkMet,firstElite:!!run.firstElite,time:run.time||0,deaths:run.deaths||0,shortcut:!!run.shortcut,coach:!!run.coachSkip}}));}catch(e){}}
   function clearSave(){saveData=null;try{localStorage.removeItem(saveSlot(selectedRoute));}catch(e){}}
   function showMenu(){selectedRoute=false;panel.classList.remove('late');state='menu';paused=false;talk=null;talkBox.hidden=true;credits=null;cine=null;rebinding=null;hud.hidden=true;touch.hidden=true;hint.hidden=true;gainBox.hidden=true;notice.style.opacity=0;messageT=0;titleT=0;sceneA=sceneB='';keys={};clearHeld();renderMenu();}
   function focusFirst(){try{const b=panel.querySelector('button:not([disabled])');if(b&&!coarse())b.focus();}catch(e){}}
@@ -915,14 +861,36 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       +'<nav class="home-tools" aria-label="其他选项">'+tools+'</nav>'
       +(best||clears?'<p class="home-record">'+(clears?'通关 '+clears+' 次　':'')+'最高 '+best+' 分</p>':'')+'</div>';
     panel.hidden=false;panel.querySelectorAll('[data-menu]').forEach(b=>b.onclick=()=>menuPick(b.dataset.menu));focusFirst();}
-  function menuPick(id){unlockAudio();beep(620,.05,'sine');if(id==='continue')continueRun();else if(id==='new')renderChars();else if(id==='tutorial')startTutorial(true);else if(id==='chapters')renderChapters();else if(id==='codex'){panelView='codex';bagTab='dex';renderBag(true);}else if(id==='settings')renderSettings('menu');}
-  function continueRun(selected=false){const s=loadSave(selected);if(!s)return;selectedRoute=selected;cycle=s.cycle||0;reset(true,s.char);const e=s.e;Object.assign(p,{max:e.max,hp:e.hp,damage:e.damage,potions:e.potions,soul:e.soul||0,shards:e.shards||0,plateHits:e.plateHits||0,leechKills:e.leechKills||0,skills:Object.assign({},p.skills,e.skills)});embers=e.embers;score=e.score;kills=e.kills;bag=Object.assign({bomb:0,knife:0,frost:0},e.bag);relics=Object.assign({},e.relics);keepsakes=Object.assign({},e.keep);
+  function menuPick(id){unlockAudio();beep(620,.05,'sine');if(id==='continue')continueRun();else if(id==='new')renderChars();else if(id==='tutorial')startTutorial();else if(id==='chapters')renderChapters();else if(id==='codex'){panelView='codex';bagTab='dex';renderBag(true);}else if(id==='settings')renderSettings('menu');}
+  // Version 2 stored absolute world coordinates. Restore the nearest actual fire on the new route.
+  function migrateRouteSave(s){
+    if(s.v>=3)return;
+    const room=STAGES[s.stage],journey=s.run||(s.run={});
+    if(room.lesson){
+      const oldExit=routePace[room.theme].oldExit;
+      const project=x=>Math.round(120+clamp((x-120)/(oldExit-120),0,1)*(room.exit-120));
+      journey.guideX=project(Number.isFinite(journey.guideX)?journey.guideX:(s.checkX||120));
+      if(Number.isFinite(s.checkX)){
+        const at=project(s.checkX);
+        s.checkX=room.checks.reduce((best,x)=>Math.abs(x-at)<Math.abs(best-at)?x:best);
+      }
+    }
+    if(journey.seen)STAGES.forEach((stage,index)=>{
+      const key='s'+index,old=journey.seen[key],count=Math.ceil(stage.w/100);
+      if(!Array.isArray(old)||old.length===count||!old.length)return;
+      // Several old map cells can represent one new cell. Keep the player's explored areas.
+      const cells=Array(count).fill(0);
+      old.forEach((seen,i)=>{if(seen)cells[Math.min(count-1,Math.floor((i+.5)*count/old.length))]=1;});
+      journey.seen[key]=cells;
+    });
+  }
+  function continueRun(selected=false){const s=loadSave(selected);if(!s)return;migrateRouteSave(s);selectedRoute=selected;cycle=s.cycle||0;reset(true,s.char);const e=s.e;Object.assign(p,{max:e.max,hp:e.hp,damage:e.damage,potions:e.potions,soul:e.soul||0,shards:e.shards||0,plateHits:e.plateHits||0,leechKills:e.leechKills||0,skills:Object.assign({},p.skills,e.skills)});embers=e.embers;score=e.score;kills=e.kills;bag=Object.assign({bomb:0,knife:0,frost:0},e.bag);relics=Object.assign({},e.relics);keepsakes=Object.assign({},e.keep);
     if(s.run){run.guided=!!s.run.guided;run.awakened=s.run.awakened||0;run.lessonMask=s.run.lessonMask||0;['seen','maps','found','visited'].forEach(k=>{if(s.run[k])run[k]=s.run[k];});run.inkMet=!!s.run.inkMet;run.firstElite=!!s.run.firstElite;run.keeper=s.run.keeper;run.time=s.run.time||0;run.deaths=s.run.deaths||0;run.shortcut=!!s.run.shortcut;run.coachSkip=!!s.run.coach;['2','3','4'].forEach(n=>{if(s.run['c'+n])run['chapter'+n]=true;});}introSeen=true;loadStage(s.stage,true);
     if(L.lesson)run.guideX=clamp(Number.isFinite(s.run&&s.run.guideX)?s.run.guideX:(s.checkX||120),120,L.exit);
     if(s.checkX!=null){p.checkX=s.checkX;checkpoint=true;L.checkpoint=s.checkX;p.x=s.checkX+20;p.y=FLOOR-p.h;p.safeX=p.x;cam=clamp(p.x-W*.35,0,Math.max(0,WORLD-W));}
     if(s.boss){const b=enemies.find(e=>e.type==='boss'&&!e.dead);if(b){b.hp=Math.min(b.max,s.boss.hp);b.phase=s.boss.phase||0;b.rage=!!s.boss.rage;b.phase3=!!s.boss.phase3;}}
     saveRun();say('继续上次的旅程 · '+(checkpoint?'从钟火':'')+(L.rest?L.name:L.n+' · '+L.name),3);}
-  function startJourney(ch,cyc){selectedRoute=false;if(!clears)cyc=0;if(!CHARS[ch])ch='lamp';cycle=cyc||0;clearSave();reset(true,ch);try{localStorage.setItem('ember:char',p.char);}catch(e){}introSeen=true;startTalk(TALK.prologue,()=>{note('lore','prologue');scenePass(enterAfterPrologue);});}
+  function startJourney(ch,cyc){selectedRoute=false;if(!clears)cyc=0;if(!CHARS[ch])ch='lamp';cycle=cyc||0;clearSave();reset(true,ch);try{localStorage.setItem('ember:char',p.char);}catch(e){}introSeen=true;startTalk(TALK.prologue,()=>{note('lore','prologue');scenePass(beginPrisonJourney);});}
   function selectLevel(room){
     // Bank the active journey before changing slots. Keep the chosen bearer and use the new chapter's supplies.
     const ch=paused?p.char:lastChar();
@@ -943,16 +911,20 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   }
   // 选角色：没解锁的画成剪影，写着解锁条件；通关过就能挑周目
   let pickChar='lamp',pickCycle=0;
-  function renderChars(){panelView='chars';if(!charOpen(pickChar))pickChar=lastChar();pickCycle=Math.min(pickCycle,Math.min(clears,4));const bar=(t,v)=>'<span class="bar"><em>'+t+'</em><i><u style="width:'+Math.round(v*100)+'%"></u></i></span>';
-    const card=id=>{const c=CHARS[id],open=charOpen(id);return'<button class="char-card'+(id===pickChar?' on':'')+(open?'':' locked')+'" data-char="'+id+'"'+(open?'':' disabled')+'><span class="portrait">'+(open?'<canvas width="240" height="240" data-idle="'+id+'" aria-label="'+c.name+'动态待机" style="width:100%;height:100%;display:block"></canvas>':'<img alt="" src="'+charPortrait(id,true)+'">')+'</span><b>'+(open?c.name:'？？？')+'</b><small class="role">'+(open?c.title:c.unlockText)+'</small>'+(open?'<span class="bars">'+bar('生命',c.hp/7)+bar('攻击',c.power)+bar('速度',c.speedK)+'</span>':'')+'</button>';};
+  function renderChars(focusPicked=false){panelView='chars';if(!charOpen(pickChar))pickChar=lastChar();pickCycle=Math.min(pickCycle,Math.min(clears,4));const bar=(t,v)=>'<span class="bar"><em>'+t+'</em><i><u style="width:'+Math.round(v*100)+'%"></u></i></span>';
+    const card=id=>{const c=CHARS[id],open=charOpen(id);return'<button class="char-card'+(id===pickChar?' on':'')+(open?'':' locked')+'" data-char="'+id+'" aria-pressed="'+(id===pickChar)+'"'+(open?'':' disabled')+'><span class="portrait">'+(open?'<canvas width="240" height="240" data-idle="'+id+'" aria-label="'+c.name+'动态待机" style="width:100%;height:100%;display:block"></canvas>':'<img alt="" src="'+charPortrait(id,true)+'">')+'</span><b>'+(open?c.name:'？？？')+'</b><small class="role">'+(open?c.title:c.unlockText)+'</small>'+(open?'<span class="bars">'+bar('生命',c.hp/7)+bar('攻击',c.power)+bar('速度',c.speedK)+'</span>':'')+'</button>';};
     const C=CHARS[pickChar],cyc=clears?'<div class="cycle-pick"><span>周目</span>'+Array.from({length:Math.min(clears,4)+1},(_,i)=>'<button data-cycle="'+i+'"'+(i===pickCycle?' class="on"':'')+'>'+(i?'第 '+(i+1)+' 周目':'一周目')+'</button>').join('')+'<small>'+(pickCycle?'敌人更硬、出手更快，余烬也更多':'第一次的旅程')+'</small></div>':'';
-    panel.innerHTML='<div class="sheet wide chars"><span class="chapter">新的旅程</span><h1>谁来引灯</h1><div class="char-cards">'+Object.keys(CHARS).filter(charOpen).map(card).join('')+'</div><div class="char-info"><p>'+C.info+'</p><div class="skill-list">'+C.skills.map((s,i)=>'<div class="sk-row">'+artImg('sk_'+s)+'<b>'+(i+1)+' · '+SKILLS[s].name+'</b><i>'+'●'.repeat(SKILLS[s].cost)+'</i><small>'+SKILLS[s].info+'</small></div>').join('')+'</div></div>'+cyc+'<button class="primary" id="go">出发 <span>↗</span></button><button class="secondary" data-back>返回</button></div>';
-    panel.hidden=false;panel.querySelectorAll('[data-char]').forEach(b=>b.onclick=()=>{pickChar=b.dataset.char;beep(560,.05,'sine');renderChars();});panel.querySelectorAll('[data-cycle]').forEach(b=>b.onclick=()=>{pickCycle=+b.dataset.cycle;renderChars();});
-    document.getElementById('go').onclick=()=>{unlockAudio();startJourney(pickChar,pickCycle);};bindBack();focusFirst();}
+    const skillRows=C.skills.map((id,i)=>'<div class="sk-row">'+artImg('sk_'+id)+'<b>'+(i+1)+' · '+SKILLS[id].name+'</b><i>'+'●'.repeat(SKILLS[id].cost)+'</i><small>'+SKILLS[id].info+'</small></div>').join('');
+    panel.innerHTML='<div class="sheet wide chars"><h1>谁来引灯</h1><div class="char-cards">'+Object.keys(CHARS).filter(charOpen).map(card).join('')+'</div>'
+      +cyc+'<div class="journey-actions"><button class="primary" id="go">出发 <span>↗</span></button><button class="secondary" data-back>返回</button></div>'
+      +'<details class="journey-details"><summary>'+C.name+'的招式</summary><div class="char-info"><p>'+C.info+'</p><div class="skill-list">'+skillRows+'</div></div></details></div>';
+    panel.hidden=false;panel.querySelectorAll('[data-char]').forEach(b=>b.onclick=()=>{pickChar=b.dataset.char;beep(560,.05,'sine');renderChars(true);});panel.querySelectorAll('[data-cycle]').forEach(b=>b.onclick=()=>{pickCycle=+b.dataset.cycle;renderChars();});
+    document.getElementById('go').onclick=()=>{unlockAudio();startJourney(pickChar,pickCycle);};bindBack();
+    if(focusPicked&&!coarse())panel.querySelector('.char-card.on').focus();else focusFirst();}
   // 设置：音量滑条、画面 / 对话选项、按键（每个动作两个键位，点一下再按新键）
-  function renderSettings(from){panelView='settings';if(from)menuFrom=from;const opt=(k,label,vals)=>'<div class="opt"><span>'+label+'</span>'+vals.map(v=>'<button data-opt="'+k+'" data-v="'+v[0]+'"'+(String(settings[k])===String(v[0])?' class="on"':'')+'>'+v[1]+'</button>').join('')+'</div>',sl=(k,label)=>'<label class="slider"><span>'+label+'</span><input type="range" min="0" max="100" step="5" value="'+Math.round(settings[k]*100)+'" data-slider="'+k+'"><b>'+Math.round(settings[k]*100)+'</b></label>';
+  function renderSettings(from){const keymapOpen=!from&&panel.querySelector?.('.keyboard-options')?.open;panelView='settings';if(from)menuFrom=from;const opt=(k,label,vals)=>'<div class="opt"><span>'+label+'</span>'+vals.map(v=>'<button data-opt="'+k+'" data-v="'+v[0]+'"'+(String(settings[k])===String(v[0])?' class="on"':'')+'>'+v[1]+'</button>').join('')+'</div>',sl=(k,label)=>'<label class="slider"><span>'+label+'</span><input type="range" min="0" max="100" step="5" value="'+Math.round(settings[k]*100)+'" data-slider="'+k+'"><b>'+Math.round(settings[k]*100)+'</b></label>';
     const rows=KEY_ORDER.map(a=>'<div class="keyrow"><span>'+KEY_LABEL[a]+'</span>'+[0,1].map(i=>{const w=rebinding&&rebinding.a===a&&rebinding.i===i;return'<button data-bind="'+a+'" data-slot="'+i+'"'+(w?' class="wait"':'')+'>'+(w?'按下新按键…':keyName(BIND[a][i]))+'</button>';}).join('')+'</div>').join('');
-    panel.innerHTML='<div class="sheet wide settings"><span class="chapter">设置</span><h1>设置</h1><h3>声音</h3>'+sl('vol','总音量')+sl('music','音乐')+sl('sfx','音效')+'<h3>画面</h3>'+opt('fx','特效',[['auto','自动'],['high','全开'],['low','省电']])+opt('shake','屏幕震动',[[true,'开'],[false,'关']])+opt('buzz','震动',[[true,'开'],[false,'关']])+opt('nums','伤害数字',[[true,'显示'],[false,'隐藏']])+opt('minimap','小地图',[[true,'显示'],[false,'隐藏']])+'<h3>对话</h3>'+opt('textSpeed','文字速度',[[.6,'慢'],[1,'中'],[1.7,'快']])+opt('autoTalk','自动翻页',[[false,'关'],[true,'开']])+'<h3>操作</h3>'+opt('touch','屏幕按键',[['auto','自动'],['show','显示'],['hide','隐藏']])+sl('touchA','按键透明度')+'<label class="slider"><span>按键左右</span><input type="range" min="-80" max="80" step="4" value="'+(settings.touchX||0)+'" data-px="touchX"><b>'+(settings.touchX||0)+'</b></label><label class="slider"><span>按键上下</span><input type="range" min="-60" max="40" step="4" value="'+(settings.touchY||0)+'" data-px="touchY"><b>'+(settings.touchY||0)+'</b></label><h3>按键 <small>'+(coarse()?'接上键盘时生效 · ':'')+'点一下，再按想用的键；Esc 取消</small></h3><div class="keymap">'+rows+'</div><button class="secondary" id="keys-reset">恢复默认按键</button><button class="primary" data-back>返回 <span>↩</span></button></div>';
+    panel.innerHTML='<div class="sheet wide settings"><span class="chapter">设置</span><h1>设置</h1><h3>声音</h3>'+sl('vol','总音量')+sl('music','音乐')+sl('sfx','音效')+'<h3>画面</h3>'+opt('fx','特效',[['auto','自动'],['high','全开'],['low','省电']])+opt('shake','屏幕震动',[[true,'开'],[false,'关']])+opt('buzz','震动',[[true,'开'],[false,'关']])+opt('nums','伤害数字',[[true,'显示'],[false,'隐藏']])+opt('minimap','小地图',[[true,'显示'],[false,'隐藏']])+'<h3>对话</h3>'+opt('textSpeed','文字速度',[[.6,'慢'],[1,'中'],[1.7,'快']])+opt('autoTalk','自动翻页',[[false,'关'],[true,'开']])+'<h3>操作</h3>'+opt('touch','屏幕按键',[['auto','自动'],['show','显示'],['hide','隐藏']])+sl('touchA','按键透明度')+'<label class="slider"><span>按键左右</span><input type="range" min="-80" max="80" step="4" value="'+(settings.touchX||0)+'" data-px="touchX"><b>'+(settings.touchX||0)+'</b></label><label class="slider"><span>按键上下</span><input type="range" min="-60" max="40" step="4" value="'+(settings.touchY||0)+'" data-px="touchY"><b>'+(settings.touchY||0)+'</b></label><details class="keyboard-options"'+(keymapOpen||rebinding||(!coarse()&&from)?' open':'')+'><summary>键盘按键</summary><p>选中一个动作，再按要使用的键。Esc 取消。</p><div class="keymap">'+rows+'</div><button class="secondary" id="keys-reset">恢复默认按键</button></details><button class="primary" data-back>返回 <span>↩</span></button></div>';
     panel.hidden=false;
     panel.querySelectorAll('[data-opt]').forEach(b=>b.onclick=()=>{const k=b.dataset.opt,v=b.dataset.v;settings[k]=v==='true'?true:v==='false'?false:isNaN(+v)?v:+v;applySettings();saveSettings();beep(600,.04,'sine');renderSettings();});
     panel.querySelectorAll('[data-slider]').forEach(r=>{r.oninput=()=>{settings[r.dataset.slider]=r.value/100;r.nextElementSibling.textContent=r.value;applySettings();saveSettings();};r.onchange=()=>beep(660,.06,'sine');});
@@ -963,12 +935,12 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   // 改键：同一个键原来属于别的动作就互换，免得两个动作抢一个键
   function finishRebind(code){const r=rebinding;rebinding=null;if(r&&code!=='Escape'){const old=BIND[r.a][r.i];KEY_ORDER.forEach(a=>{if(a===r.a)return;const j=BIND[a].indexOf(code);if(j>=0){if(old)BIND[a][j]=old;else BIND[a].splice(j,1);}});const j2=BIND[r.a].indexOf(code);if(j2>=0&&j2!==r.i)BIND[r.a].splice(j2,1);BIND[r.a][r.i]=code;BIND[r.a]=BIND[r.a].filter(Boolean);rebuildKeys();saveSettings();beep(700,.06,'sine');}renderSettings();}
   // 菜单里用方向键 / Tab 选，空格或回车确定，Esc 返回
-  function menuKey(e){const act=codeAct[e.code],btns=Array.prototype.slice.call(panel.querySelectorAll('button:not([disabled]),input'));if(!btns.length)return;const i=btns.indexOf(document.activeElement);
+  function menuKey(e){const act=codeAct[e.code],btns=Array.prototype.slice.call(panel.querySelectorAll('button:not([disabled]),input,summary')).filter(b=>b.getClientRects().length);if(!btns.length)return;const i=btns.indexOf(document.activeElement);
     if(e.code==='ArrowDown'||act==='down'||(e.code==='Tab'&&!e.shiftKey)){e.preventDefault();btns[(i+1+btns.length)%btns.length].focus();}
     else if(e.code==='ArrowUp'||act==='up'||(e.code==='Tab'&&e.shiftKey)){e.preventDefault();btns[(i-1+btns.length*2)%btns.length].focus();}
     else if(e.code==='Escape'){if(state==='menu'&&panelView==='menu')return;if(panelView==='codex'){renderMenu();return;}menuBack();}
     else if(e.code==='Space'&&document.activeElement&&document.activeElement.tagName==='BUTTON'){e.preventDefault();document.activeElement.click();}}
-  function showPanel(title,t,label,fn,alts){alts=alts||[];panel.innerHTML='<div class="sheet"><span class="chapter">余烬地牢 · '+(L.rest?L.name:L.n+' · '+L.name)+'</span><h1>'+title+'</h1><p class="intro">'+t+'</p><button class="primary" id="main-action">'+label+' <span>↗</span></button>'+alts.map((a,i)=>'<button class="secondary" id="alt-'+i+'">'+a.label+'</button>').join('')+'<p class="keys">击败 '+kills+'　·　得分 '+score+'　·　最高 '+best+'</p><p class="footnote">'+(coarse()?'摇杆移动，推着摇杆攻击可上挑 / 下劈 · 右侧跳跃、翻滚、三个技能 · 左下治疗':K('left')+' / '+K('right')+' 移动 · '+K('jump')+' 跳 · '+K('attack')+' 攻击 · '+K('up')+' / '+K('down')+' + '+K('attack')+' 上挑 / 下劈 · '+K('roll')+' 翻滚 · '+K('skill1')+' '+K('skill2')+' '+K('skill3')+' 技能 · '+K('heal')+' 治疗')+'</p></div>';panel.hidden=false;document.getElementById('main-action').onclick=fn;alts.forEach((a,i)=>{document.getElementById('alt-'+i).onclick=a.fn;});}
+  function showPanel(title,t,label,fn,alts){alts=alts||[];panel.innerHTML='<div class="sheet"><span class="chapter">余烬地牢 · '+(L.rest?L.name:L.n+' · '+L.name)+'</span><h1>'+title+'</h1><p class="intro">'+t+'</p><button class="primary" id="main-action">'+label+' <span>↗</span></button>'+alts.map((a,i)=>'<button class="secondary" id="alt-'+i+'">'+a.label+'</button>').join('')+'<p class="keys">击败 '+kills+'　·　得分 '+score+'　·　最高 '+best+'</p></div>';panel.hidden=false;document.getElementById('main-action').onclick=fn;alts.forEach((a,i)=>{document.getElementById('alt-'+i).onclick=a.fn;});}
   // 篝火驿站的烛叟：1~6 购买；第 6 格是这一站的护符（买过就售罄，护符都有了就换成磨刀石）。余烬不够或生命已满时按钮变暗
   // 价格跟着刚走出来的那一层涨（后面几层掉的余烬也更多）
   const relicSlot=()=>shopRelic?{name:ITEMS[shopRelic].name,info:ITEMS[shopRelic].info.replace(/。$/,'')}:{name:'磨刀石',info:'攻击伤害 +8'};
@@ -1024,7 +996,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   const CHARS={
     lamp:{id:'lamp',name:'小引灯人',title:'敏捷 · 二段跳，攻击最弱，每三杀回一口火',info:'只有她能二段跳，刀是三人里最轻的。每打倒三个敌人，余火自己回来一口。',hp:5,dmg:14,atkCd:14/60,swing:14/60,power:.28,speedK:.9,skills:['shade','ring','bolt']},
     bell:{id:'bell',name:'钟锤学徒',title:'近战 · 三连，第三击击退，血厚步慢',info:'连砍三下，第三锤把敌人推开，并震出一道地波。生命多，开局多一瓶药，走得慢，没有二段跳。',hp:6,dmg:36,atkCd:14/60,swing:14/60,power:.86,speedK:.42,skills:['quake','dome','toll']},
-    bow:{id:'bow',name:'拾灯弓手',title:'远程 · 蓄力穿透，血薄，闪避后撤',info:'按住攻击蓄力，蓄满的箭能穿透一排敌人。生命少，开局多一瓶药和三把飞刀，护身铃每层挡一次伤害，闪避向后撤。',hp:4,dmg:17,atkCd:14/60,swing:14/60,power:.46,speedK:.78,skills:['fan','trap','pierce']}};
+    bow:{id:'bow',name:'拾灯弓手',title:'远程 · 蓄力穿透，血薄，闪避后撤',info:'按住攻击蓄力，蓄满自动射出穿透箭，松手可提前出箭。生命少，开局多一瓶药和三把飞刀，护身铃每层挡一次伤害，闪避向后撤。',hp:4,dmg:17,atkCd:14/60,swing:14/60,power:.46,speedK:.78,skills:['fan','trap','pierce']}};
   const SKILLS={
     shade:{name:'影步斩',cost:1,info:'化作影子向前冲斩一段，冲刺中不会受伤。'},
     ring:{name:'魂灯环',cost:2,info:'三团魂火绕身旋转 5 秒：烧伤碰到的敌人，挡下飞来的东西。'},
@@ -1094,7 +1066,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   const nearInk=()=>!!(L.ink!=null&&Math.abs(p.x+p.w/2-L.ink)<80&&p.y+p.h>FLOOR-60);
   const inkPrice=()=>Math.max(20,Math.round(20*L.hpK/5)*5);
   const hasMap=()=>!!(L.rest||L.arena||L.tutorial||(run.maps&&run.maps['s'+stage]));
-  function talkInk(){const price=inkPrice(),th=L.theme;if(hasMap()){startTalk([['墨翁','地图已经在你手上了。按 '+K('map')+' 看看——走过的地方，会画得更清楚。']]);return;}
+  function talkInk(){const price=inkPrice(),th=L.theme;if(hasMap()){startTalk([['墨翁','地图已经在你手上了。'+(coarse()?'点右上角的地图':'按 '+K('map'))+' 看看，走过的地方会画得更清楚。']]);return;}
     const lines=run.inkMet?[]:INK_TALK.intro.slice();run.inkMet=true;
     if(embers<price){lines.push(['墨翁','这一卷要 {g:'+price+' 余烬}。你还差 '+(price-embers)+'。'],['墨翁','不急。我在这儿哼着曲子等你。']);startTalk(lines);return;}
     lines.push(['墨翁','这一卷，{g:'+price+' 余烬}。拿好——别走冤枉路。']);
@@ -1110,7 +1082,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function closeMap(){if(state!=='map')return;state='play';panel.hidden=true;keys={};clearHeld();hudKey='';}
   function renderMap(){const has=hasMap(),ch=chests.length,chOpen=chests.filter(c=>c.open).length,sec=secrets.length,secOpen=secrets.filter(s=>s.open).length,mapped=!L.rest&&!L.arena&&!L.tutorial;
     const info=mapTab==='area'?(mapped?'已探索 '+exploredPct()+'%'+' · ':'')+'宝箱 '+chOpen+' / '+ch+(sec?' · 暗格 '+secOpen+' / '+sec:'')+' · 魂灯碎片 '+((p.shards||0)%3)+' / 3'+(L.ink!=null?(has?' · 墨翁的地图 ✓':' · 还没有这一层的地图：听着哼曲声去找墨翁'):''):'墨迹标出已探索的路段，白色灯标是你的位置';
-    panel.innerHTML='<div class="sheet wide mapview"><div class="tabs"><button data-mtab="area"'+(mapTab==='area'?' class="on"':'')+'>这一层</button><button data-mtab="world"'+(mapTab==='world'?' class="on"':'')+'>沉钟地宫</button></div><div class="map-head"><b>'+(mapTab==='area'?(L.rest?L.name:L.n+' · '+L.name):'沉钟地宫')+'</b><small>'+info+'</small></div><canvas id="map-canvas"></canvas><button class="secondary" id="map-close">合上地图</button><p class="footnote">'+(coarse()?'点右上「地图」也能合上':K('map')+' / Esc 合上 · ← → 切换')+'</p></div>';
+    panel.innerHTML='<div class="sheet wide mapview"><div class="tabs"><button data-mtab="area"'+(mapTab==='area'?' class="on"':'')+'>这一层</button><button data-mtab="world"'+(mapTab==='world'?' class="on"':'')+'>沉钟地宫</button></div><div class="map-head"><b>'+(mapTab==='area'?(L.rest?L.name:L.n+' · '+L.name):'沉钟地宫')+'</b><small>'+info+'</small></div><canvas id="map-canvas"></canvas><button class="secondary" id="map-close">合上地图</button><p class="footnote">'+(coarse()?'':K('map')+' / Esc 合上 · ← → 切换')+'</p></div>';
     panel.hidden=false;panel.querySelectorAll('[data-mtab]').forEach(b=>b.onclick=()=>{mapTab=b.dataset.mtab;renderMap();});document.getElementById('map-close').onclick=closeMap;paintMap();}
   function paintMap(){const cv=document.getElementById('map-canvas');if(!cv||!cv.getContext)return;const cw=Math.max(1,cv.clientWidth||860),chh=Math.round(clamp(cw*.41,218,Math.max(218,Math.min(410,(innerHeight||620)*.52)))),d=Math.min(devicePixelRatio||1,2);cv.width=Math.round(cw*d);cv.height=Math.round(chh*d);if(cv.style)cv.style.height=chh+'px';
     const keep=ctx;try{ctx=cv.getContext('2d');ctx.setTransform(d,0,0,d,0,0);ctx.lineCap='round';ctx.lineJoin='round';if(mapTab==='area')drawAreaMap(cw,chh);else drawWorldMap(cw,chh);}catch(e){}ctx=keep;}
@@ -1228,7 +1200,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   }
   // 小地图（参考死亡细胞）：右上角一条，显示身边 ±800 的地形、出口、宝箱和敌人
   function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();}
-  function drawMinimap(){const cv=mmCanvas||(mmCanvas=document.getElementById('minimap'));if(!cv||!cv.getContext)return;const on=settings.minimap!==false&&state==='play'&&!L.tutorial&&!rotationBlocked;if(cv.hidden!==!on)cv.hidden=!on;if(!on)return;
+  function drawMinimap(){const cv=mmCanvas||(mmCanvas=document.getElementById('minimap'));if(!cv||!cv.getContext)return;const on=settings.minimap!==false&&state==='play'&&!L.tutorial;if(cv.hidden!==!on)cv.hidden=!on;if(!on)return;
     const d=Math.min(devicePixelRatio||1,2),cw=cv.clientWidth||200,chh=cv.clientHeight||66;if(cv.width!==Math.round(cw*d)||cv.height!==Math.round(chh*d)){cv.width=Math.round(cw*d);cv.height=Math.round(chh*d);}
     const keep=ctx;try{ctx=cv.getContext('2d');ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,cw,chh);rr(.5,.5,cw-1,chh-1,8);ctx.fillStyle='rgba(10,12,18,.66)';ctx.fill();ctx.strokeStyle='rgba(219,188,135,.5)';ctx.lineWidth=1;ctx.stroke();ctx.save();rr(1,1,cw-2,chh-2,7);ctx.clip();
       const span=1700,x0=p.x+13-span/2,sx=cw/span,X=x=>(x-x0)*sx,sy=(chh-14)/(FLOOR+24-150),Y=y=>7+(Math.max(150,y)-150)*sy,ok=x=>mapLevel(x)>0,inView=a=>a.x+a.w>x0&&a.x<x0+span;
@@ -1277,7 +1249,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     else if(bagTab==='dex'){body='<h3>敌人</h3><div class="grid">'+FOES.map(d=>{const s=codex.seen[d.id],img=s&&portrait(d.id);return'<div class="cell foe">'+(img?'<img alt="" src="'+img+'">':'<i class="mark q">?</i>')+'<b>'+(s?d.name:'？？？')+'</b><small>'+(s?d.info+'<br>已击倒 '+(codex.kills[d.id]||0):'还没遇见过。')+'</small></div>';}).join('')+'</div>'
         +'<h3>道具 <small>'+Object.keys(ITEMS).filter(id=>codex.items[id]).length+' / '+Object.keys(ITEMS).length+' · 点一下看说明</small></h3><p class="detail" id="dex-detail">得到过的东西会画在这面墙上。</p><div class="gallery">'+Object.keys(ITEMS).map(id=>{const f=codex.items[id];return'<button class="pic'+(f?'':' off')+'" data-dex="'+id+'"><span class="art">'+artImg(id,!f)+'</span><b>'+(f?ITEMS[id].name:'？？？')+'</b></button>';}).join('')+'</div>';}
     else body='<div class="lore">'+LORE.map(l=>codex.lore[l.id]?'<p>'+mark(LORE_ART[l.id]||'bell')+'<b>'+l.title+'</b>'+l.text+'</p>':'<p class="off">'+mark(LORE_ART[l.id]||'bell',true)+'<b>？？？</b>还没读到这段往事。</p>').join('')+'</div>';
-    panel.innerHTML='<div class="sheet wide"><div class="tabs">'+(menuView?[['dex','图鉴'],['lore','传说']]:[['bag','背包'],['dex','图鉴'],['lore','传说']]).map(t=>'<button data-tab="'+t[0]+'"'+(bagTab===t[0]?' class="on"':'')+'>'+t[1]+'</button>').join('')+'</div>'+body+'<button class="secondary" id="bag-close">'+(menuView?'返回':'合上行囊')+'</button><p class="footnote">'+(menuView?'Esc 返回':coarse()?'点右上「行囊」也能合上':K('bag')+' / Esc 合上 · ← → 切换页签')+'</p></div>';
+    panel.innerHTML='<div class="sheet wide"><div class="tabs">'+(menuView?[['dex','图鉴'],['lore','传说']]:[['bag','背包'],['dex','图鉴'],['lore','传说']]).map(t=>'<button data-tab="'+t[0]+'"'+(bagTab===t[0]?' class="on"':'')+'>'+t[1]+'</button>').join('')+'</div>'+body+'<button class="secondary" id="bag-close">'+(menuView?'返回':'合上行囊')+'</button><p class="footnote">'+(coarse()?'':menuView?'Esc 返回':K('bag')+' / Esc 合上 · ← → 切换页签')+'</p></div>';
     panel.hidden=false;panel.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{bagTab=b.dataset.tab;renderBag();});panel.querySelectorAll('[data-sel]').forEach(b=>b.onclick=()=>{sel=b.dataset.sel;hudKey='';renderBag();});
     panel.querySelectorAll('[data-dex]').forEach(b=>b.onclick=()=>{const id=b.dataset.dex,f=codex.items[id],d=document.getElementById('dex-detail');d.innerHTML=f?'<b>'+ITEMS[id].name+'</b>　'+ITEMS[id].info:'还没得到过这样东西。';});document.getElementById('bag-close').onclick=menuView?renderMenu:closeBag;}
   function pickOffer(i){if(state!=='upgrade'||!offers[i])return;const o=offers[i];if(o.kind==='up'){if(o.id==='blade')p.damage+=12;if(o.id==='heart'){p.max+=LIFE;p.hp=p.max;}if(o.id==='flask')p.potions+=2;if(p.skills[o.id]!=null)p.skills[o.id]=Math.min(3,p.skills[o.id]+1);showGain(o.id,1);}else gain(o.id,o.n);if(o.kind==='use')sel=o.id;
@@ -1332,7 +1304,18 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     document.getElementById('item-name').innerHTML=artImg(sel);document.getElementById('quick-item').innerHTML=artImg(sel)+'<b>'+(L.tutorial?'∞':bag[sel])+'</b>';document.getElementById('quick-item').title=ITEMS[sel].name+' · '+K('use')+' 使用 / '+K('cycle')+' 切换';document.getElementById('item-count').textContent=L.tutorial?'∞':bag[sel];if(bag[sel])itemBtn.classList.remove('empty');else itemBtn.classList.add('empty');
     const meter=document.getElementById('soul-meter');if(meter.setAttribute)meter.setAttribute('aria-label','魂火 '+p.soul+' / 3，攻击命中积攒，技能花掉');meter.innerHTML=[0,1,2].map(i=>'<i class="'+(p.soul>i?'filled':'')+(p.soul>=3?' full':'')+'"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5"/><path d="M10 3.6c-1 3-4.1 4.6-4.1 8a4.1 4.1 0 0 0 8.2 0c0-3-2.7-5.2-4.1-8z"/></svg></i>').join('');
     // 技能栏：三格技能的画、按键、要花几格魂火；魂火够了就亮起来。HUD 一份（键盘），触屏按键一份
-    for(let i=1;i<=3;i++){const s=C.skills[i-1],S=SKILLS[s],ok=p.soul>=S.cost,html=artImg('sk_'+s)+'<i>'+K('skill'+i)+'</i><em>'+(L.tutorial?'∞':'<u></u>'.repeat(S.cost))+'</em>';['sk'+i,'tsk'+i].forEach(id=>{const b=document.getElementById(id);if(!b)return;b.hidden=!!run.guided&&i>run.awakened;b.innerHTML=html;b.className='sk'+(id.charAt(0)==='t'?' t'+i:'')+(ok?' ready':'');b.title=S.name+'（'+S.cost+' 格魂火）：'+S.info;});}
+    for(let i=1;i<=3;i++){
+      const s=C.skills[i-1],S=SKILLS[s],art=artImg('sk_'+s),cost=L.tutorial?'∞':'<u></u>'.repeat(S.cost);
+      ['sk'+i,'tsk'+i].forEach(id=>{
+        const b=document.getElementById(id);if(!b)return;
+        const touchSkill=id==='tsk'+i;
+        b.hidden=!!run.guided&&i>run.awakened;
+        b.innerHTML=art+'<i>'+(touchSkill?i:K('skill'+i))+'</i><em>'+cost+'</em>';
+        b.className='sk'+(touchSkill?' t'+i:'')+(p.soul>=S.cost?' ready':'');
+        b.title=S.name+'（'+S.cost+' 格魂火）：'+S.info;
+        if(b.setAttribute)b.setAttribute('aria-label',S.name);
+      });
+    }
     const life=document.getElementById('health'),count=p.max/LIFE,alive=p.hp/LIFE;life.innerHTML=Array.from({length:count},(_,i)=>'<svg class="life-ghost '+(i<alive?'alive':'lost')+'" viewBox="0 0 24 27" aria-hidden="true"><path d="M3 23V11C3 5 6.7 2 12 2s9 3 9 9v12l-3-2-3 3-3-3-3 3-3-3z"/><ellipse cx="9" cy="11" rx="1.3" ry="1.8"/><ellipse cx="15" cy="11" rx="1.3" ry="1.8"/></svg>').join('');if(life.setAttribute)life.setAttribute('aria-label','生命 '+alive+' / '+count+' 个小幽灵');document.getElementById('stats').textContent=alive+' / '+count;document.getElementById('chips').innerHTML=chip('flask',p.potions)+chip('ember',embers);document.getElementById('zone').textContent=zone;
     const bar=document.getElementById('progress-fill');if(bar&&bar.style)bar.style.width=(L.rest||L.arena?0:Math.round(prog*100))+'%';const pb=document.getElementById('progress');if(pb)pb.hidden=!!(L.rest||L.arena);
     document.getElementById('potion-count').textContent=p.potions;if(p.potions)healBtn.classList.remove('empty');else healBtn.classList.add('empty');}
@@ -1591,7 +1574,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       if(p.x+p.w>x-12&&p.x<x+18&&p.y<bot&&p.y+p.h>top+8){p.vy=D.u?-220:150;p.ground=false;p.jumps=1;p.on=null;p.x+=(x-8-p.x)*Math.min(1,dt*10);if(Math.random()<dt*8)ember(x,p.y+20,1,'#ffd7a4');break;}}}
   function currentBand(){if(!L||!L.bands)return null;const x=(p&&p.x)||cam;let b=L.bands[0];for(const q of L.bands)if(x>=q[0])b=q;return b;}
   function noteBand(){const b=currentBand();if(!b||state!=='play')return;if(!bandId){bandId=b[2];return;}if(b[2]!==bandId){bandId=b[2];say(b[1],2.2);}}
-  function step(dt){if(passage){if(!rotationBlocked){passageTick(dt);musicTick();}return;}if(rotationBlocked){stopBattleMusic(.8);return;}const rdt=dt;if(cine&&cine.slow&&cine.t<cine.slow)dt*=.3;if(slowMo>0){slowMo-=rdt;dt*=.35;}time+=dt;if(messageT>0){messageT-=rdt;notice.style.opacity=messageT>0?1:0;}if(gainT>0){gainT-=rdt;if(gainT<=0){gainBox.hidden=true;if(toastQ.length)toastNow(toastQ.shift());}}if(flashT>0)flashT=Math.max(0,flashT-rdt);if(state==='dead'&&deathT<9)deathT+=rdt;
+  function step(dt){if(passage){passageTick(dt);musicTick();return;}const rdt=dt;if(cine&&cine.slow&&cine.t<cine.slow)dt*=.3;if(slowMo>0){slowMo-=rdt;dt*=.35;}time+=dt;if(messageT>0){messageT-=rdt;notice.style.opacity=messageT>0?1:0;}if(gainT>0){gainT-=rdt;if(gainT<=0){gainBox.hidden=true;if(toastQ.length)toastNow(toastQ.shift());}}if(flashT>0)flashT=Math.max(0,flashT-rdt);if(state==='dead'&&deathT<9)deathT+=rdt;
     musicTick(rdt);
     if(credits){credits.t+=rdt;if(credits.t>credits.dur)endCredits();return;}
     if(paused||state==='upgrade'||state==='shop'||state==='bag'||state==='map')return;
@@ -3083,11 +3066,10 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   let lastMenuPaint=-Infinity;
   let simAcc=0;
   function frame(now){requestAnimationFrame(frame);if(!canvas.width)resize();const raw=last?Math.min(.05,(now-last)/1000):1/60;last=now;simAcc+=raw;const t0=performance.now();let steps=0;while(simAcc>=1/60&&steps<3){step(1/60);simAcc-=1/60;steps++;}if(state==='menu'&&panelView==='menu')return;if((state==='menu'||paused)&&now-lastMenuPaint<32)return;lastMenuPaint=now;draw();drawCharIdles();if(state==='play'&&!paused&&settings.fx==='auto'){if(performance.now()-t0>11)slowT+=raw;else slowT=Math.max(0,slowT-raw*.5);if(slowT>2)lowFx=true;}}
-  document.getElementById('portrait-go').onclick=()=>{portraitAccepted=true;resize();};
-  document.getElementById('landscape-go').onclick=async()=>{try{if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();}catch(e){}try{if(window.screen&&screen.orientation&&screen.orientation.lock)await screen.orientation.lock('landscape');}catch(e){}resize();};
+  async function enterLandscape(){try{if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();}catch(e){}try{if(window.screen&&screen.orientation&&screen.orientation.lock)await screen.orientation.lock('landscape');}catch(e){}resize();}
   resize();
   if(preview){
-    window.emberExhibit=true;clears=4;unlocked=4;introSeen=true;tutorialDone=true;
+    window.emberExhibit=true;clears=4;unlocked=4;introSeen=true;
     FOES.forEach(f=>{codex.seen[f.id]=1;codex.kills[f.id]=1;});
     Object.keys(ITEMS).forEach(id=>{codex.items[id]=1;});
     LORE.forEach(l=>{codex.lore[l.id]=1;});BLUEPRINTS.forEach(id=>{codex.blue[id]=1;});
