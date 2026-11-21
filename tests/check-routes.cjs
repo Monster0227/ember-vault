@@ -2,9 +2,9 @@
 const assert = require('node:assert/strict');
 
 // Driven by check-ember.js --routes. Advance the actual physics in 60 Hz steps.
-// Walk from spawn using normal movement, combat and healing, both with and without the ember.
+// Walk from spawn using normal movement, combat and healing, accompanying the ember to every lamp.
 module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, storage }) {
-  function traverse(theme, mode, character) {
+  function traverse(theme, character) {
     const index = stageOf(theme);
     if (theme === 'prison') {
       t.startJourney(character, 0);
@@ -17,7 +17,7 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
     }
     assert.equal(t.stage, index);
     const room = t.L, p = t.player;
-    let frames = 0, deaths = 0, stalled = 0, lastX = p.x, delivered = false;
+    let frames = 0, deaths = 0, stalled = 0, lastX = p.x, lastLit = 0;
     press('KeyD');
     press('KeyJ');
     while (t.stage === index && frames < 160 * 60) {
@@ -28,28 +28,31 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
         press('KeyD');
         press('KeyJ');
       }
-      const lead = p.x - t.run.guideX;
       const danger = room.spikes.some(([x,n]) => p.x > x-40 && p.x < x+n*20+30)
         || room.acid.some(([x,w]) => p.x > x-40 && p.x < x+w+30)
         || t.traps.some(trap => Math.abs(p.x-trap.x) < 100)
         || room.gaps.some(([a,b]) => p.x > a-60 && p.x < b+45);
-      if (t.run.guideX >= room.exit) delivered = true;
-      if (mode === 'direct') { release('KeyA'); press('KeyD'); }
-      else if (!delivered && p.x >= room.exit-55) { release('KeyD'); release('KeyA'); }
-      else if (lead > 385) { release('KeyD'); press('KeyA'); }
-      else if (lead < (danger ? 325 : 95) || delivered) { release('KeyA'); press('KeyD'); }
-      else { release('KeyD'); release('KeyA'); }
+      const wick=room.wicks[t.run.litWicks];
+      if(t.run.litWicks!==lastLit){assert.equal(t.run.litWicks,lastLit+1);lastLit++;}
+      const target=wick?Math.min(wick.x-p.w/2,t.run.guideX+(danger?245:85)):room.exit+55;
+      const moving=Math.abs(target-p.x)>13;
+      if(moving&&target>p.x){release('KeyA');press('KeyD');}
+      else if(moving){release('KeyD');press('KeyA');}
+      else {release('KeyD');release('KeyA');}
       if (p.hp <= Math.max(40, p.max-60)) t.action('heal');
 
       const gap = room.gaps.some(([a,b]) => p.x+26 >= a-38 && p.x < b);
       const wall = t.platforms.some(a => a.solid && a.x > p.x && a.x < p.x+55 && p.y+p.h > a.y+4);
-      if (p.ground && (gap || wall || (stalled > 4 && (mode === 'direct' || lead < 95 || lead > 385)))) t.action('jump');
+      const atWick=wick&&Math.abs(p.x+p.w/2-wick.x)<75;
+      const climb=atWick&&p.y+p.h>wick.y+(wick.y<480?26:48);
+      const descend=atWick&&p.y+p.h<wick.y-(wick.y<480?26:48);
+      if(descend)press('KeyS');else release('KeyS');
+      if (p.ground && (climb || descend || (moving && (gap || wall || stalled>4)))) t.action('jump');
       if (character === 'lamp' && !p.ground && p.vy > 0 &&
           (gap || t.platforms.some(a => a.solid && Math.abs(a.x-p.x) < 60))) t.action('jump');
 
       const foe = t.enemies.find(e => !e.dead && Math.abs(e.x-p.x) < 130 && Math.abs(p.y-e.y) < 80);
-      // A dash or roll near the open doorway would end the escort early.
-      if (foe && (mode === 'direct' || delivered || p.x < room.exit-350)) {
+      if (foe) {
         if (p.soul >= 2 && (!t.run.guided || t.run.awakened >= 2)) t.action('skill2');
         else if (p.soul && character !== 'lamp' && (!t.run.guided || t.run.awakened >= 1)) t.action('skill1');
         if (character === 'bow' && t.bag.knife && Math.abs(p.x-foe.x) < 80) t.action('use');
@@ -60,11 +63,11 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
       t.step(1/60);
       frames++;
     }
-    assert.equal(t.stage, index+1, theme+' / '+character+' '+mode+' must enter next room; stopped at '+p.x+' ember '+t.run.guideX+' deaths '+deaths);
-    assert.equal(delivered, mode === 'escort', theme+' '+mode+' ember delivery');
-    if (mode === 'escort') assert(frames > 78*60, theme+' escort has a distinct slower pace');
-    assert(frames < (mode === 'direct' ? 35 : 140)*60, theme+' '+mode+' route stays short');
-    console.log(theme, character, mode, (frames/60).toFixed(1)+'s', deaths+' deaths');
+    release('KeyA');release('KeyD');release('KeyS');release('KeyJ');
+    assert.equal(t.stage,index+1,theme+' / '+character+' stopped at '+p.x+' feet '+(p.y+p.h)+' fire '+t.run.guideX+' lamps '+lastLit+' deaths '+deaths);
+    assert.equal(lastLit,room.wicks.length);
+    console.log(theme, character, (frames/60).toFixed(1)+'s', deaths+' deaths');
+    assert(frames>=78*60&&frames<=108*60,'main route should take about a minute and a half');
     // Finish the door fade before starting the next journey.
     for (let i=0; i<60; i++) t.step(1/60);
   }
@@ -74,9 +77,7 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
     const index = stageOf(theme), room = t.STAGES[index];
     assert(room.exit-120 <= (oldExit-120)*2/3, theme+' is at least one third shorter');
     assert(room.exit >= t.STAGES[0].exit, 'first map is the shortest');
-    for (const mode of ['direct','escort']) {
-      for (const hero of theme === 'prison' ? ['lamp','bell','bow'] : ['lamp']) traverse(theme, mode, hero);
-    }
+    for (const hero of theme === 'prison' ? ['lamp','bell','bow'] : ['lamp']) traverse(theme, hero);
 
     // Both save slots used absolute coordinates and a 100-pixel fog grid in v2.
     for (const selected of [false,true]) {
@@ -109,13 +110,26 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
       assert.equal(fog.length, Math.ceil(room.w/100));
       assert(fog[0] && fog[fog.length-1] && !fog[Math.floor(fog.length/2)]);
       const persisted = JSON.parse(storage[key]);
-      assert.equal(persisted.v, 3);
+      assert.equal(persisted.v, 4);
+      assert.equal(persisted.run.litWicks,room.wicks.filter(w=>w.x<=t.run.guideX).length);
       t.showMenu();
       t.continueRun(selected);
       assert.equal(t.player.checkX, persisted.checkX);
       assert.equal(t.run.guideX, persisted.run.guideX);
+
+      // v3 used the compact map coordinates but saved only the travelling ember.
+      const legacyX=selected?room.exit:room.wicks[1].x-1;
+      const v3=JSON.parse(storage[key]);
+      v3.v=3;
+      v3.run.guideX=legacyX;
+      delete v3.run.litWicks;
+      storage[key]=JSON.stringify(v3);
+      t.showMenu();
+      t.continueRun(selected);
+      assert.equal(t.run.litWicks,room.wicks.filter(w=>w.x<=legacyX).length);
+      assert.equal(t.run.doorLift,selected?1:0);
     }
-    console.log(theme, 'v2 journey and selected-route save migration passed');
+    console.log(theme, 'v2 and v3 journey and selected-route saves migrated');
   }
 };
 

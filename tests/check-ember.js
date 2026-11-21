@@ -29,7 +29,7 @@ sandbox.window=sandbox;
 sandbox.matchMedia=() => ({matches:false});
 let code=fs.readFileSync(require('path').join(__dirname,'../dist/js/ember.js'),'utf8');
 // Instrument only this VM instance; no test controls are shipped in the browser.
-code=code.replace(/\}\)\(\);\s*$/, 'window.test={step,action,selectLevel,renderChapters,showWinPanel,hurt,strike,killEnemy,startChapter,finish,reset,respawn,loadStage,retryStage,STAGES,TALK,get bag(){return bag},get relics(){return relics},get keepsakes(){return keepsakes},get sel(){return sel},set sel(v){sel=v},get offers(){return offers},get flags(){return flags},get run(){return run},get codex(){return codex},get thrown(){return thrown},get breakables(){return breakables},get hazards(){return hazards},get loot(){return loot},get floats(){return floats},get gateK(){return gateK},get talk(){return talk},set introSeen(v){introSeen=v},get player(){return p},get enemies(){return enemies},get shots(){return shots},get waves(){return waves},get orbs(){return orbs},get fx(){return fx},get chunks(){return chunks},get platforms(){return platforms},get chests(){return chests},get state(){return state},get score(){return score},get stage(){return stage},get unlocked(){return unlocked},set unlocked(v){unlocked=v},get L(){return L},get embers(){return embers},set embers(v){embers=v},get checkpoint(){return checkpoint},get credits(){return credits},get cine(){return cine},get traps(){return traps},get lamps(){return lamps},get clears(){return clears},set clears(v){clears=v},get cycle(){return cycle},set cycle(v){cycle=v},useSkill,get secrets(){return secrets},hasMap,parseLine,relicPool,gainShard,gainBlueprint,startTutorial,finishTutorial,TUTORIAL,CHARS,SKILLS,showMenu,startJourney,continueRun,finishRebind,SONGS,get settings(){return settings},get BIND(){return BIND},set rebinding(v){rebinding=v},get cam(){return cam},set cam(v){cam=v}};})();');
+code=code.replace(/\}\)\(\);\s*$/, 'window.test={step,action,selectLevel,renderChapters,showWinPanel,hurt,strike,killEnemy,startChapter,finish,reset,respawn,loadStage,retryStage,STAGES,TALK,get bag(){return bag},get relics(){return relics},get keepsakes(){return keepsakes},get sel(){return sel},set sel(v){sel=v},get offers(){return offers},get flags(){return flags},get run(){return run},get codex(){return codex},get thrown(){return thrown},get breakables(){return breakables},get hazards(){return hazards},get loot(){return loot},get floats(){return floats},get gateK(){return gateK},get talk(){return talk},set introSeen(v){introSeen=v},get player(){return p},get enemies(){return enemies},get shots(){return shots},get waves(){return waves},get orbs(){return orbs},get fx(){return fx},get chunks(){return chunks},get platforms(){return platforms},get chests(){return chests},get state(){return state},get score(){return score},get stage(){return stage},get unlocked(){return unlocked},set unlocked(v){unlocked=v},get L(){return L},get embers(){return embers},set embers(v){embers=v},get checkpoint(){return checkpoint},get credits(){return credits},get sceneArt(){return sceneA},get cine(){return cine},get traps(){return traps},get clears(){return clears},set clears(v){clears=v},get cycle(){return cycle},set cycle(v){cycle=v},useSkill,get secrets(){return secrets},hasMap,parseLine,relicPool,gainShard,gainBlueprint,startTutorial,finishTutorial,TUTORIAL,CHARS,SKILLS,showMenu,startJourney,continueRun,finishRebind,SONGS,get settings(){return settings},get BIND(){return BIND},set rebinding(v){rebinding=v},get cam(){return cam},set cam(v){cam=v}};})();');
 vm.runInNewContext(code,sandbox);
 const t=sandbox.test;
 function advance(seconds) { for(let i=0;i<Math.ceil(seconds*120);i++)t.step(1/120); }
@@ -50,6 +50,13 @@ test('movement, landing, double jump and no third jump',()=>{
   t.action('jump');advance(.08);assert.equal(t.player.jumps,2);
   const vy=t.player.vy;t.action('jump');advance(.02);assert(t.player.vy>vy);
   advance(1.3);assert(t.player.ground);assert.equal(t.player.jumps,0);
+});
+test('a quick jump tap between ticks makes a short hop and a held jump clears a lamp shelf',()=>{
+  advance(.05);const p=t.player, floor=p.y;
+  press('Space');release('Space');advance(.15);const tap=floor-p.y;assert(tap>5&&tap<30);
+  advance(.6);press('Space');advance(.28);release('Space');assert(floor-p.y>80);
+  t.reset(true,'bell');Object.assign(t.player,{y:200,ground:false,coyote:0,jumps:0,vy:60});
+  t.action('jump');advance(.02);assert(t.player.vy>0,'the bell cannot jump in midair after grace expires');t.reset(true,'lamp');
 });
 test('platform collision and landing above ground',()=>{
   t.player.x=520;t.player.y=280;t.player.vy=0;advance(.5);
@@ -187,22 +194,29 @@ test('four chapters contain five maps, four dedicated boss arenas and four wayst
     assert(s.arena?s.seal<s.w-100:s.exit<s.w-100,s.name+' has a way out');
     const floor=t.platforms.filter(a=>a.h>100&&!a.solid).reduce((n,a)=>n+a.w,0),gaps=s.gaps.reduce((n,g)=>n+g[1]-g[0],0);assert.equal(floor+gaps,s.w);});
 });
-test('all five main-map east doors work with the ember left behind or fully escorted',()=>{
-  const rooms=t.STAGES.filter(s=>s.lesson);
-  assert.equal(rooms.length,5);
-  for(const room of rooms){
-    const index=t.STAGES.indexOf(room);
-    for(const escorted of [false,true]){
-      t.loadStage(index);
-      t.run.guideX=escorted?room.exit:120;
-      t.player.x=room.exit-40;
-      press('KeyD');advance(1.4);release('KeyD');
-      assert.equal(t.stage,index+1,room.name+' east exit, escorted='+escorted);
+test('each main-map door stays shut until every wick catches in order',()=>{
+  for(const room of t.STAGES.filter(s=>s.lesson)){
+    const index=t.STAGES.indexOf(room);t.loadStage(index);
+    t.player.inv=100;
+    for(const [i,wick] of room.wicks.entries()){
+      Object.assign(t.player,{x:room.exit-38,y:480-t.player.h,vy:0});
+      press('KeyD');advance(.5);release('KeyD');
+      assert.equal(t.stage,index);assert.equal(t.run.litWicks,i);
+      assert(t.player.x+t.player.w<=room.exit-10);
+      t.run.guideX=wick.x;
+      if(wick.y<480-48){
+        Object.assign(t.player,{x:wick.x-13,y:480-t.player.h,vy:0});advance(.04);
+        assert.equal(t.run.litWicks,i,'a raised lamp needs a jump');
+      }
+      Object.assign(t.player,{x:wick.x-13,y:wick.y-t.player.h,vy:0});advance(.04);
+      assert.equal(t.run.litWicks,i+1,room.name+' wick '+i);
     }
+    advance(.5);assert.equal(t.run.doorLift,1);
+    press('KeyD');advance(1.4);release('KeyD');assert.equal(t.stage,index+1);
   }
 });
 test('the exit leads to a boss arena, then a waystation and the next chapter with stats kept',()=>{
-  t.player.damage=40;t.player.potions=2;t.embers=55;t.player.x=t.L.exit+20;t.player.y=428;advance(1);
+  t.run.litWicks=t.L.wicks.length;t.run.doorLift=1;t.player.damage=40;t.player.potions=2;t.embers=55;t.player.x=t.L.exit+20;t.player.y=428;advance(1);
   assert(t.L.arena);assert.equal(t.player.damage,40);assert.equal(t.embers,55);
   t.enemies.find(e=>e.type==='boss').dead=true;t.player.x=t.L.seal+20;advance(1);assert(t.L.rest);
   t.player.x=t.L.exit+20;t.player.y=428;advance(1);finishTalk();assert.equal(t.L.name,'腐水下水道');assert.equal(t.player.potions,2);assert.equal(t.embers,55);
@@ -374,7 +388,7 @@ test('a defeated chapter boss unlocks a replay with a balanced fresh loadout',()
   t.reset();const idx=t.STAGES.findIndex(s=>s.bossKind==='lock');t.loadStage(idx);t.killEnemy(t.enemies[0]);assert.equal(storage['ember:unlocked'],'2');assert.equal(nodes['chapter-2'].disabled,false);assert.equal(nodes['chapter-3'].disabled,true);t.startChapter(2);assert.equal(t.L.chapter,2);assert(t.L.chapterStart);assert.equal(t.state,'talk');assert.equal(t.player.damage,23);assert.equal(t.player.hp,120);assert.equal(t.player.potions,2);assert.equal(t.bag.bomb,2);
 });
 test('all four boss arenas have an intro, a sealed exit and the correct continuation',()=>{
-  for(const arena of t.STAGES.filter(s=>s.arena)){t.reset();const index=t.STAGES.indexOf(arena);t.loadStage(index);t.player.x=arena.trigger+20;t.player.y=428;t.player.inv=100;advance(.03);assert.equal(t.state,'talk',arena.name+' has an introduction');finishTalk();const b=t.enemies.find(e=>e.type==='boss');t.player.x=arena.seal+20;advance(.03);assert.equal(t.state,'play');assert.equal(t.stage,index);assert(t.player.x<=arena.seal);t.killEnemy(b);assert.equal(t.state,'cine',arena.name+' has a defeat scene');finishCine();assert.equal(t.state,'talk',arena.name+' has a conclusion');finishTalk();t.player.x=arena.seal+20;advance(1.8);if(arena.bossKind==='warden'){finishCine();assert.equal(t.state,'win');}else{assert.equal(t.stage,index+1);assert(t.L.rest);}}
+  for(const arena of t.STAGES.filter(s=>s.arena)){t.reset();const index=t.STAGES.indexOf(arena);t.loadStage(index);t.player.x=arena.trigger+20;t.player.y=428;t.player.inv=100;advance(.03);assert.equal(t.state,'talk',arena.name+' has an introduction');assert(t.talk.arena);assert(!t.sceneArt);finishTalk();const b=t.enemies.find(e=>e.type==='boss');t.player.x=arena.seal+20;advance(.03);assert.equal(t.state,'play');assert.equal(t.stage,index);assert(t.player.x<=arena.seal);t.killEnemy(b);assert.equal(t.state,'cine',arena.name+' has a defeat scene');finishCine();assert.equal(t.state,'talk',arena.name+' has a conclusion');assert(t.talk.arena);assert(!t.sceneArt);finishTalk();t.player.x=arena.seal+20;advance(1.8);if(arena.bossKind==='warden'){finishCine();assert.equal(t.state,'win');}else{assert.equal(t.stage,index+1);assert(t.L.rest);}}
 });
 test('later chapters introduce their own story when entered from the waystation',()=>{
   for(const chapter of [2,3,4]){t.reset();const idx=t.STAGES.findIndex(s=>s.chapterStart&&s.chapter===chapter);t.loadStage(idx-1);assert(t.L.rest);t.player.x=t.L.exit+25;t.player.y=428;advance(1);assert.equal(t.stage,idx);assert.equal(t.state,'talk');assert(t.talk.lines.length>=3);finishTalk();assert.equal(t.state,'play');}
@@ -596,17 +610,18 @@ test('a fatal moth dive names the attack in the result panel',()=>{
 test('the ramparts shortcut carries a relit ember and a continued run remembers it',()=>{
   t.loadStage(stageOf('ramparts'));const wall=t.L.shortcut;
   t.player.x=wall.open+20;advance(.1);assert(!t.run.shortcut);
-  t.run.guideX=wall.dest;advance(.1);assert(t.run.shortcut);
-  t.retryStage();t.player.x=wall.door-13;advance(.05);
+  t.run.guideX=wall.dest;advance(.1);assert(!t.run.shortcut);
+  t.run.litWicks=t.L.wicks.filter(w=>w.x<=wall.dest).length;t.run.guideX=wall.dest;advance(.1);assert(t.run.shortcut);
+  t.retryStage();const kept=t.run.litWicks;assert.equal(kept,wall.wicks);t.player.x=wall.door-13;advance(.05);assert.equal(t.run.litWicks,kept);
   assert(t.player.x>=wall.dest-10);assert(t.run.guideX>=wall.dest);
-  t.player.x=t.L.checks.at(-1)-13;t.player.y=428;advance(.05);
+  const wick=t.L.wicks[t.run.litWicks];t.run.guideX=wick.x;t.player.x=wick.x-13;t.player.y=wick.y-t.player.h;advance(.05);
   const saved=JSON.parse(storage['ember:save']);assert(saved.run.guideX>=wall.dest);
   t.showMenu();t.continueRun();assert.equal(t.run.guideX,saved.run.guideX);
   delete saved.run.guideX;storage['ember:save']=JSON.stringify(saved);
   t.showMenu();t.continueRun();assert.equal(t.run.guideX,saved.checkX);
   assert(t.run.guideX<t.L.exit);
   t.player.x=t.L.exit-40;press('KeyD');advance(1.4);release('KeyD');
-  assert.equal(t.stage,saved.stage+1,'a legacy checkpoint can exit without completing the escort');
+  assert.equal(t.stage,saved.stage,'the remaining fires still secure the east door');
 });
 test('the prison starts on an open path and the first guard waits for a hit',()=>{
   const first=t.enemies[0],start=t.run.guideX;
