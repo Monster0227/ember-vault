@@ -187,9 +187,22 @@ test('four chapters contain five maps, four dedicated boss arenas and four wayst
     assert(s.arena?s.seal<s.w-100:s.exit<s.w-100,s.name+' has a way out');
     const floor=t.platforms.filter(a=>a.h>100&&!a.solid).reduce((n,a)=>n+a.w,0),gaps=s.gaps.reduce((n,g)=>n+g[1]-g[0],0);assert.equal(floor+gaps,s.w);});
 });
+test('all five main-map east doors work with the ember left behind or fully escorted',()=>{
+  const rooms=t.STAGES.filter(s=>s.lesson);
+  assert.equal(rooms.length,5);
+  for(const room of rooms){
+    const index=t.STAGES.indexOf(room);
+    for(const escorted of [false,true]){
+      t.loadStage(index);
+      t.run.guideX=escorted?room.exit:120;
+      t.player.x=room.exit-40;
+      press('KeyD');advance(1.4);release('KeyD');
+      assert.equal(t.stage,index+1,room.name+' east exit, escorted='+escorted);
+    }
+  }
+});
 test('the exit leads to a boss arena, then a waystation and the next chapter with stats kept',()=>{
-  t.player.x=t.L.exit+20;t.player.y=428;advance(1);assert(!t.L.arena,'the east door needs its travelling ember');
-  t.run.guideX=t.L.exit;t.player.damage=40;t.player.potions=2;t.embers=55;t.player.x=t.L.exit+20;t.player.y=428;advance(1);
+  t.player.damage=40;t.player.potions=2;t.embers=55;t.player.x=t.L.exit+20;t.player.y=428;advance(1);
   assert(t.L.arena);assert.equal(t.player.damage,40);assert.equal(t.embers,55);
   t.enemies.find(e=>e.type==='boss').dead=true;t.player.x=t.L.seal+20;advance(1);assert(t.L.rest);
   t.player.x=t.L.exit+20;t.player.y=428;advance(1);finishTalk();assert.equal(t.L.name,'腐水下水道');assert.equal(t.player.potions,2);assert.equal(t.embers,55);
@@ -581,6 +594,9 @@ test('the ramparts shortcut carries a relit ember and a continued run remembers 
   t.showMenu();t.continueRun();assert.equal(t.run.guideX,saved.run.guideX);
   delete saved.run.guideX;storage['ember:save']=JSON.stringify(saved);
   t.showMenu();t.continueRun();assert.equal(t.run.guideX,saved.checkX);
+  assert(t.run.guideX<t.L.exit);
+  t.player.x=t.L.exit-40;press('KeyD');advance(1.4);release('KeyD');
+  assert.equal(t.stage,saved.stage+1,'a legacy checkpoint can exit without completing the escort');
 });
 test('the prison starts on an open path and the first guard waits for a hit',()=>{
   const first=t.enemies[0],start=t.run.guideX;

@@ -690,7 +690,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     startTalk(CHAPTERS[0].story);
   }
   const prisonLessons=[
-    [140,'left','right','跟着金色火种向东走，离得太远它会停下'],
+    [140,'left','right','向东走到出口就能过关，金色火种可以顺路护送'],
     [255,'jump',null,'试着跳上矮台，也可以沿平地走'],
     [485,'attack',null,'试着打第一下；守卫会在挨打后还手'],
     [850,'roll',null,'翻滚穿过来袭的兵刃'],
@@ -722,7 +722,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       return;
     }
     const door=L.lesson.door,trap=traps.find(t=>t.teach);if(p.x>door+48)run['les'+stage]=1;if(run['les'+stage])return;
-    if(trap){const u=trap.t/(trap.per||3);if(trap.warn||(trap.k==='ballista'&&u>.45)||(trap.k==='piston'&&u>.7))trap.sawWarn=true;const hot=!!(trap.up||trap.on||(trap.k==='ballista'&&trap.kick>0)||(trap.k==='piston'&&u>=.86&&u<.94));if(trap.sawWarn&&hot){run['les'+stage]=1;say('石门开了 · 护送金色火种到东门，走远了它会停下',4);beep(520,.12,'sine');return;}}
+    if(trap){const u=trap.t/(trap.per||3);if(trap.warn||(trap.k==='ballista'&&u>.45)||(trap.k==='piston'&&u>.7))trap.sawWarn=true;const hot=!!(trap.up||trap.on||(trap.k==='ballista'&&trap.kick>0)||(trap.k==='piston'&&u>=.86&&u<.94));if(trap.sawWarn&&hot){run['les'+stage]=1;say('石门开了 · 向东走到出口就能过关',4);beep(520,.12,'sine');return;}}
     if(p.x+p.w>door-6&&p.x<door+40){p.x=door-p.w-8;if(p.vx>0)p.vx=0;}if(run.lessonSaid!==stage&&p.x<door){run.lessonSaid=stage;say(L.lesson.hint,4.2);}}
   // Each main map has one travelling ember. Keep it within sight to lead it to the exit.
   const emberTravelSeconds={prison:178,sewers:184,ramparts:181,ossuary:188,tower:190};
@@ -731,15 +731,12 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     const distance=p.x+p.w/2-run.guideX;
     if(distance < -100||distance > 420)return;
     run.guideX=Math.min(L.exit,run.guideX+(L.exit-120)*dt/emberTravelSeconds[L.theme]);
-    if(run.guideX===L.exit){say('火种点亮了东门 · 可以出发了',3);beep(760,.25);}
+    if(run.guideX===L.exit){say('火种已送达东门',3);beep(760,.25);}
   }
   function guideGoal(){
-    if(run.guideX>=L.exit)return '东门已亮 · 进门';
-    const delta=p.x+p.w/2-run.guideX;
+    if(p.x>L.exit-300)return '穿过东门 →';
     const percent=Math.floor(100*(run.guideX-120)/(L.exit-120));
-    if(delta>420)return '← 回到火种身边 · '+percent+'%';
-    if(delta < -100)return '向右追上火种 → · '+percent+'%';
-    return '护送火种向东 · '+percent+'%';
+    return '向东走到出口 · 可选护送 '+percent+'%';
   }
   function drawGuide(){
     const x=run.guideX;
@@ -1719,7 +1716,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(kind!==nearKind){nearKind=kind;nearChest=!!kind;chestBtn.hidden=!kind;chestBtn.textContent={fire:'休息',shop:'商店',npc:'交谈',ink:'地图',lore:'查看'}[kind]||'开箱';}
     if(kind&&messageT<.2){const t=coarse(),E=K('interact');say({fire:t?'篝火 · 点「休息」恢复状态':'篝火 · 按 '+E+' 休息（每站一次）',shop:t?'烛叟 · 点「商店」':'烛叟 · 按 '+E+' 交谈、交易',npc:t?'守钟人 · 点「交谈」':'守钟人 · 按 '+E+' 交谈',ink:hasMap()?'制图人墨翁 · 地图已经在你手上了':'制图人墨翁 · '+(t?'点「地图」':'按 '+E)+' 买这一层的地图（'+inkPrice()+' 余烬）',lore:t?'有什么东西在发光 · 点「查看」':'有什么东西在发光 · 按 '+E+' 查看',chest:t?'铜色宝箱 · 点「开箱」':'铜色宝箱 · 按 '+E+' 打开'}[kind],.3);}
     if(L.seal){if(p.x>L.seal+10){if(enemies.some(e=>e.type==='boss'&&!e.dead)){p.x=L.seal;say('铁闸紧闭 · 先击败首领',2);}else if(L.bossKind==='warden')finish(true);else{nextStage();return;}}}
-    else if((!L.lesson||run.guideX>=L.exit)&&p.x+p.w/2>L.exit+20&&p.ground){nextStage();return;}
+    else if(p.x+p.w/2>L.exit+20&&p.ground){nextStage();return;}
     // 镜头：首领战时框住铁闸与封印之间的场地
     const lead=p.face>0?.35:.62,lo=bossOn?Math.min(L.gate-40,WORLD-W):0,hi=bossOn?Math.max(lo,Math.min(WORLD-W,L.seal+130-W)):Math.max(0,WORLD-W);cam+=(clamp(p.x-W*lead,lo,hi)-cam)*Math.min(1,dt*5);if(bossCardT>0){bossCardT=Math.max(0,bossCardT-dt);notice.style.opacity=0;}markSeen();
     // 墨翁的哼曲：越近越清楚
