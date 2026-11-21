@@ -29,7 +29,7 @@ sandbox.window=sandbox;
 sandbox.matchMedia=() => ({matches:false});
 let code=fs.readFileSync(require('path').join(__dirname,'../dist/js/ember.js'),'utf8');
 // Instrument only this VM instance; no test controls are shipped in the browser.
-code=code.replace(/\}\)\(\);\s*$/, 'window.test={step,action,selectLevel,renderChapters,showWinPanel,hurt,strike,killEnemy,startChapter,finish,reset,respawn,loadStage,retryStage,STAGES,TALK,get bag(){return bag},get relics(){return relics},get keepsakes(){return keepsakes},get sel(){return sel},set sel(v){sel=v},get offers(){return offers},get flags(){return flags},get run(){return run},get codex(){return codex},get thrown(){return thrown},get breakables(){return breakables},get hazards(){return hazards},get loot(){return loot},get floats(){return floats},get gateK(){return gateK},get talk(){return talk},set introSeen(v){introSeen=v},get player(){return p},get enemies(){return enemies},get shots(){return shots},get waves(){return waves},get orbs(){return orbs},get fx(){return fx},get chunks(){return chunks},get platforms(){return platforms},get chests(){return chests},get state(){return state},get score(){return score},get stage(){return stage},get unlocked(){return unlocked},set unlocked(v){unlocked=v},get L(){return L},get embers(){return embers},set embers(v){embers=v},get checkpoint(){return checkpoint},get credits(){return credits},get sceneArt(){return sceneA},get cine(){return cine},get traps(){return traps},get clears(){return clears},set clears(v){clears=v},get cycle(){return cycle},set cycle(v){cycle=v},useSkill,get secrets(){return secrets},hasMap,parseLine,relicPool,gainShard,gainBlueprint,startTutorial,finishTutorial,TUTORIAL,CHARS,SKILLS,showMenu,startJourney,continueRun,finishRebind,SONGS,get settings(){return settings},get BIND(){return BIND},set rebinding(v){rebinding=v},get cam(){return cam},set cam(v){cam=v}};})();');
+code=code.replace(/\}\)\(\);\s*$/, 'window.test={step,action,selectLevel,renderChapters,showWinPanel,hurt,strike,hitEnemy,killEnemy,startChapter,finish,reset,respawn,loadStage,retryStage,STAGES,TALK,get bag(){return bag},get relics(){return relics},get keepsakes(){return keepsakes},get sel(){return sel},set sel(v){sel=v},get offers(){return offers},get flags(){return flags},get run(){return run},get codex(){return codex},get thrown(){return thrown},get breakables(){return breakables},get hazards(){return hazards},get loot(){return loot},get floats(){return floats},get gateK(){return gateK},get talk(){return talk},set introSeen(v){introSeen=v},get player(){return p},get enemies(){return enemies},get shots(){return shots},get waves(){return waves},get orbs(){return orbs},get fx(){return fx},get chunks(){return chunks},get platforms(){return platforms},get chests(){return chests},get state(){return state},get score(){return score},get stage(){return stage},get unlocked(){return unlocked},set unlocked(v){unlocked=v},get L(){return L},get embers(){return embers},set embers(v){embers=v},get checkpoint(){return checkpoint},get credits(){return credits},get sceneArt(){return sceneA},get cine(){return cine},get traps(){return traps},get clears(){return clears},set clears(v){clears=v},get cycle(){return cycle},set cycle(v){cycle=v},useSkill,get secrets(){return secrets},hasMap,parseLine,relicPool,gainShard,gainBlueprint,startTutorial,finishTutorial,TUTORIAL,CHARS,SKILLS,showMenu,startJourney,continueRun,finishRebind,SONGS,get settings(){return settings},get BIND(){return BIND},set rebinding(v){rebinding=v},get cam(){return cam},set cam(v){cam=v}};})();');
 vm.runInNewContext(code,sandbox);
 const t=sandbox.test;
 function advance(seconds) { for(let i=0;i<Math.ceil(seconds*120);i++)t.step(1/120); }
@@ -50,6 +50,14 @@ test('movement, landing, double jump and no third jump',()=>{
   t.action('jump');advance(.08);assert.equal(t.player.jumps,2);
   const vy=t.player.vy;t.action('jump');advance(.02);assert(t.player.vy>vy);
   advance(1.3);assert(t.player.ground);assert.equal(t.player.jumps,0);
+});
+test('the ember follows both shoulders, jumps and ground rolls',()=>{
+  const p=t.player;
+  const attached=()=>{assert(Math.abs(t.run.guideX-(p.x+p.w/2))<=35.01);assert(Math.abs(t.run.guideY-(p.y+5))<=23.01);};
+  press('KeyD');advance(.6);attached();assert(t.run.guideX<p.x);
+  t.action('jump');advance(.2);attached();assert(t.run.guideY<385);
+  release('KeyD');press('KeyA');advance(.6);attached();assert(t.run.guideX>p.x+p.w);
+  advance(.3);t.action('roll');advance(.11);attached();release('KeyA');
 });
 test('a quick jump tap between ticks makes a short hop and a held jump clears a lamp shelf',()=>{
   advance(.05);const p=t.player, floor=p.y;
@@ -203,12 +211,20 @@ test('each main-map door stays shut until every wick catches in order',()=>{
       press('KeyD');advance(.5);release('KeyD');
       assert.equal(t.stage,index);assert.equal(t.run.litWicks,i);
       assert(t.player.x+t.player.w<=room.exit-10);
-      t.run.guideX=wick.x;
+      Object.assign(t.player,{x:wick.x-60,y:480-t.player.h,vy:0});advance(.04);
+      const ward=t.enemies.find(e=>e.ward&&!e.dead);
+      if(ward){
+        const counter=()=>t.hitEnemy(ward,99,1,false,ward.x,ward.y,0);
+        const hp=ward.hp;
+        counter();assert.equal(ward.hp,hp,'armour protects the core');
+        for(let j=0;j<hp;j++){ward.phaseName='open';counter();}
+        assert(ward.dead);assert.equal(t.run.wardLeft,0);
+      }
       if(wick.y<480-48){
         Object.assign(t.player,{x:wick.x-13,y:480-t.player.h,vy:0});advance(.04);
         assert.equal(t.run.litWicks,i,'a raised lamp needs a jump');
       }
-      Object.assign(t.player,{x:wick.x-13,y:wick.y-t.player.h,vy:0});advance(.04);
+      Object.assign(t.player,{x:wick.x-13,y:wick.y-t.player.h,vy:0});advance(.17);
       assert.equal(t.run.litWicks,i+1,room.name+' wick '+i);
     }
     advance(.5);assert.equal(t.run.doorLift,1);
@@ -613,12 +629,15 @@ test('the ramparts shortcut carries a relit ember and a continued run remembers 
   t.run.guideX=wall.dest;advance(.1);assert(!t.run.shortcut);
   t.run.litWicks=t.L.wicks.filter(w=>w.x<=wall.dest).length;t.run.guideX=wall.dest;advance(.1);assert(t.run.shortcut);
   t.retryStage();const kept=t.run.litWicks;assert.equal(kept,wall.wicks);t.player.x=wall.door-13;advance(.05);assert.equal(t.run.litWicks,kept);
-  assert(t.player.x>=wall.dest-10);assert(t.run.guideX>=wall.dest);
-  const wick=t.L.wicks[t.run.litWicks];t.run.guideX=wick.x;t.player.x=wick.x-13;t.player.y=wick.y-t.player.h;advance(.05);
-  const saved=JSON.parse(storage['ember:save']);assert(saved.run.guideX>=wall.dest);
-  t.showMenu();t.continueRun();assert.equal(t.run.guideX,saved.run.guideX);
-  delete saved.run.guideX;storage['ember:save']=JSON.stringify(saved);
-  t.showMenu();t.continueRun();assert.equal(t.run.guideX,saved.checkX);
+  const attached=()=>assert(Math.abs(t.run.guideX-t.player.x-t.player.w/2)<=35);
+  assert(t.player.x>=wall.dest-10);attached();
+  const wick=t.L.wicks[kept];t.player.x=wick.x-13;t.player.y=wick.y-t.player.h;advance(.05);
+  const ward=t.enemies.find(e=>e.ward&&!e.dead);ward.phaseName='open';
+  t.hitEnemy(ward,99,1,false,ward.x,ward.y,0);
+  const saved=JSON.parse(storage['ember:save']);assert.equal(saved.run.wardLeft,ward.max-1);
+  t.showMenu();t.continueRun();attached();assert.equal(t.run.wardLeft,saved.run.wardLeft);
+  saved.v=4;delete saved.run.wardLeft;delete saved.run.guideX;storage['ember:save']=JSON.stringify(saved);
+  t.showMenu();t.continueRun();assert.equal(t.run.litWicks,kept);attached();
   assert(t.run.guideX<t.L.exit);
   t.player.x=t.L.exit-40;press('KeyD');advance(1.4);release('KeyD');
   assert.equal(t.stage,saved.stage,'the remaining fires still secure the east door');

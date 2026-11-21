@@ -28,16 +28,14 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
         press('KeyD');
         press('KeyJ');
       }
-      const danger = room.spikes.some(([x,n]) => p.x > x-40 && p.x < x+n*20+30)
-        || room.acid.some(([x,w]) => p.x > x-40 && p.x < x+w+30)
-        || t.traps.some(trap => Math.abs(p.x-trap.x) < 100)
-        || room.gaps.some(([a,b]) => p.x > a-60 && p.x < b+45);
       const wick=room.wicks[t.run.litWicks];
       if(t.run.litWicks!==lastLit){assert.equal(t.run.litWicks,lastLit+1);lastLit++;}
-      const target=wick?Math.min(wick.x-p.w/2,t.run.guideX+(danger?245:85)):room.exit+55;
+      const ward=t.enemies.find(e=>e.ward&&!e.dead);
+      const target=ward ? Math.max(wick.x-65,Math.min(wick.x+36,ward.x-40)) : wick?wick.x-p.w/2:room.exit+55;
       const moving=Math.abs(target-p.x)>13;
       if(moving&&target>p.x){release('KeyA');press('KeyD');}
       else if(moving){release('KeyD');press('KeyA');}
+      else if(ward&&Math.sign(ward.x-p.x)!==p.face&&Math.abs(ward.x-p.x)>5){release(ward.x>p.x?'KeyA':'KeyD');press(ward.x>p.x?'KeyD':'KeyA');}
       else {release('KeyD');release('KeyA');}
       if (p.hp <= Math.max(40, p.max-60)) t.action('heal');
 
@@ -47,7 +45,7 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
       const climb=atWick&&p.y+p.h>wick.y+(wick.y<480?26:48);
       const descend=atWick&&p.y+p.h<wick.y-(wick.y<480?26:48);
       if(descend)press('KeyS');else release('KeyS');
-      if (p.ground && (climb || descend || (moving && (gap || wall || stalled>4)))) t.action('jump');
+      if (p.ground && ((ward?.phaseName==='aim'&&ward.age>ward.span-.19) || climb || descend || (moving && (gap || wall || stalled>4)))) t.action('jump');
       if (character === 'lamp' && !p.ground && p.vy > 0 &&
           (gap || t.platforms.some(a => a.solid && Math.abs(a.x-p.x) < 60))) t.action('jump');
 
@@ -67,7 +65,7 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
     assert.equal(t.stage,index+1,theme+' / '+character+' stopped at '+p.x+' feet '+(p.y+p.h)+' fire '+t.run.guideX+' lamps '+lastLit+' deaths '+deaths);
     assert.equal(lastLit,room.wicks.length);
     console.log(theme, character, (frames/60).toFixed(1)+'s', deaths+' deaths');
-    assert(frames>=78*60&&frames<=108*60,'main route should take about a minute and a half');
+    assert(frames>=78*60&&frames<=105*60,theme+' main route time '+frames/60);
     // Finish the door fade before starting the next journey.
     for (let i=0; i<60; i++) t.step(1/60);
   }
@@ -102,20 +100,20 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
       assert(room.checks.includes(t.player.checkX));
       assert.equal(t.player.x, t.player.checkX+20);
       assert(t.platforms.some(a => a.groundBlock && a.x <= t.player.x && t.player.x+t.player.w <= a.x+a.w));
-      const progress = (t.run.guideX-120)/(room.exit-120);
-      assert(Math.abs(progress-(save.run.guideX-120)/(oldExit-120)) < .001);
+      const previousGuide = 120+(save.run.guideX-120)/(oldExit-120)*(room.exit-120);
+      assert(Math.abs(t.run.guideX-t.player.x)<55,'the companion starts beside the restored player');
       assert.equal(t.run.shortcut, theme === 'ramparts');
       assert(t.secrets[1].open);
       const fog = t.run.seen['s'+index];
       assert.equal(fog.length, Math.ceil(room.w/100));
       assert(fog[0] && fog[fog.length-1] && !fog[Math.floor(fog.length/2)]);
       const persisted = JSON.parse(storage[key]);
-      assert.equal(persisted.v, 4);
-      assert.equal(persisted.run.litWicks,room.wicks.filter(w=>w.x<=t.run.guideX).length);
+      assert.equal(persisted.v, 5);
+      assert.equal(persisted.run.litWicks,room.wicks.filter(w=>w.x<=previousGuide+.5).length);
       t.showMenu();
       t.continueRun(selected);
       assert.equal(t.player.checkX, persisted.checkX);
-      assert.equal(t.run.guideX, persisted.run.guideX);
+      assert(Math.abs(t.run.guideX-t.player.x)<55);
 
       // v3 used the compact map coordinates but saved only the travelling ember.
       const legacyX=selected?room.exit:room.wicks[1].x-1;
