@@ -44,7 +44,7 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
       const atWick=wick&&Math.abs(p.x+p.w/2-wick.x)<75;
       const climb=atWick&&p.y+p.h>wick.y+(wick.y<480?26:48);
       const descend=atWick&&p.y+p.h<wick.y-(wick.y<480?26:48);
-      if(descend)press('KeyS');else release('KeyS');
+      if(descend&&p.ground)press('KeyS');else release('KeyS');
       if (p.ground && ((ward?.phaseName==='aim'&&ward.age>ward.span-.19) || climb || descend || (moving && (gap || wall || stalled>4)))) t.action('jump');
       if (character === 'lamp' && !p.ground && p.vy > 0 &&
           (gap || t.platforms.some(a => a.solid && Math.abs(a.x-p.x) < 60))) t.action('jump');
@@ -108,7 +108,7 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
       assert.equal(fog.length, Math.ceil(room.w/100));
       assert(fog[0] && fog[fog.length-1] && !fog[Math.floor(fog.length/2)]);
       const persisted = JSON.parse(storage[key]);
-      assert.equal(persisted.v, 5);
+      assert.equal(persisted.v, 6);
       assert.equal(persisted.run.litWicks,room.wicks.filter(w=>w.x<=previousGuide+.5).length);
       t.showMenu();
       t.continueRun(selected);

@@ -145,11 +145,18 @@ test('hud text follows health and potions',()=>{
   t.player.inv=0;t.hurt(10,0);advance(.02);assert.equal(nodes.stats.textContent,'4 / 5');assert.equal((nodes.health.innerHTML.match(/life-ghost/g)||[]).length,5);assert.equal((nodes.health.innerHTML.match(/lost/g)||[]).length,1);assert.equal(nodes['potion-count'].textContent,1);
 });
 test('roll follows the held direction and covers a short dash',()=>{
-  t.player.x=1800;t.player.face=1;press('KeyA');t.action('roll');release('KeyA');assert.equal(t.player.face,-1);
-  const x0=t.player.x;advance(.3);const d=x0-t.player.x;assert(d>110&&d<200,'roll distance '+d);
-  t.player.face=1;advance(1);const x1=t.player.x;t.action('roll');advance(.3);assert(t.player.x-x1>110,'without input it rolls the way it faces');
+  for(const hero of ['bow','bell','lamp']){
+    t.reset(true,hero);t.player.x=1800;t.player.face=1;press('KeyA');t.action('roll');release('KeyA');assert.equal(t.player.face,-1);
+    const x0=t.player.x;advance(.3);const d=x0-t.player.x;assert(d>110&&d<200,'roll distance '+d);
+    t.player.face=1;advance(1);const x1=t.player.x;t.action('roll');advance(.3);assert(t.player.x-x1>110,'without input it rolls the way it faces');
+  }
+});
+test('a buffered roll remembers a briefly tapped direction during an attack',()=>{
+  t.player.face=1;t.action('attack');press('KeyA');t.action('roll');release('KeyA');
+  advance(.17);assert(t.player.roll>0);assert.equal(t.player.rollDir,-1);
 });
 test('arrows fly over a rolling player but hit a standing one',()=>{
+  t.enemies.forEach(e=>e.dead=true);
   t.player.x=1800;t.player.face=-1;advance(.05);
   t.shots.push({x:t.player.x+13-60,y:t.player.y+20,vx:320,life:2});t.action('roll');advance(.2);
   assert.equal(t.player.hp,100);assert.equal(t.shots.length,1);
@@ -186,6 +193,7 @@ test('side slash only reaches as far as the drawn arc',()=>{
   advance(.4);t.player.x=e.x-80-13;t.action('attack');advance(.12);assert(e.hp<e.max,'80 away is inside the arc');
 });
 test('a slash cuts arrows out of the air',()=>{
+  t.enemies.forEach(e=>e.dead=true);
   t.player.x=1800;t.player.y=428;t.player.face=-1;t.player.inv=0;advance(.05);
   t.shots.push({x:t.player.x+13-50,y:t.player.y+20,vx:320,life:2});t.action('attack');advance(.12);
   assert.equal(t.shots.length,0);assert.equal(t.player.hp,100);
@@ -197,6 +205,10 @@ test('heal is on L now, H does nothing',()=>{
 test('four chapters contain five maps, four dedicated boss arenas and four waystations',()=>{
   const maps=t.STAGES.filter(s=>!s.rest&&!s.arena),rests=t.STAGES.filter(s=>s.rest),arenas=t.STAGES.filter(s=>s.arena);
   assert.equal(maps.length,5);assert.equal(rests.length,4);assert.equal(arenas.length,4);assert.equal(new Set(arenas.map(s=>s.chapter)).size,4);
+  for(const map of maps)map.bands.forEach(([start],i)=>{
+    const end=map.bands[i+1]?.[0]??map.exit;
+    assert(map.ens.filter(([x])=>x>=start&&x<end).length>=3,map.name+' patrol density');
+  });
   t.STAGES.forEach((s,i)=>{t.loadStage(i);assert.equal(t.state,'play');assert.equal(t.player.x,120);
     if(s.rest)assert.equal(t.enemies.length,0);else if(s.arena)assert.equal(t.enemies.filter(e=>e.type==='boss').length,1);else assert(t.enemies.length>=8,s.name+' has enemies');
     assert(s.arena?s.seal<s.w-100:s.exit<s.w-100,s.name+' has a way out');
@@ -211,15 +223,18 @@ test('each main-map door stays shut until every wick catches in order',()=>{
       press('KeyD');advance(.5);release('KeyD');
       assert.equal(t.stage,index);assert.equal(t.run.litWicks,i);
       assert(t.player.x+t.player.w<=room.exit-10);
-      Object.assign(t.player,{x:wick.x-60,y:480-t.player.h,vy:0});advance(.04);
-      const ward=t.enemies.find(e=>e.ward&&!e.dead);
-      if(ward){
-        const counter=()=>t.hitEnemy(ward,99,1,false,ward.x,ward.y,0);
-        const hp=ward.hp;
-        counter();assert.equal(ward.hp,hp,'armour protects the core');
-        for(let j=0;j<hp;j++){ward.phaseName='open';counter();}
-        assert(ward.dead);assert.equal(t.run.wardLeft,0);
+      Object.assign(t.player,{x:wick.x-98,y:480-t.player.h,vy:0});advance(.05);
+      for(let wave=0;wave<8&&t.run.wardParty?.some(hp=>hp>0);wave++){
+        for(const ward of t.enemies.filter(e=>e.ward&&!e.dead)){
+          const hit=()=>t.hitEnemy(ward,10,1,false,ward.x,ward.y,0);
+          const hp=ward.hp;hit();assert.equal(ward.hp,hp-10,'an arriving sentry is vulnerable');
+          ward.phaseName='open';hit();assert.equal(ward.hp,hp-30,'bright core takes double damage');
+          t.hitEnemy(ward,ward.max,1,false,ward.x,ward.y,0);
+          assert(ward.dead);
+        }
+        Object.assign(t.player,{x:wick.x-98,y:480-t.player.h,vy:0});advance(.25);
       }
+      assert(!t.run.wardParty?.some(hp=>hp>0),'each patrol is finite');
       if(wick.y<480-48){
         Object.assign(t.player,{x:wick.x-13,y:480-t.player.h,vy:0});advance(.04);
         assert.equal(t.run.litWicks,i,'a raised lamp needs a jump');
@@ -374,7 +389,7 @@ test('ground rolls stop at exposed banks and platform ends in both directions; a
       const deck={x:1900,y:top,w:240,h:raised?22:160,groundBlock:!raised};
       t.platforms.splice(0,t.platforms.length,deck);
       p.x=direction>0?deck.x+deck.w-p.w-20:deck.x+20;
-      p.y=top-p.h;p.ground=true;p.face=hero==='bow'?-direction:direction;
+      p.y=top-p.h;p.ground=true;p.face=direction;
       const start=p.x;t.action('roll');advance(.65);
       assert((p.x-start)*direction>10,'roll advanced');
       assert(p.ground&&Math.abs(p.y+p.h-top)<.01,'still supported');
@@ -385,7 +400,7 @@ test('ground rolls stop at exposed banks and platform ends in both directions; a
   }
 });
 test('real prison trench has solid banks and can be rolled through from either side',()=>{
-  for(const [hero,x,face,direction] of [['lamp',2118,1,1],['bow',2118,-1,1],['bell',2242,-1,-1]]){
+  for(const [hero,x,face,direction] of [['lamp',2118,1,1],['bow',2118,1,1],['bell',2242,-1,-1]]){
     t.reset(true,hero);t.enemies.forEach(e=>e.dead=true);
     const p=t.player;Object.assign(p,{x,y:480-p.h,face,ground:true,inv:3});
     t.action('roll');
@@ -633,9 +648,11 @@ test('the ramparts shortcut carries a relit ember and a continued run remembers 
   assert(t.player.x>=wall.dest-10);attached();
   const wick=t.L.wicks[kept];t.player.x=wick.x-13;t.player.y=wick.y-t.player.h;advance(.05);
   const ward=t.enemies.find(e=>e.ward&&!e.dead);ward.phaseName='open';
-  t.hitEnemy(ward,99,1,false,ward.x,ward.y,0);
-  const saved=JSON.parse(storage['ember:save']);assert.equal(saved.run.wardLeft,ward.max-1);
-  t.showMenu();t.continueRun();attached();assert.equal(t.run.wardLeft,saved.run.wardLeft);
+  t.hitEnemy(ward,10,1,false,ward.x,ward.y,0);
+  const saved=JSON.parse(storage['ember:save']);assert.equal(saved.run.wardParty[ward.slot],ward.max-20);
+  t.showMenu();t.continueRun();attached();assert.deepEqual(Array.from(t.run.wardParty),saved.run.wardParty);
+  saved.v=5;delete saved.run.wardParty;saved.run.wardLeft=1;storage['ember:save']=JSON.stringify(saved);
+  t.showMenu();t.continueRun();assert.equal(t.run.wardParty.filter(x=>x>0).length,1);assert.equal(t.run.wardParty.at(-1),ward.max);
   saved.v=4;delete saved.run.wardLeft;delete saved.run.guideX;storage['ember:save']=JSON.stringify(saved);
   t.showMenu();t.continueRun();assert.equal(t.run.litWicks,kept);attached();
   assert(t.run.guideX<t.L.exit);
