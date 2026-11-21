@@ -62,6 +62,15 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
 
 (function () {
   'use strict';
+  const preview=window.location && window.location.search==='?preview=all';
+  function gameStorage(){
+    if(!preview){
+      try{if(window.localStorage)return window.localStorage;}catch(e){}
+    }
+    const values=new Map();
+    return {getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value)),removeItem:key=>values.delete(key)};
+  }
+  const localStorage=gameStorage();
   const VERSION='5.9';
   const canvas=document.getElementById('world');let ctx=canvas.getContext('2d');   // 图鉴画敌人头像时会临时换成离屏画布
   const panel=document.getElementById('panel'),hud=document.getElementById('hud'),touch=document.getElementById('touch'),notice=document.getElementById('notice'),hint=document.getElementById('hint');
@@ -2940,10 +2949,16 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function drawCharIdles(){if(panel.hidden||panelView!=='chars')return;const keep=ctx;try{panel.querySelectorAll('canvas[data-idle]').forEach(c=>{const ch=c.dataset.idle,P=ch==='bell'?GH_BELL:ch==='bow'?GH_BOW:GH,b=Math.sin(time*2.8);ctx=c.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,240,240);ctx.save();ctx.translate(120,215);ctx.scale(3.5,3.5);oval(0,0,13-b,2,'rgba(0,0,0,.25)');ctx.translate(0,-4+b*1.6);ctx.rotate(Math.sin(time*1.4)*.025);ctx.scale(1+b*.012,1-b*.018);shape(()=>{ctx.moveTo(-10,-22);ctx.bezierCurveTo(-19,-24,-24,-14+b*3,-32,-15+b*3);ctx.quadraticCurveTo(-25,-7+b*3,-12,-17);ctx.closePath();},P.scarf,OL,1.3);if(ch==='bow')quiver();drawGhost(P,time*6,0);heroGear(ch);ghostEmber(P,true);oval(-10,-18+b*.6,3.1,3.6,P.body);const a=-.94+Math.sin(time*2.8+.4)*.055,y=-18+b*.65;if(ch==='bow')bowW(12,y,-.12+b*.035,0);else if(ch==='bell')hammer(12,y,a,24);else nail(12,y,a,P,28);circle(12,y,3.3,P.body,OL,1.3);ctx.restore();});}finally{ctx=keep;}}
   let lastMenuPaint=-Infinity;
   let simAcc=0;
-  function frame(now){requestAnimationFrame(frame);if(!canvas.width)resize();const raw=last?Math.min(.05,(now-last)/1000):1/60;last=now;simAcc+=raw;const t0=performance.now();let steps=0;while(simAcc>=1/60&&steps<3){step(1/60);simAcc-=1/60;steps++;}if(!steps)simAcc=0;if((state==='menu'||paused)&&now-lastMenuPaint<32)return;lastMenuPaint=now;draw();drawCharIdles();if(state==='play'&&!paused&&settings.fx==='auto'){if(performance.now()-t0>11)slowT+=raw;else slowT=Math.max(0,slowT-raw*.5);if(slowT>2)lowFx=true;}}
+  function frame(now){requestAnimationFrame(frame);if(!canvas.width)resize();const raw=last?Math.min(.05,(now-last)/1000):1/60;last=now;simAcc+=raw;const t0=performance.now();let steps=0;while(simAcc>=1/60&&steps<3){step(1/60);simAcc-=1/60;steps++;}if((state==='menu'||paused)&&now-lastMenuPaint<32)return;lastMenuPaint=now;draw();drawCharIdles();if(state==='play'&&!paused&&settings.fx==='auto'){if(performance.now()-t0>11)slowT+=raw;else slowT=Math.max(0,slowT-raw*.5);if(slowT>2)lowFx=true;}}
   document.getElementById('portrait-go').onclick=()=>{portraitAccepted=true;resize();};
   document.getElementById('landscape-go').onclick=async()=>{try{if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();}catch(e){}try{if(window.screen&&screen.orientation&&screen.orientation.lock)await screen.orientation.lock('landscape');}catch(e){}resize();};
   resize();
+  if(preview){
+    window.emberExhibit=true;clears=4;unlocked=4;introSeen=true;tutorialDone=true;
+    FOES.forEach(f=>{codex.seen[f.id]=1;codex.kills[f.id]=1;});
+    Object.keys(ITEMS).forEach(id=>{codex.items[id]=1;});
+    LORE.forEach(l=>{codex.lore[l.id]=1;});BLUEPRINTS.forEach(id=>{codex.blue[id]=1;});
+  }
   reset(true);applySettings();showMenu();cam=220;
   muteBtn.textContent=muted?'静音':'声音';if(muted)muteBtn.classList.add('off');
   window.EmberGame={get state(){return state;},get player(){return p;},get enemies(){return enemies;},get chests(){return chests;},get traps(){return traps;},get score(){return score;},get paused(){return paused;},get checkpoint(){return checkpoint;},get waves(){return waves;},get lowFx(){return lowFx;},get cam(){return cam;},get stage(){return stage;},get stageName(){return L.name;},get embers(){return embers;},set embers(v){embers=v;},get bag(){return bag;},get relics(){return relics;},get codex(){return codex;},get talking(){return !!talk;},get music(){return musicMode;},talkNext:talkNext,goto:loadStage,start:reset,respawn:respawn,version:VERSION};
