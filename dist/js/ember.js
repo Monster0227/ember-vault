@@ -94,7 +94,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   let WORLD=4400,stage=0,L=null,T=null,PAL=null,decor=null,embers=0,entry=null,titleT=0,nearKind='';
   let W=1100,H=620,scale=1,viewY=0,tall=false,cam=0,time=0,last=0,state='menu',paused=false,lowFx=false,slowT=0;
   let p,enemies=[],shots=[],waves=[],breakables=[],particles=[],floats=[],orbs=[],fx=[],chunks=[],platforms=[],chests=[],kills=0,shake=0,hitstop=0,checkpoint=false,nearChest=false,bellRing=0;
-  let hazards=[],loot=[],gateK=0,sealK=0,bossCardT=0,gainT=0,revealC=null,sceneA='',sceneB='',sceneT=0,traps=[],signs={},panelView='menu',saveData=null,secrets=[],arm={};   // 首领的落石 / 腐水 / 灵枪；飞向主角的道具图；铁闸；首领名号卡；获得提示；开箱时浮起的奖励；插画；静止机关的预警计时
+  let hazards=[],loot=[],gateK=0,sealK=0,bossCardT=0,gainT=0,revealC=null,sceneA='',sceneB='',sceneT=0,traps=[],signs={},panelView='menu',lastWrittenSave=null,secrets=[],arm={};   // 首领的落石 / 腐水 / 灵枪；飞向主角的道具图；铁闸；首领名号卡；获得提示；开箱时浮起的奖励；插画；静止机关的预警计时
   let keys={},held={},score=0,messageT=0,ac=null,best=0,muted=false,hudKey='',unlocked=1,deathWhy='受到了攻击',shakeT=0,coachDone=false;
   try{coachDone=localStorage.getItem('ember:coach')==='1';}catch(e){}
   let bag={bomb:0,knife:0,frost:0},relics={},keepsakes={},sel='bomb',thrown=[],offers=[],chestC=null,talk=null,flags={},run={},runSeed=1,shopRelic='',bagTab='bag',introSeen=false;
@@ -887,7 +887,8 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function jumpRelease(){if(!p||state!=='play')return;if(p.buffer>0)p.cutQueued=true;else if(p.jumpRising&&p.vy<-230)p.vy=-230;p.jumpRising=false;}
   addEventListener('keyup',e=>{delete keys[e.code];if(codeAct[e.code]==='jump')jumpRelease();});
   addEventListener('blur',()=>{keys={};clearHeld();if(state==='play'&&!paused)togglePause();});
-  document.addEventListener('visibilitychange',()=>{if(document.hidden){keys={};clearHeld();if(fileMusic)silenceLocal();if(state==='play'&&!paused)togglePause();if(ac){const r=ac.suspend();if(r&&r.catch)r.catch(()=>{});}}else if(ac&&!muted){const r=ac.resume();if(r&&r.catch)r.catch(()=>{});}});
+  addEventListener('pagehide',saveActiveJourney);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){saveActiveJourney();keys={};clearHeld();if(fileMusic)silenceLocal();if(state==='play'&&!paused)togglePause();if(ac){const r=ac.suspend();if(r&&r.catch)r.catch(()=>{});}}else if(ac&&!muted){const r=ac.resume();if(r&&r.catch)r.catch(()=>{});}});
   ['pointerdown','touchend','click'].forEach(n=>document.addEventListener(n,unlockAudio,true));
   // 微信 / iOS：不许整页拖动回弹、双指缩放、长按弹菜单（面板本身可以滚动）
   document.addEventListener('touchmove',e=>{if(!(e.target&&e.target.closest&&e.target.closest('.veil')))e.preventDefault();},{passive:false});
@@ -916,10 +917,21 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   const EMBLEM='<svg viewBox="0 0 96 96"><circle cx="48" cy="48" r="43"/><path d="M31 59h34l-5-8V37a12 12 0 0 0-24 0v14zM43 64a5 5 0 0 0 10 0M48 19v6M21 48h-7m68 0h-7"/><path class="ember" d="M48 37c-7 8-5 16 0 19 6-3 7-11 0-19z"/></svg>';
   let selectedRoute=false;
   const saveSlot=selected=>selected?'ember:selected-save':'ember:save';
-  function loadSave(selected=false){try{saveData=JSON.parse(localStorage.getItem(saveSlot(selected))||'null');}catch(e){saveData=null;}if(saveData&&!STAGES[saveData.stage])saveData=null;return saveData;}
+  function loadSave(selected=false){
+    try{
+      const save=JSON.parse(localStorage.getItem(saveSlot(selected)));
+      if(save&&Number.isInteger(save.stage)&&STAGES[save.stage]&&Number.isFinite(save.e?.hp)&&Number.isFinite(save.e.max))return save;
+    }catch(e){}
+    return null;
+  }
   function bossSnap(){const b=enemies.find(e=>e.type==='boss'&&!e.dead);return b?{hp:b.hp,max:b.max,phase:b.phase||0,rage:!!b.rage,phase3:!!b.phase3}:null;}
-  function saveRun(){if(!L||!p||L.tutorial||state==='menu'||!entry)return;try{localStorage.setItem(saveSlot(selectedRoute),JSON.stringify({v:4,stage:stage,char:p.char,cycle:cycle,checkX:p.checkX,boss:bossSnap(),e:entry,run:{guideX:Math.floor(run.guideX),litWicks:run.litWicks,guided:!!run.guided,awakened:run.awakened||0,lessonMask:run.lessonMask||0,keeper:!!run.keeper,c2:!!run.chapter2,c3:!!run.chapter3,c4:!!run.chapter4,seen:run.seen||{},maps:run.maps||{},found:run.found||{},visited:run.visited||{},inkMet:!!run.inkMet,firstElite:!!run.firstElite,time:run.time||0,deaths:run.deaths||0,shortcut:!!run.shortcut,coach:!!run.coachSkip}}));}catch(e){}}
-  function clearSave(){saveData=null;try{localStorage.removeItem(saveSlot(selectedRoute));}catch(e){}}
+  function saveRun(){if(!L||!p||L.tutorial||state==='menu'||!entry)return;try{const record=JSON.stringify({v:4,stage:stage,char:p.char,cycle:cycle,checkX:p.checkX,boss:bossSnap(),e:entry,run:{guideX:Math.floor(run.guideX),litWicks:run.litWicks,guided:!!run.guided,awakened:run.awakened||0,lessonMask:run.lessonMask||0,keeper:!!run.keeper,c2:!!run.chapter2,c3:!!run.chapter3,c4:!!run.chapter4,seen:run.seen||{},maps:run.maps||{},found:run.found||{},visited:run.visited||{},inkMet:!!run.inkMet,firstElite:!!run.firstElite,time:run.time||0,deaths:run.deaths||0,shortcut:!!run.shortcut,coach:!!run.coachSkip}});localStorage.setItem(saveSlot(selectedRoute),record);lastWrittenSave=record;}catch(e){}}
+  // A title screen, practice room or stale background tab must never create a journey.
+  function saveActiveJourney(){
+    if(state!=='play'||passage||L.tutorial||!lastWrittenSave)return;
+    try{if(localStorage.getItem(saveSlot(selectedRoute))===lastWrittenSave)saveRun();}catch(e){}
+  }
+  function clearSave(){lastWrittenSave=null;try{localStorage.removeItem(saveSlot(selectedRoute));}catch(e){}}
   function showMenu(){selectedRoute=false;panel.classList.remove('late');state='menu';paused=false;talk=null;talkBox.hidden=true;credits=null;cine=null;rebinding=null;hud.hidden=true;touch.hidden=true;hint.hidden=true;gainBox.hidden=true;notice.style.opacity=0;messageT=0;titleT=0;sceneA=sceneB='';keys={};clearHeld();renderMenu();}
   function focusFirst(){try{const b=panel.querySelector('button:not([disabled])');if(b&&!coarse())b.focus();}catch(e){}}
   function bindBack(){panel.querySelectorAll('[data-back]').forEach(b=>b.onclick=menuBack);}
@@ -932,11 +944,11 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     ).join('');
     const library=[['tutorial','操作练习'],['codex','图鉴与传说'],['settings','设置']];
     const tools=library.map(([id,label])=>'<button data-menu="'+id+'">'+label+'</button>').join('');
-    panel.innerHTML='<div class="home-menu"><div class="home-wordmark"><span class="home-seal" aria-hidden="true">'+EMBLEM+'</span><span lang="en">Ember Vault</span></div>'
+    panel.innerHTML='<div class="home-scene" aria-hidden="true"><canvas></canvas></div><div class="home-menu"><div class="home-wordmark"><span class="home-seal" aria-hidden="true">'+EMBLEM+'</span><span lang="en">Ember Vault</span></div>'
       +'<h1>余烬地牢</h1><nav class="home-journeys" aria-label="开始游玩">'+journeys+'</nav>'
       +'<nav class="home-tools" aria-label="其他选项">'+tools+'</nav>'
       +(best||clears?'<p class="home-record">'+(clears?'通关 '+clears+' 次　':'')+'最高 '+best+' 分</p>':'')+'</div>';
-    panel.hidden=false;panel.querySelectorAll('[data-menu]').forEach(b=>b.onclick=()=>menuPick(b.dataset.menu));focusFirst();}
+    panel.hidden=false;window.EmberTitle?.mount(panel.querySelector('.home-scene canvas'));panel.querySelectorAll('[data-menu]').forEach(b=>b.onclick=()=>menuPick(b.dataset.menu));focusFirst();}
   function menuPick(id){unlockAudio();beep(620,.05,'sine');if(id==='continue')continueRun();else if(id==='new')renderChars();else if(id==='tutorial')startTutorial();else if(id==='chapters')renderChapters();else if(id==='codex'){panelView='codex';bagTab='dex';renderBag(true);}else if(id==='settings')renderSettings('menu');}
   // Version 2 stored absolute world coordinates. Restore the nearest actual fire on the new route.
   function migrateRouteSave(s){
@@ -3151,7 +3163,10 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function drawCharIdles(){if(panel.hidden||panelView!=='chars')return;const keep=ctx;try{panel.querySelectorAll('canvas[data-idle]').forEach(c=>{const ch=c.dataset.idle,P=ch==='bell'?GH_BELL:ch==='bow'?GH_BOW:GH,b=Math.sin(time*2.8);ctx=c.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,240,240);ctx.save();ctx.translate(120,215);ctx.scale(3.5,3.5);oval(0,0,13-b,2,'rgba(0,0,0,.25)');ctx.translate(0,-4+b*1.6);ctx.rotate(Math.sin(time*1.4)*.025);ctx.scale(1+b*.012,1-b*.018);shape(()=>{ctx.moveTo(-10,-22);ctx.bezierCurveTo(-19,-24,-24,-14+b*3,-32,-15+b*3);ctx.quadraticCurveTo(-25,-7+b*3,-12,-17);ctx.closePath();},P.scarf,OL,1.3);if(ch==='bow')quiver();drawGhost(P,time*6,0);heroGear(ch);ghostEmber(P,true);oval(-10,-18+b*.6,3.1,3.6,P.body);const a=-.94+Math.sin(time*2.8+.4)*.055,y=-18+b*.65;if(ch==='bow')bowW(12,y,-.12+b*.035,0);else if(ch==='bell')hammer(12,y,a,24);else nail(12,y,a,P,28);circle(12,y,3.3,P.body,OL,1.3);ctx.restore();});}finally{ctx=keep;}}
   let lastMenuPaint=-Infinity;
   let simAcc=0;
-  function frame(now){requestAnimationFrame(frame);if(!canvas.width)resize();const raw=last?Math.min(.05,(now-last)/1000):1/60;last=now;simAcc+=raw;const t0=performance.now();let steps=0;while(simAcc>=1/60&&steps<3){step(1/60);simAcc-=1/60;steps++;}if(state==='menu'&&panelView==='menu')return;if((state==='menu'||paused)&&now-lastMenuPaint<32)return;lastMenuPaint=now;draw();drawCharIdles();if(state==='play'&&!paused&&settings.fx==='auto'){if(performance.now()-t0>11)slowT+=raw;else slowT=Math.max(0,slowT-raw*.5);if(slowT>2)lowFx=true;}}
+  function frame(now){requestAnimationFrame(frame);if(!canvas.width)resize();const raw=last?Math.min(.05,(now-last)/1000):1/60;last=now;simAcc+=raw;const t0=performance.now();let steps=0;while(simAcc>=1/60&&steps<3){step(1/60);simAcc-=1/60;steps++;}
+    if(state==='menu'&&panelView==='menu'){window.EmberTitle?.paint(now);return;}
+    window.EmberTitle?.unmount();
+    if((state==='menu'||paused)&&now-lastMenuPaint<32)return;lastMenuPaint=now;draw();drawCharIdles();if(state==='play'&&!paused&&settings.fx==='auto'){if(performance.now()-t0>11)slowT+=raw;else slowT=Math.max(0,slowT-raw*.5);if(slowT>2)lowFx=true;}}
   async function enterLandscape(){try{if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();}catch(e){}try{if(window.screen&&screen.orientation&&screen.orientation.lock)await screen.orientation.lock('landscape');}catch(e){}resize();}
   resize();
   if(preview){

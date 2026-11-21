@@ -677,6 +677,22 @@ test('optional full practice is available from the title screen and protects the
   assert(t.traps.length>0 && t.L.signs.length>4);
   t.finishTutorial();advance(1);assert.equal(t.state,'menu');assert.equal(storage['ember:save'],journey);
 });
+test('opening or leaving the title cannot manufacture a journey',()=>{
+  delete storage['ember:save'];
+  t.showMenu();listeners.pagehide();
+  assert.equal(storage['ember:save'],undefined);
+  assert(!nodes.panel.innerHTML.includes('data-menu="continue"'));
+  storage['ember:save']='{"stage":0}';
+  t.showMenu();assert(!nodes.panel.innerHTML.includes('data-menu="continue"'));
+  t.startJourney('bell',0);finishTalk();advance(1);
+  t.run.guideX=250;listeners.pagehide();
+  const own=JSON.parse(storage['ember:save']);
+  assert.equal(own.char,'bell');assert.equal(own.run.guideX,250);
+  const newer=JSON.stringify({...own,char:'bow'});
+  storage['ember:save']=newer;listeners.pagehide();
+  assert.equal(storage['ember:save'],newer,'a stale background tab preserves the newer save');
+  t.showMenu();assert(nodes.panel.innerHTML.includes('data-menu="continue"'));
+});
 console.log('All '+passed+' gameplay checks passed.');
 
 

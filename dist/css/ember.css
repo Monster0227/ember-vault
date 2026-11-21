@@ -577,15 +577,21 @@ html,body,#stage{max-width:100%;overflow:hidden}
 }
 @media(min-width:900px){.sheet.mapview{width:min(1120px,94vw);max-width:1120px}#map-canvas{height:min(52vh,520px)}}
 
-/* The title illustration fills the menu; all navigation remains live HTML. */
+/* The painting and its moving details share one crop. The controls stay still. */
 #panel:has(>.home-menu){
   padding:clamp(24px,6vh,68px) clamp(24px,8vw,150px);
-  background-color:#203440;
-  background-image:linear-gradient(90deg,rgba(14,26,38,.85),rgba(18,31,43,.64) 32%,transparent 67%),url("../assets/images/bellwatch.jpg");
-  background-position:center;
-  background-size:cover;
+  background:#142634;
+}
+.home-scene{
+  position:absolute;inset:0;pointer-events:none;
+  background:url("../assets/images/bellwatch.jpg") center/cover no-repeat;
+}
+#panel:has(>.home-menu)::before{
+  content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:linear-gradient(90deg,rgba(14,26,38,.85),rgba(18,31,43,.64) 32%,transparent 67%);
 }
 .home-menu{
+  position:relative;z-index:2;
   width:min(390px,43vw);flex:none;margin:auto 0;color:#fff4da;
   font-family:"Microsoft YaHei","PingFang SC",sans-serif;
 }
@@ -616,10 +622,10 @@ html,body,#stage{max-width:100%;overflow:hidden}
 .home-record{color:#d5d3c7;font-size:12px;margin:4px 0}
 @media (orientation:portrait){
   #panel:has(>.home-menu){
-    background-image:linear-gradient(0deg,#142634 0%,#142634 32%,#142634bd 40%,transparent 56%),url("../assets/images/bellwatch.jpg");
-    background-size:100% 100%,auto 68%;background-position:center,84% top;background-repeat:no-repeat;
     padding:max(22px,env(safe-area-inset-top)) max(22px,env(safe-area-inset-right)) max(26px,env(safe-area-inset-bottom)) max(22px,env(safe-area-inset-left));
   }
+  .home-scene{bottom:32%;background-position:84% top}
+  #panel:has(>.home-menu)::before{background:linear-gradient(0deg,#142634 32%,#142634bd 40%,transparent 56%)}
   .home-menu{width:min(100%,430px);margin:auto auto 0}
   .home-menu h1{font-size:clamp(44px,11vw,70px);margin:8px 0 22px}
   .home-wordmark>span[lang]{font-size:18px}
