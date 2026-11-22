@@ -664,6 +664,27 @@ html,body,#stage{max-width:100%;overflow:hidden}
 }
 
 /* Keep the combat floor and both characters in view while they speak. */
+/* Cutscene dialogue shares the bottom edge with the portrait and skip button. */
+#talk.over-art{
+  --face-space:118px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  column-gap:8px;
+}
+#talk.over-art.has-face{padding-left:var(--face-space)}
+#talk.over-art p{grid-column:1;margin:0;padding-right:0}
+#talk.over-art #talk-skip{
+  position:static;
+  grid-column:2;
+  grid-row:1;
+  min-width:44px;
+  min-height:44px;
+  padding:4px;
+  white-space:nowrap;
+}
+@media(max-width:600px){#talk.over-art{--face-space:82px}}
+@media(max-height:500px) and (min-width:601px){#talk.over-art{--face-space:92px}}
 #talk.arena-dialog{
   top:calc(env(safe-area-inset-top, 0px) + 26px);
   bottom:auto;

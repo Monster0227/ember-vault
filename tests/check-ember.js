@@ -77,6 +77,17 @@ test('one hit per enemy per swing, combo and kill reward',()=>{
   let n=2;while(!e.dead&&n<8){t.player.x=e.x-40;t.player.face=1;advance(.2);t.action('attack');advance(.2);n++;}
   assert(e.dead);assert(n>3,'the agile knife does not fell a guard in three hits');assert.equal(t.score,25);
 });
+test('attack recovery delays the next input without extending the swing or the bow charge',()=>{
+  for(const hero of ['lamp','bell']){
+    t.reset(true,hero);t.action('attack');
+    assert.equal(t.player.attack,14/60);assert.equal(t.player.atkCd,16/60);
+    advance(.245);assert.equal(t.player.attack,0);assert(t.player.atkCd>0);
+    assert(!t.fx.some(f=>f.k==='contact'),'a missed swing draws no contact');
+    t.action('attack');advance(.055);assert(t.player.attack>0,'buffered follow-up fires after recovery');
+  }
+  t.reset(true,'bow');press('KeyJ');assert.equal(t.player.chargeMax,.45);release('KeyJ');t.step(1/120);
+  assert.equal(t.player.atkCd,8/60);t.reset(true,'lamp');
+});
 test('roll immunity, cooldown and damage recovery',()=>{
   t.action('roll');t.hurt(20,200);assert.equal(t.player.hp,100);
   advance(.4);t.hurt(20,200);assert.equal(t.player.hp,80);
@@ -228,7 +239,10 @@ test('each main-map door stays shut until every wick catches in order',()=>{
         for(const ward of t.enemies.filter(e=>e.ward&&!e.dead)){
           const hit=()=>t.hitEnemy(ward,10,1,false,ward.x,ward.y,0);
           const hp=ward.hp;hit();assert.equal(ward.hp,hp-10,'an arriving sentry is vulnerable');
+          assert.equal(ward.hpBeforeHit,hp);assert(ward.hitT>0&&ward.hitDir===1);
+          assert(t.fx.some(f=>f.k==='contact'&&f.target===ward&&!f.open));
           ward.phaseName='open';hit();assert.equal(ward.hp,hp-30,'bright core takes double damage');
+          assert(t.fx.some(f=>f.k==='contact'&&f.target===ward&&f.open));
           t.hitEnemy(ward,ward.max,1,false,ward.x,ward.y,0);
           assert(ward.dead);
         }
@@ -287,7 +301,7 @@ test('dying on a later map retries it with the stats you came in with',()=>{
 });
 test('hits knock enemies back but never off their ledge, with slash marks; kills shatter',()=>{
   const e=t.enemies[3];e.cd=99;e.x=1830-e.w-6;e.hp=e.max=400;t.player.x=e.x-45;t.player.y=318;t.player.vy=0;t.player.face=1;t.player.inv=100;advance(.02);
-  t.action('attack');advance(.12);assert(t.fx.some(f=>f.k==='cut')&&t.fx.some(f=>f.k==='star'),'slash mark and spark');assert(e.kb>0,'knocked back');
+  t.action('attack');advance(.12);assert(t.fx.some(f=>f.kind==='blade'&&f.target===e),'directional cut on the struck enemy');assert(e.kb>0,'knocked back');
   for(let i=0;i<4;i++){advance(.4);assert(e.x+e.w<=1830&&e.x>=1650,'stays on its ledge');t.player.x=e.x-45;t.player.y=318;t.player.face=1;t.action('attack');advance(.12);}
   e.hp=1;advance(.4);t.player.x=e.x-45;t.player.y=318;t.action('attack');advance(.12);assert(e.dead);assert(t.chunks.length>=8,'shattered');
 });
@@ -545,7 +559,8 @@ test('keys can be rebound in the settings and work at once',()=>{
 });
 test('a shield jailer blocks frontal swings until a heavy third swing breaks its guard; its back is open',()=>{
   const s=t.enemies.find(e=>e.type==='shield');t.enemies.forEach(e=>{if(e!==s)e.dead=true;});t.player.x=s.origin-45;t.player.y=428;advance(.02);s.cd=99;s.x=s.origin;s.face=-1;t.player.inv=100;t.player.x=s.x-45;t.player.face=1;
-  const hp=s.hp;t.action('attack');advance(.12);assert.equal(s.hp,hp,'blocked');advance(.4);t.action('attack');advance(.45);assert.equal(s.hp,hp,'still blocked');
+  const hp=s.hp;t.action('attack');advance(.12);assert.equal(s.hp,hp,'blocked');
+  assert(t.fx.some(f=>f.kind==='block')&&!t.fx.some(f=>f.target===s),'shield ricochet only');advance(.4);t.action('attack');advance(.45);assert.equal(s.hp,hp,'still blocked');
   t.action('attack');advance(.12);assert(s.brk>0,'guard broken');assert(s.hp<hp);
   advance(.4);s.brk=0;s.face=1;s.turnT=0;const hp2=s.hp;t.player.x=s.x-45;t.action('attack');advance(.12);assert(s.hp<hp2,'hit in the back');
 });
