@@ -456,12 +456,12 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   let audioPool=null,verticalBase=0,hitNoise=null,bandId='';
   // 声音分两路：音乐和音效各有自己的音量（设置里调）
   let musicBus=null,sfxBus=null;
-  function buses(){if(currentVoice&&(settings.sfx<=0||settings.vol===0))stopSceneVoice();else if(voiceMedia&&currentVoice)voiceMedia.volume=muted?0:settings.sfx*(settings.vol??1);if(!ac)return;try{if(!sfxBus){sfxBus=ac.createGain();sfxBus.connect(ac.destination);musicBus=ac.createGain();musicBus.connect(ac.destination);synthBus=ac.createGain();synthBus.connect(musicBus);synthBus.gain.setValueAtTime(1,ac.currentTime);}const master=settings.vol==null?1:settings.vol;sfxBus.gain.value=settings.sfx*master;musicBus.gain.value=settings.music*master;}catch(e){}}
+  function buses(){if(settings.sfx<=0||settings.vol===0)stopDialogueCue();if(!ac)return;try{if(!sfxBus){sfxBus=ac.createGain();sfxBus.connect(ac.destination);musicBus=ac.createGain();musicBus.connect(ac.destination);synthBus=ac.createGain();synthBus.connect(musicBus);synthBus.gain.setValueAtTime(1,ac.currentTime);}const master=settings.vol==null?1:settings.vol;sfxBus.gain.value=settings.sfx*master;musicBus.gain.value=settings.music*master;}catch(e){}}
   function audio(){if(muted)return null;try{if(!ac){ac=new(window.AudioContext||window.webkitAudioContext)();buses();}if(ac.state!=='running'){const r=ac.resume();if(r&&r.catch)r.catch(()=>{});}}catch(e){return null;}return ac;}
   function unlockAudio(){if(ac&&ac.state==='running')return;const a=audio();if(!a)return;try{const s=a.createBufferSource();s.buffer=a.createBuffer(1,1,22050);s.connect(a.destination);s.start(0);}catch(e){}}
   function beep(freq,duration,type,vol){const a=audio();if(!a||settings.sfx<=0)return;try{if(!audioPool)audioPool=new EmberCore.AudioPool(a,sfxBus||a.destination,16);audioPool.play(freq,duration,type,vol);}catch(e){}}
   // 刀和命中不再走单音“哔”：一层沉下去的弦乐身体、一层布料破风、一层灯罩似的金属余响。
-  function weighted(parts){const a=audio();if(!a||settings.sfx<=0)return;const t0=a.currentTime,bus=sfxBus||a.destination;
+  function weighted(parts,output){const a=audio();if(!a||settings.sfx<=0)return;const t0=a.currentTime,bus=output||sfxBus||a.destination;
     parts.forEach(part=>{try{const at=t0+(part.at||0),dur=part.dur||.12;
       if(part.noise){if(!hitNoise||hitNoise.sampleRate!==a.sampleRate){hitNoise=a.createBuffer(1,Math.floor(a.sampleRate*.22),a.sampleRate);const ch=hitNoise.getChannelData(0);for(let i=0;i<ch.length;i++){const u=i/ch.length;ch[i]=(Math.random()*2-1)*(1-u)*(1-u);}}
         const s=a.createBufferSource(),fl=a.createBiquadFilter(),g=a.createGain();s.buffer=hitNoise;fl.type=part.filter||'lowpass';fl.frequency.value=part.freq||280;fl.Q.value=part.q||.8;g.gain.setValueAtTime(part.vol||.06,at);g.gain.exponentialRampToValueAtTime(.0001,at+dur);s.connect(fl);fl.connect(g);g.connect(bus);s.start(at);s.stop(at+dur+.02);}
@@ -644,7 +644,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function musicTone(f,d,vol,wave,when){if(!ac||muted||ac.state!=='running')return;mnote(f,d,vol,wave,ac.currentTime+(when||0));}
   function bossCue(which){if(!ac||muted||ac.state!=='running')return;const k=L&&L.bossKind||'warden',base={lock:92,brood:123,standard:146,warden:110}[k]||110;if(which==='enter'){musicTone(base,.7,.04,'sawtooth');musicTone(base*1.5,.8,.018,'triangle',.12);}else if(which==='rage'){musicTone(base*.8,.6,.045,'sawtooth');musicTone(base*2,.5,.025,'square',.12);musicTone(base*2.5,.6,.02,'triangle',.25);}else if(which==='attack')musicTone(base*3,.2,.025,'triangle');
     else if(which==='toll')bellTone(98,ac.currentTime,.07,4.5);else{[0,4,7,12].forEach((s,i)=>musicTone(base*2*Math.pow(2,s/12),1.2-i*.15,.03,'triangle',i*.12));bellTone(base*2,ac.currentTime+.5,.04,3);}}
-  function setMuted(m){muted=m;if(m)stopSceneVoice();if(m&&fileMusic)silenceLocal();try{localStorage.setItem('ember:muted',m?'1':'0');}catch(e){}muteBtn.textContent=m?'静音':'声音';if(m)muteBtn.classList.add('off');else muteBtn.classList.remove('off');if(ac){try{const r=m?ac.suspend():ac.resume();if(r&&r.catch)r.catch(()=>{});}catch(e){}}if(!m){unlockAudio();beep(520,.12);}}
+  function setMuted(m){muted=m;if(m)stopDialogueCue();if(m&&fileMusic)silenceLocal();try{localStorage.setItem('ember:muted',m?'1':'0');}catch(e){}muteBtn.textContent=m?'静音':'声音';if(m)muteBtn.classList.add('off');else muteBtn.classList.remove('off');if(ac){try{const r=m?ac.suspend():ac.resume();if(r&&r.catch)r.catch(()=>{});}catch(e){}}if(!m){unlockAudio();beep(520,.12);}}
   function say(t,s){notice.textContent=t;messageT=s||3;notice.style.opacity=1;}
   function clearHeld(){inputQueue.clear();held={};document.querySelectorAll('[data-action]').forEach(b=>b.classList.remove('held'));stickEnd();}
   // 新的一局：从第一层开始
@@ -917,14 +917,15 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     saveRun();say(L.name+' · 再来一次',2.5);}
   // ---- 对话：底部对话框，逐字显示；E / 空格 / J / 回车 / 点一下：先显示整句，再翻到下一句；Esc 跳过 ----
   // keep：不切到 talk 状态（结局旁白在 win 状态下播放）。说话人有头像就显示在对话框左边；句子带场景时铺插画
-  // 文本按标点停顿。自动翻页也等待当前角色念完。
+  // 文本按标点停顿，自动翻页留出阅读时间。
   const PAUSE={'，':.13,'、':.11,'。':.32,'！':.32,'？':.32,'…':.2,'：':.16,'；':.18,'—':.06,'）':.12};
   // 台词里可以给词加效果：{g:发光} {w:飘动} {s:颤抖} {b:加重}；显示前先拆成纯文字 + 每个字的效果
   function parseLine(s){const out=[],fx=[];let i=0;while(i<s.length){if(s.charAt(i)==='{'&&s.charAt(i+2)===':'&&'gwsb'.indexOf(s.charAt(i+1))>=0){const end=s.indexOf('}',i+3);if(end>0){for(let j=i+3;j<end;j++){out.push(s.charAt(j));fx.push(s.charAt(i+1));}i=end+1;continue;}}out.push(s.charAt(i));fx.push('');i++;}return{text:out.join(''),fx:fx};}
   const talkBar=document.getElementById('talk-bar');
   function startTalk(lines,done,keep,opts){opts=opts||{};talk={lines:lines,i:0,n:0,shown:0,wait:opts.delay||0,hold:0,arena:!!opts.arena,auto:!!opts.auto,done:done||null,keep:!!keep,text:'',fx:[],swapT:0};if(lines===TALK.prologue||keep)hud.hidden=true;if(talk.arena){talkBox.classList.add('arena-dialog');touch.hidden=true;hud.hidden=true;}else talkBox.classList.remove('arena-dialog');if(!keep)state='talk';keys={};clearHeld();talkBox.hidden=false;if(talk.auto)talkBox.classList.add('auto');else talkBox.classList.remove('auto');sceneA='';sceneB='';showLine();}
   function showLine(){const l=talk.lines[talk.i],face=FACES[l[0]]||FACE_ART[l[0]],P=parseLine(l[1]);talk.text=P.text;talk.fx=P.fx;talkWho.textContent=l[0];talkWho.style.color=WHO[l[0]]||'#c9b28a';talkText.textContent='';talk.n=0;talk.shown=0;talk.hold=0;talkBox.classList.add('typing');if(talkBar)talkBar.style.transform='scaleX(0)';if(l[0])talkBox.classList.remove('narrate');else talkBox.classList.add('narrate');
-    playSceneVoice(l[0],P.text);
+    stopDialogueCue();
+    if(!talk.i||talk.lines[talk.i-1][0]!==l[0])playDialogueCue(l[0]);
     talk.faceAge=0;talk.facePaint=-1;talkFace.hidden=!face;if(face){talkBox.classList.add('has-face');}else talkBox.classList.remove('has-face');
     // 换了说话人：名牌从左边滑进来，头像弹一下
     if(talk.i===0||talk.lines[talk.i-1][0]!==l[0]){talkBox.classList.remove('swap');try{void talkBox.offsetWidth;}catch(e){}talkBox.classList.add('swap');talk.swapT=.5;}
@@ -934,60 +935,29 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   // 每个字是一个 span：从上方落下来、由虚变实；带效果的字之后一直飘 / 抖 / 发光（delay 错开，像一条波浪）
   function chSpan(i,done){const k=talk.fx[i]||'';return'<span class="ch'+(k?' f'+k:'')+(done?' done':'')+'"'+(k==='w'||k==='s'?' style="animation-delay:0s,'+(-i*.11).toFixed(2)+'s"':'')+'>'+esc(talk.text.charAt(i))+'</span>';}
   function addChar(i){if(talkText.insertAdjacentHTML)talkText.insertAdjacentHTML('beforeend',chSpan(i,false));else talkText.textContent+=talk.text.charAt(i);}
-  const voiceBuffers=new Map();
-  let currentVoice=null,voiceMedia=null;
-  function stopSceneVoice(){
-    const previous=currentVoice;
-    currentVoice=null;
-    if(previous?.source){
-      previous.source.onended=null;
-      try{previous.source.stop();}catch(e){}
-      previous.source.disconnect();
-    }
-    if(voiceMedia){voiceMedia.onloadedmetadata=null;voiceMedia.onerror=null;voiceMedia.pause();}
+  // Each speaker has an instrumental signature. Pitch and rhythm are fixed
+  // to the character, independent of the subtitle text or its length.
+  const dialogueCues={
+    '青带女孩':[{f:587.33,dur:.15,vol:.052},{f:880,at:.18,dur:.24,vol:.048}],
+    '守钟人':[{f:196,dur:.36,vol:.054},{f:526,dur:.13,vol:.019}],
+    '烛叟':[{f:293.66,wave:'triangle',dur:.17,vol:.035},{f:220,at:.16,dur:.21,vol:.042}],
+    '小幽灵':[{f:440,dur:.14,vol:.036},{f:659.25,at:.10,dur:.17,vol:.030}],
+    '墨翁':[{f:392,wave:'triangle',dur:.065,vol:.046},{f:493.88,at:.11,dur:.09,vol:.034}],
+    '守锁兽':[{f:110,wave:'triangle',dur:.22,vol:.058},{f:278,dur:.075,vol:.025}],
+    '溺灯':[{f:261.63,dur:.32,vol:.045},{f:392,at:.17,dur:.22,vol:.027}],
+    '无名旗手':[{f:329.63,wave:'triangle',dur:.14,vol:.041},{f:246.94,at:.12,dur:.15,vol:.038}],
+    '沉钟典狱长':[{f:98,dur:.45,vol:.068},{f:271,dur:.19,vol:.029}]
+  };
+  let dialogueBus=null;
+  function stopDialogueCue(){
+    if(dialogueBus){dialogueBus.disconnect();dialogueBus=null;}
   }
-  function cacheVoice(src){
-    if(!voiceBuffers.has(src)){
-      const buffer=fetch(src).then(reply=>{if(!reply.ok)throw Error('Voice unavailable');return reply.arrayBuffer();}).then(decodeBuffer);
-      voiceBuffers.set(src,buffer);
-      if(voiceBuffers.size>2)voiceBuffers.delete(voiceBuffers.keys().next().value);
-      buffer.catch(()=>{if(voiceBuffers.get(src)===buffer)voiceBuffers.delete(src);});
-    }
-    return voiceBuffers.get(src);
-  }
-  function playSceneVoice(who,text){
-    stopSceneVoice();
-    const role=window.EmberVoiceLines?.[who];
-    if(!role||!ac||muted||settings.sfx<=0||settings.vol===0)return;
-    let clip=role.lines[text];
-    if(!clip&&who==='墨翁'){
-      const greeting=text.startsWith('地图已经')?'地图已经在你手上了。':text.startsWith('这一卷要')?'这一卷要些余烬。':text.startsWith('这一卷，')?'拿好，别走冤枉路。':'';
-      clip=role.lines[greeting];
-    }
-    if(!clip)return;
-    const [from,length]=clip,src='assets/voices/'+role.actor+'.mp3',voice={from,length};
-    currentVoice=voice;
-    if(fileMusic){
-      if(!voiceMedia)voiceMedia=new Audio();
-      const media=voiceMedia;
-      const start=()=>{
-        if(currentVoice!==voice)return;
-        media.volume=settings.sfx*(settings.vol??1);
-        media.currentTime=from;
-        const started=media.play();
-        if(started?.catch)started.catch(()=>{if(currentVoice===voice)stopSceneVoice();});
-      };
-      media.onerror=()=>{if(currentVoice===voice)stopSceneVoice();};
-      if(media.getAttribute('src')===src&&media.readyState>=1)start();
-      else{media.onloadedmetadata=start;media.src=src;media.load();}
-      return;
-    }
-    cacheVoice(src).then(buffer=>{
-      if(currentVoice!==voice)return;
-      const source=ac.createBufferSource();voice.source=source;source.buffer=buffer;source.connect(sfxBus||ac.destination);
-      source.onended=()=>{source.disconnect();if(currentVoice===voice)currentVoice=null;};
-      source.start(0,from,length);
-    }).catch(()=>{if(currentVoice===voice)stopSceneVoice();});
+  function playDialogueCue(who){
+    const parts=dialogueCues[who];
+    if(!parts||!ac||muted||settings.sfx<=0||settings.vol===0)return;
+    dialogueBus=ac.createGain();
+    dialogueBus.connect(sfxBus||ac.destination);
+    weighted(parts,dialogueBus);
   }
   function typeTalk(dt){const l=talk.lines[talk.i],s=talk.text,len=s.length,sp=settings.textSpeed||1;if(talk.swapT>0){talk.swapT-=dt;if(talk.swapT<=0)talkBox.classList.remove('swap');}
     if(talk.lines===TALK.prologue){
@@ -998,14 +968,13 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
         else weighted([{noise:true,filter:'bandpass',freq:1700,q:1.8,vol:.035,dur:.08},{f:940,to:570,wave:'triangle',vol:.018,dur:.13,at:.025}]);
       }
     }
-    if(currentVoice&&voiceMedia&&!voiceMedia.paused&&voiceMedia.currentTime>=currentVoice.from+currentVoice.length)stopSceneVoice();
     if(talk.shown<len){if(talk.wait>0){talk.wait-=dt;return;}talk.n=Math.min(len,talk.n+dt*24*sp);
       while(talk.shown<Math.floor(talk.n)){const c=s.charAt(talk.shown);addChar(talk.shown++);if(PAUSE[c]&&talk.shown<len){talk.wait=PAUSE[c]/sp;talk.n=talk.shown;break;}}
       if(talk.shown>=len)talkBox.classList.remove('typing');return;}
     // 自动翻页：对话框底边一道细线慢慢走满，走满就翻页
-    if(talk.auto||settings.autoTalk){talk.hold+=dt;const need=(1+len*.045+(l[2]?1.4:0))/sp;if(talkBar)talkBar.style.transform='scaleX('+Math.min(1,talk.hold/need).toFixed(3)+')';if(talk.hold>need&&(!currentVoice||talk.hold>currentVoice.length+3))talkNext();}}
-  function talkNext(){if(!talk)return;if(talk.shown<talk.text.length){talk.n=talk.shown=talk.text.length;talk.wait=0;let h='';for(let i=0;i<talk.text.length;i++)h+=chSpan(i,true);talkText.innerHTML=h;if(!talkText.insertAdjacentHTML)talkText.textContent=talk.text;talkBox.classList.remove('typing');return;}talk.i++;if(talk.i<talk.lines.length){showLine();beep(520,.04,'sine',.02);return;}
-    stopSceneVoice();const done=talk.done,keep=talk.keep;talk=null;talkBox.hidden=true;talkBox.classList.remove('auto');talkBox.classList.remove('swap');sceneA=sceneB='';if(!keep){hud.hidden=false;touch.hidden=!coarse();state='play';}hudKey='';keys={};clearHeld();if(done)done();}
+    if(talk.auto||settings.autoTalk){talk.hold+=dt;const need=(1+len*.045+(l[2]?1.4:0))/sp;if(talkBar)talkBar.style.transform='scaleX('+Math.min(1,talk.hold/need).toFixed(3)+')';if(talk.hold>need)talkNext();}}
+  function talkNext(){if(!talk)return;if(talk.shown<talk.text.length){talk.n=talk.shown=talk.text.length;talk.wait=0;let h='';for(let i=0;i<talk.text.length;i++)h+=chSpan(i,true);talkText.innerHTML=h;if(!talkText.insertAdjacentHTML)talkText.textContent=talk.text;talkBox.classList.remove('typing');return;}talk.i++;if(talk.i<talk.lines.length){showLine();return;}
+    stopDialogueCue();const done=talk.done,keep=talk.keep;talk=null;talkBox.hidden=true;talkBox.classList.remove('auto');talkBox.classList.remove('swap');sceneA=sceneB='';if(!keep){hud.hidden=false;touch.hidden=!coarse();state='play';}hudKey='';keys={};clearHeld();if(done)done();}
   function skipTalk(){if(!talk)return;talk.i=talk.lines.length-1;talk.n=talk.shown=1e9;talkNext();}
   // 敌人血量随层数变厚；精英是放大一圈的守卫，带光环
   // 首领各有体型：守锁兽又宽又矮、溺灯高高浮着、旗手瘦长、典狱长最高
@@ -1066,7 +1035,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   addEventListener('keyup',e=>{delete keys[e.code];if(codeAct[e.code]==='jump')jumpRelease();});
   addEventListener('blur',()=>{keys={};clearHeld();if(state==='play'&&!paused)togglePause();});
   addEventListener('pagehide',saveActiveJourney);
-  document.addEventListener('visibilitychange',()=>{if(document.hidden){stopSceneVoice();saveActiveJourney();keys={};clearHeld();if(fileMusic)silenceLocal();if(state==='play'&&!paused)togglePause();if(ac){const r=ac.suspend();if(r&&r.catch)r.catch(()=>{});}}else if(ac&&!muted){const r=ac.resume();if(r&&r.catch)r.catch(()=>{});}});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){stopDialogueCue();saveActiveJourney();keys={};clearHeld();if(fileMusic)silenceLocal();if(state==='play'&&!paused)togglePause();if(ac){const r=ac.suspend();if(r&&r.catch)r.catch(()=>{});}}else if(ac&&!muted){const r=ac.resume();if(r&&r.catch)r.catch(()=>{});}});
   ['pointerdown','touchend','click'].forEach(n=>document.addEventListener(n,unlockAudio,true));
   // 微信 / iOS：不许整页拖动回弹、双指缩放、长按弹菜单（面板本身可以滚动）
   document.addEventListener('touchmove',e=>{if(!(e.target&&e.target.closest&&e.target.closest('.veil')))e.preventDefault();},{passive:false});
@@ -1110,7 +1079,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     try{if(localStorage.getItem(saveSlot(selectedRoute))===lastWrittenSave)saveRun();}catch(e){}
   }
   function clearSave(){lastWrittenSave=null;try{localStorage.removeItem(saveSlot(selectedRoute));}catch(e){}}
-  function showMenu(){clearSecretRoom();selectedRoute=false;panel.classList.remove('late');state='menu';paused=false;talk=null;talkBox.hidden=true;credits=null;cine=null;rebinding=null;hud.hidden=true;touch.hidden=true;hint.hidden=true;gainBox.hidden=true;gainT=0;toastQ.length=0;notice.style.opacity=0;messageT=0;titleT=0;sceneA=sceneB='';keys={};clearHeld();renderMenu();}
+  function showMenu(){stopDialogueCue();clearSecretRoom();selectedRoute=false;panel.classList.remove('late');state='menu';paused=false;talk=null;talkBox.hidden=true;credits=null;cine=null;rebinding=null;hud.hidden=true;touch.hidden=true;hint.hidden=true;gainBox.hidden=true;gainT=0;toastQ.length=0;notice.style.opacity=0;messageT=0;titleT=0;sceneA=sceneB='';keys={};clearHeld();renderMenu();}
   function focusFirst(){try{const b=panel.querySelector('button:not([disabled])');if(b&&!coarse())b.focus();}catch(e){}}
   function bindBack(){panel.querySelectorAll('[data-back]').forEach(b=>b.onclick=menuBack);}
   function menuBack(){rebinding=null;if(panelView==='chapters'&&paused){showPause();return;}beep(420,.05,'sine');if(panelView==='settings'&&menuFrom==='pause'&&state==='play'){showPause();return;}if(state==='menu')renderMenu();}
@@ -1677,7 +1646,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       else showPanel('余火将息',why+'。<br>这次旅途暂时结束。翻滚能穿过攻击，宝箱能让下一场战斗轻松一些。','重新出发',()=>reset(false),[menu]);focusFirst();}
     beep(win?650:110,.5);}
   // 片尾字幕：黎明的插画上，名字一行行往上走；按任意键 / 点一下跳过
-  const CREDITS=[['余烬地牢','title'],['EMBER VAULT','en'],['',''],['— 引灯的人 —','h'],['小引灯人　钟锤学徒　拾灯弓手',''],['',''],['— 路上遇见的 —','h'],['守钟人　烛叟　阿苓',''],['',''],['— 守着门的 —','h'],['守锁兽 · 铜壳',''],['溺灯 · 腐潮母巢',''],['无名旗手 · 归骨',''],['沉钟典狱长',''],['',''],['— 走过的路 —','h'],['焚炉底层　沉钟监牢　腐水下水道',''],['落日城墙　骸骨墓窟　沉钟之巅',''],['',''],['画面、关卡与对白','h'],['原创绘制与编写',''],['— 音乐 —','h'],['《两下灯影》与《渡灯谣》 · 原创配乐',''],['灯坊、五座地牢与四位守钟者',''],['场景对白 · 普通话合成配音',''],['',''],['',''],['谢谢你，把每一盏火都送回了家。','end']];
+  const CREDITS=[['余烬地牢','title'],['EMBER VAULT','en'],['',''],['— 引灯的人 —','h'],['小引灯人　钟锤学徒　拾灯弓手',''],['',''],['— 路上遇见的 —','h'],['守钟人　烛叟　阿苓',''],['',''],['— 守着门的 —','h'],['守锁兽 · 铜壳',''],['溺灯 · 腐潮母巢',''],['无名旗手 · 归骨',''],['沉钟典狱长',''],['',''],['— 走过的路 —','h'],['焚炉底层　沉钟监牢　腐水下水道',''],['落日城墙　骸骨墓窟　沉钟之巅',''],['',''],['画面、关卡与对白','h'],['原创绘制与编写',''],['— 音乐 —','h'],['《两下灯影》与《渡灯谣》 · 原创配乐',''],['灯坊、五座地牢与四位守钟者',''],['角色提示音 · 灯铃与器乐',''],['',''],['',''],['谢谢你，把每一盏火都送回了家。','end']];
   function startCredits(){credits={t:0,dur:26};talkBox.hidden=true;hud.hidden=true;touch.hidden=true;sceneA=sceneB='';}
   function endCredits(){if(!credits)return;credits=null;showWinPanel();}
   // 结算：通关次数 +1，解锁新角色；可以带着同一个角色开启下一周目

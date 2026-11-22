@@ -483,9 +483,15 @@ test('pickups show up as drawn items with a count, never as written names',()=>{
   assert(t.floats.some(f=>f.art==='knife'&&f.t==='×2'),'a drawn knife bundle pops out');assert(!t.floats.some(f=>/飞刀/.test(f.t)),'no written name');assert(t.loot.some(o=>o.id==='knife'),'and flies to you');
   t.reset();t.player.x=t.L.npc-13;t.player.y=428;advance(.02);t.action('interact');finishTalk();assert(t.loot.some(o=>o.id==='bomb'),'the bellkeeper\'s fire flask flies over as a picture');
 });
-test('procedural music schedules different notes for exploration and boss combat',()=>{
-  const notes=[];function FakeAudio(){this.state='running';this.currentTime=10;this.destination={};this.resume=()=>Promise.resolve();this.createBuffer=()=>({});this.createBufferSource=()=>({connect:noop,start:noop});this.createGain=()=>({gain:{setValueAtTime:noop,exponentialRampToValueAtTime:noop},connect:noop});this.createOscillator=()=>({frequency:{setValueAtTime:v=>notes.push(v),exponentialRampToValueAtTime:noop},connect:noop,start:noop,stop:noop});}
+test('exploration and boss music differ, and the girl signals once with two chimes',()=>{
+  const notes=[];function FakeAudio(){this.state='running';this.currentTime=10;this.destination={};this.resume=()=>Promise.resolve();this.createBuffer=()=>({});this.createBufferSource=()=>({connect:noop,start:noop});this.createGain=()=>({gain:{setValueAtTime:noop,exponentialRampToValueAtTime:noop},connect:noop,disconnect:noop});this.createOscillator=()=>({frequency:{setValueAtTime:v=>notes.push(v),exponentialRampToValueAtTime:noop},connect:noop,start:noop,stop:noop});}
   sandbox.AudioContext=FakeAudio;t.reset();press('KeyD');release('KeyD');advance(.6);assert(notes.length>0,'exploration music starts after gesture');notes.length=0;t.loadStage(t.STAGES.findIndex(s=>s.bossKind==='brood'));t.flags.boss=true;advance(.3);assert(notes.length>=2,'boss theme has multiple layers');assert(notes.some(n=>Math.abs(n-55)<.01),'boss rhythm uses its own bass');
+  t.startJourney('lamp',0);notes.length=0;
+  press('KeyE');release('KeyE');press('KeyE');release('KeyE');
+  assert.equal(t.talk.lines[t.talk.i][0],'青带女孩');
+  assert.deepEqual(notes,[587.33,880]);
+  press('KeyE');release('KeyE');
+  assert.deepEqual(notes,[587.33,880],'revealing the subtitle does not retrigger the chimes');
 });
 test('boss unlock persists even after gameplay panels replaced the menu',()=>{
   t.reset();t.unlocked=1;t.loadStage(t.STAGES.findIndex(s=>s.bossKind==='lock'));const original=sandbox.document.getElementById;sandbox.document.getElementById=id=>id.indexOf('chapter-')===0?null:original(id);try{t.killEnemy(t.enemies[0]);assert.equal(storage['ember:unlocked'],'2');assert.equal(t.unlocked,2);assert.equal(t.state,'cine');}finally{sandbox.document.getElementById=original;}
