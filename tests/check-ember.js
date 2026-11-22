@@ -148,9 +148,10 @@ test('slain enemies fade out before disappearing',()=>{
   t.action('attack');advance(.12);
   assert(e.dead);assert(e.dieT>.3);advance(.55);assert.equal(e.dieT,0);
 });
-test('chest button only shows next to an unopened chest',()=>{
+test('the interaction button offers an unopened chest and hides on an empty stretch',()=>{
   t.player.x=600;t.player.y=318;t.player.vy=0;advance(.02);assert.equal(nodes['chest-btn'].hidden,false);
-  t.player.x=300;t.player.y=428;advance(.02);assert.equal(nodes['chest-btn'].hidden,true);
+  assert.equal(nodes['chest-btn'].textContent,'开箱');
+  t.player.x=190;t.player.y=428;advance(.02);assert.equal(nodes['chest-btn'].hidden,true);
 });
 test('hud text follows health and potions',()=>{
   t.player.inv=0;t.hurt(10,0);advance(.02);assert.equal(nodes.stats.textContent,'4 / 5');assert.equal((nodes.health.innerHTML.match(/life-ghost/g)||[]).length,5);assert.equal((nodes.health.innerHTML.match(/lost/g)||[]).length,1);assert.equal(nodes['potion-count'].textContent,1);
@@ -630,12 +631,57 @@ test('portrait starts playing immediately and rotation preserves the run',()=>{
 });
 test('the prologue leads straight into a playable prison with the chosen bearer',()=>{delete storage['ember:tutorial'];t.clears=0;t.startJourney('bow',2);assert.equal(t.player.char,'bow');assert.equal(t.cycle,0);assert.equal(t.talk.lines,t.TALK.prologue);finishTalk();advance(1);assert.equal(t.stage,0);assert(t.run.guided);assert.equal(t.state,'play');assert(!t.L.tutorial);const x=t.player.x;press('KeyD');advance(.25);release('KeyD');assert(t.player.x>x);});
 test('existing players keep their prologue and go straight to play too',()=>{storage['ember:tutorial']='1';t.startJourney('lamp',0);assert.equal(t.talk.lines,t.TALK.prologue);finishTalk();advance(1);assert.equal(t.stage,0);assert(!t.L.tutorial);assert.equal(t.state,'play');});
-test('the map opens with M, fills in as you explore, and the cartographer sells the whole floor',()=>{
+test('exploration fills the map and the unattended map stand charges once per floor',()=>{
   advance(.1);assert(t.run.seen&&t.run.seen.s0,'exploration is recorded');const seen0=t.run.seen.s0.reduce((a,b)=>a+b,0);t.player.inv=100;
   t.player.x=1500;t.player.y=428;advance(.8);assert(t.run.seen.s0.reduce((a,b)=>a+b,0)>seen0,'walking reveals more');
   press('KeyM');release('KeyM');assert.equal(t.state,'map');press('Escape');release('Escape');assert.equal(t.state,'play');
-  assert(!t.hasMap());t.enemies.forEach(e=>e.dead=true);t.embers=5;t.player.x=t.L.ink-13;t.player.y=428;advance(.05);assert.equal(nodes['chest-btn'].textContent,'地图');t.action('interact');finishTalk();assert(!t.hasMap(),'too poor to buy');
-  t.embers=100;t.action('interact');finishTalk();assert(t.hasMap(),'bought');assert(t.embers<100);
+  assert(!t.hasMap());t.enemies.forEach(e=>e.dead=true);t.embers=5;t.player.x=t.L.mapStand-13;t.player.y=428;advance(.05);
+  assert.equal(nodes['chest-btn'].textContent,'购图');t.action('interact');assert(!t.hasMap());assert.equal(t.embers,5);
+  assert(nodes.notice.textContent.includes('还差 15'));assert.equal(t.state,'play');
+  t.embers=100;t.action('interact');assert(t.hasMap());assert.equal(t.embers,80);advance(.05);
+  assert.equal(nodes['chest-btn'].textContent,'看图');t.action('interact');assert.equal(t.state,'map');assert.equal(t.embers,80);
+  press('Escape');release('Escape');t.retryStage();assert(t.hasMap(),'bought map survives a floor retry');
+  t.showMenu();t.continueRun();assert(t.hasMap(),'existing map flags survive reload');
+});
+test('every main floor offers its own full route at the original price',()=>{
+  for(const [theme,price] of [['prison',20],['sewers',25],['ramparts',35],['ossuary',40],['tower',50]]){
+    t.loadStage(stageOf(theme));t.enemies.forEach(e=>e.dead=true);
+    t.embers=100;t.player.x=t.L.mapStand-t.player.w/2;t.player.y=480-t.player.h;advance(.1);
+    assert.equal(nodes['chest-btn'].textContent,'购图',theme);t.action('interact');
+    assert(t.hasMap(),theme);assert.equal(t.embers,100-price,theme);
+  }
+});
+function talkToWayfarer(){
+  const npc=t.L.wayfarer;
+  t.player.x=npc.x-t.player.w/2;t.player.y=npc.y-t.player.h;
+  t.action('interact');
+  assert.equal(t.state,'talk');assert.equal(t.talk.lines[0][0],npc.name);
+  return t.talk.lines[0][1];
+}
+test('roadside gifts arrive only when the first conversation finishes and persist exactly once',()=>{
+  for(const [theme,item,count] of [['prison','knife',2],['sewers','frost',1],['tower','bomb',1]]){
+    t.loadStage(stageOf(theme));
+    const npc=t.L.wayfarer,start=t.bag[item];
+    assert.equal(talkToWayfarer(),npc.lines[0]);press('KeyE');press('KeyE');
+    assert.equal(t.talk.i,1);assert.equal(t.bag[item],start,'the last line is still on screen');
+    t.showMenu();t.continueRun();
+    assert.equal(t.bag[item],start);assert.equal(talkToWayfarer(),npc.lines[0],'interrupted meeting starts over');
+    finishTalk();assert.equal(t.bag[item],start+count);
+    function checkRepeatVisit(){
+      assert.equal(t.bag[item],start+count);
+      assert.equal(talkToWayfarer(),npc.again);finishTalk();assert.equal(t.bag[item],start+count);
+    }
+    checkRepeatVisit();t.retryStage();checkRepeatVisit();
+    t.showMenu();t.continueRun();checkRepeatVisit();
+  }
+});
+test('the flag courier and crypt keeper tell their stories without changing the inventory',()=>{
+  const inventory=()=>JSON.stringify([t.bag,t.keepsakes,t.relics,t.player.potions,t.embers]);
+  for(const theme of ['ramparts','ossuary']){
+    t.loadStage(stageOf(theme));const npc=t.L.wayfarer,before=inventory();
+    assert.equal(talkToWayfarer(),npc.lines[0]);finishTalk();assert.equal(inventory(),before);
+    assert.equal(talkToWayfarer(),npc.again);finishTalk();assert.equal(inventory(),before);
+  }
 });
 test('a cracked wall opens a walk-in side room that preserves the outside route and pays once',()=>{
   const s=t.secrets[0];t.enemies.forEach(e=>e.dead=true);t.player.inv=100;t.player.y=428;t.player.face=1;
