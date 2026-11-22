@@ -200,6 +200,19 @@ h1{font:700 clamp(42px,6vw,78px)/1.2 Georgia,"SimSun",serif;letter-spacing:9px;m
 #gain b{display:block;font-size:16px;letter-spacing:2px;color:#f6deb0}
 #gain small{display:block;font-size:12px;line-height:1.6;color:#b9c2c4;margin-top:2px}
 #gain.pop{animation:gainpop .45s ease-out}
+#skill-practice{position:absolute;top:max(14px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);width:min(340px,calc(100% - 24px));box-sizing:border-box;display:grid;grid-template-columns:42px minmax(0,1fr) auto;align-items:center;gap:9px;padding:8px 9px;border:1px solid #8b8265;border-left:3px solid #ebca86;border-radius:4px;background:linear-gradient(110deg,#252e33fa,#101b23f5);box-shadow:0 4px 15px #0005;color:#f1e4c9;pointer-events:none}
+#skill-practice[hidden],#stage:has(#panel:not([hidden]),#talk:not([hidden]),#hud[hidden]) #skill-practice{display:none}
+#skill-practice img{width:42px;height:42px}
+#skill-practice b{display:block;font-size:14px;line-height:1.35}
+#skill-practice p,#skill-practice small{margin:3px 0 0;font-size:12px;line-height:1.45}
+#skill-practice small{display:block;color:#a9e6d8}
+#practice-later{min-height:44px;min-width:44px;padding:4px;border:0;background:transparent;color:#e2d3b1;font-size:12px;pointer-events:auto}
+#stage .sk.practicing{outline:2px solid #f0c87b;outline-offset:2px}
+#gain-info{white-space:pre-line}
+.slots .practice-link{display:block;margin-top:6px;color:#a9e6d8;font-size:12px}
+@media(min-width:900px) and (min-height:500px){#skill-practice{top:54px}#stage:has(#skill-practice:not([hidden])) #notice{top:29%}}
+@media(orientation:portrait){#skill-practice{top:max(100px,calc(env(safe-area-inset-top) + 92px))}#stage:has(#skill-practice:not([hidden])) #notice{top:max(208px,calc(env(safe-area-inset-top) + 208px))}}
+@media(orientation:landscape) and (max-height:500px){#skill-practice{top:max(4px,env(safe-area-inset-top));width:min(330px,50vw);grid-template-columns:30px minmax(0,1fr) auto;gap:6px;padding:4px 6px}#skill-practice img{width:30px;height:30px}}
 @keyframes gainpop{0%{opacity:0;transform:translate(-50%,10px) scale(.9)}100%{opacity:1;transform:translate(-50%,0) scale(1)}}
 
 /* 对话框：说话人的头像在左边；铺插画时对话框更通透 */
@@ -698,6 +711,7 @@ html,body,#stage{max-width:100%;overflow:hidden}
 #talk.arena-dialog #talk-face{width:48px;height:48px;margin-top:-24px;left:19px}
 #talk.arena-dialog p{padding:0 46px 0 0;min-height:24px;font-size:clamp(14px,2.1vw,18px);line-height:1.6}
 #talk.arena-dialog #talk-skip{min-width:44px;min-height:44px;top:2px}
+#stage.in-secret :is(#minimap,#heal-btn,#item-btn,#skills,#hint,#touch .attack,#touch .roll,#touch .sk){display:none}
 @media(max-width:500px){
   #talk.arena-dialog{left:12px;right:12px;padding:13px 12px}
   #talk.arena-dialog.has-face{padding-left:59px}

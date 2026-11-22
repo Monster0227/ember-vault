@@ -521,6 +521,24 @@ test('first-map skills unlock after the basic actions',()=>{
   t.loadStage(stageOf('sewers'));advance(.05);assert.equal(t.run.awakened,2);
   t.loadStage(stageOf('ramparts'));advance(.05);assert.equal(t.run.awakened,3);
 });
+test('a new skill teaches a real cast, survives a reload, and can be set aside',()=>{
+  t.startJourney('lamp',0);finishTalk();advance(1);t.player.x=1460;advance(.05);
+  assert.equal(t.run.practiceSlot,1);assert(nodes['practice-name'].textContent.includes('影步斩'));
+  assert(nodes['practice-key'].textContent.includes('按 1'));assert(t.player.soul>=1);
+  t.showMenu();t.continueRun();advance(.05);assert.equal(t.run.practiceSlot,1);
+  t.player.soul=0;press('Digit1');release('Digit1');assert.equal(t.run.practiceSlot,1);
+  t.player.soul=1;press('Digit1');release('Digit1');assert(t.player.dash>0);assert.equal(t.run.practiceSlot,0);
+  assert.equal(JSON.parse(storage['ember:save']).run.practiceSlot,0);
+  t.loadStage(stageOf('sewers'));advance(.05);assert.equal(t.run.practiceSlot,2);
+  const soul=t.player.soul;nodes['practice-later'].onclick();assert.equal(t.run.practiceSlot,0);assert.equal(t.player.soul,soul);
+});
+test('using a consumable reports its count, replacement, and empty inventory',()=>{
+  t.bag.knife=2;t.bag.frost=1;t.sel='knife';
+  t.action('use');assert.equal(t.bag.knife,1);assert(nodes.notice.textContent.includes('掷出飞刀 · 剩 1 件'));
+  t.action('use');assert.equal(t.sel,'frost');assert(nodes.notice.textContent.includes('已换为寒霜铃'));
+  t.action('use');assert.equal(t.bag.frost,0);assert(nodes.notice.textContent.includes('最后一件已用完'));
+  t.action('use');assert(nodes.notice.textContent.includes('补给'));
+});
 test('the tutorial cannot kill you and, opened without a saved journey, flows into the first level',()=>{
   delete storage['ember:save'];
   t.startTutorial(true);assert(t.L.tutorial);
@@ -613,10 +631,21 @@ test('the map opens with M, fills in as you explore, and the cartographer sells 
   assert(!t.hasMap());t.enemies.forEach(e=>e.dead=true);t.embers=5;t.player.x=t.L.ink-13;t.player.y=428;advance(.05);assert.equal(nodes['chest-btn'].textContent,'地图');t.action('interact');finishTalk();assert(!t.hasMap(),'too poor to buy');
   t.embers=100;t.action('interact');finishTalk();assert(t.hasMap(),'bought');assert(t.embers<100);
 });
-test('a cracked wall hides a secret: three hits break it, and a stage retry puts it back',()=>{
+test('a cracked wall opens a walk-in side room that preserves the outside route and pays once',()=>{
   const s=t.secrets[0];t.enemies.forEach(e=>e.dead=true);t.player.inv=100;t.player.y=428;t.player.face=1;
-  for(let i=0;i<3;i++){t.player.x=s.x-60;t.action('attack');advance(.4);}assert(s.open,'the wall crumbles');assert.equal(t.player.shards,1,'a lantern shard was inside');
-  t.retryStage();assert(!t.secrets[0].open,'a retry restores the wall');assert.equal(t.player.shards||0,0,'and the shard with it');
+  for(let i=0;i<3;i++){t.player.x=s.x-60;t.action('attack');advance(.4);}
+  assert(s.open);assert.equal(t.player.shards||0,0,'treasure remains inside');
+  const pos=t.player.x,lit=t.run.litWicks;
+  press('KeyE');release('KeyE');advance(1);assert.equal(nodes['chest-btn'].textContent,'出暗门');
+  press('KeyD');advance(1.2);release('KeyD');assert.equal(nodes['chest-btn'].textContent,'取藏品');
+  press('KeyE');release('KeyE');t.action('interact');assert.equal(t.player.shards,1);
+  press('KeyA');advance(1.7);release('KeyA');t.action('interact');advance(.92);
+  assert(Math.abs(t.player.x-pos)<2);assert.equal(t.run.litWicks,lit);
+  t.action('interact');advance(1);press('KeyD');advance(1.2);release('KeyD');
+  assert(nodes['chest-btn'].hidden,'spent pedestal has no second interaction');
+  t.action('interact');assert.equal(t.player.shards,1);
+  t.retryStage();assert(t.secrets[0].open&&t.secrets[0].claimed);assert.equal(t.player.shards,1);
+  t.continueRun();assert(t.secrets[0].open&&t.secrets[0].claimed);assert.equal(t.player.shards,1);
 });
 test('three lantern shards raise the life cap by one ghost',()=>{
   const max=t.player.max;t.gainShard(100,300);t.gainShard(100,300);assert.equal(t.player.max,max);t.gainShard(100,300);assert.equal(t.player.max,max+20);assert.equal(t.player.hp,t.player.max);
