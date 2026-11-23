@@ -678,16 +678,17 @@ html,body,#stage{max-width:100%;overflow:hidden}
 
 /* Keep the combat floor and both characters in view while they speak. */
 /* Cutscene dialogue shares the bottom edge with the portrait and skip button. */
-#talk.over-art{
+#talk:is(.over-art,.chapter-dialog){
   --face-space:118px;
   display:grid;
   grid-template-columns:minmax(0,1fr) auto;
   align-items:center;
   column-gap:8px;
 }
-#talk.over-art.has-face{padding-left:var(--face-space)}
-#talk.over-art p{grid-column:1;margin:0;padding-right:0}
-#talk.over-art #talk-skip{
+#talk:is(.over-art,.chapter-dialog).has-face{padding-left:var(--face-space)}
+#talk:is(.over-art,.chapter-dialog) p{grid-column:1;margin:0;padding-right:0}
+#talk.chapter-dialog p{text-wrap:balance}
+#talk:is(.over-art,.chapter-dialog) #talk-skip{
   position:static;
   grid-column:2;
   grid-row:1;
@@ -696,8 +697,8 @@ html,body,#stage{max-width:100%;overflow:hidden}
   padding:4px;
   white-space:nowrap;
 }
-@media(max-width:600px){#talk.over-art{--face-space:82px}}
-@media(max-height:500px) and (min-width:601px){#talk.over-art{--face-space:92px}}
+@media(max-width:600px){#talk:is(.over-art,.chapter-dialog){--face-space:82px}}
+@media(max-height:500px) and (min-width:601px){#talk:is(.over-art,.chapter-dialog){--face-space:92px}}
 #talk.arena-dialog{
   top:calc(env(safe-area-inset-top, 0px) + 26px);
   bottom:auto;
@@ -711,6 +712,14 @@ html,body,#stage{max-width:100%;overflow:hidden}
 #talk.arena-dialog #talk-face{width:48px;height:48px;margin-top:-24px;left:19px}
 #talk.arena-dialog p{padding:0 46px 0 0;min-height:24px;font-size:clamp(14px,2.1vw,18px);line-height:1.6}
 #talk.arena-dialog #talk-skip{min-width:44px;min-height:44px;top:2px}
+#chapter-marker{
+  position:absolute;top:max(19px,env(safe-area-inset-top));left:max(18px,env(safe-area-inset-left));
+  padding:6px 26px 7px 12px;border-left:2px solid #e4c68a;
+  color:#f4dfb6;background:linear-gradient(90deg,#151819e8 24%,#151819a8 76%,transparent);
+  font:600 clamp(13px,1.7vw,18px)/1.4 "Songti SC","STSong","SimSun",serif;
+  letter-spacing:.13em;text-shadow:0 1px 3px #111;pointer-events:none;
+}
+#chapter-marker[hidden],#stage:has(#talk[hidden]) #chapter-marker{display:none}
 #stage.in-secret :is(#minimap,#heal-btn,#item-btn,#skills,#hint,#touch .attack,#touch .roll,#touch .sk){display:none}
 @media(max-width:500px){
   #talk.arena-dialog{left:12px;right:12px;padding:13px 12px}

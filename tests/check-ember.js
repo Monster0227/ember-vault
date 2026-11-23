@@ -15,7 +15,7 @@ function node(id) {
 const sandbox = {
   document:{getElementById:node, querySelectorAll:() => [], addEventListener:noop},
   innerWidth:1100, innerHeight:620, devicePixelRatio:1,
-  localStorage:{getItem:k => storage[k], setItem:(k,v) => storage[k]=v},
+  localStorage:{getItem:k => storage[k], setItem:(k,v) => storage[k]=v, removeItem:k => {delete storage[k];}},
   addEventListener:(event,fn) => listeners[event]=fn,
   requestAnimationFrame:noop, console, Math, Set
 };
@@ -37,6 +37,11 @@ function press(code) { listeners.keydown({code,repeat:false,preventDefault:noop}
 function release(code) { listeners.keyup({code}); }
 function finishTalk() { for(let i=0;i<60&&t.state==='talk';i++)press('KeyE'); }
 function finishCine() { for(let i=0;i<600&&t.state==='cine';i++)t.step(1/60); }
+function assertGateStory(stage,lineCount){
+  assert.equal(t.stage,stage,'subtitles play before changing rooms');
+  assert.equal(t.state,'talk');assert.equal(t.talk.lines.length,lineCount);
+  assert(t.talk.coda&&t.talk.auto);assert(!t.sceneArt,'the original room remains on screen');
+}
 const FINAL=t.STAGES.length-1, stageOf=theme=>t.STAGES.findIndex(s=>s.theme===theme&&!s.arena&&!s.rest),firstRest=()=>t.STAGES.findIndex(s=>s.rest&&s.restNo===0);
 if (routeCheck) {
   require('./check-routes.cjs')({t,press,release,stageOf,finishTalk,storage});
@@ -258,13 +263,16 @@ test('each main-map door stays shut until every wick catches in order',()=>{
       assert.equal(t.run.litWicks,i+1,room.name+' wick '+i);
     }
     advance(.5);assert.equal(t.run.doorLift,1);
-    press('KeyD');advance(1.4);release('KeyD');assert.equal(t.stage,index+1);
+    press('KeyD');advance(1.4);release('KeyD');
+    if(room.theme==='ramparts'){assertGateStory(index,2);finishTalk();advance(1);}
+    assert.equal(t.stage,index+1);
   }
 });
 test('the exit leads to a boss arena, then a waystation and the next chapter with stats kept',()=>{
   t.run.litWicks=t.L.wicks.length;t.run.doorLift=1;t.player.damage=40;t.player.potions=2;t.embers=55;t.player.x=t.L.exit+20;t.player.y=428;advance(1);
   assert(t.L.arena);assert.equal(t.player.damage,40);assert.equal(t.embers,55);
-  t.enemies.find(e=>e.type==='boss').dead=true;t.player.x=t.L.seal+20;advance(1);assert(t.L.rest);
+  t.enemies.find(e=>e.type==='boss').dead=true;t.player.x=t.L.seal+20;advance(.1);
+  assertGateStory(firstRest()-1,3);finishTalk();advance(1);assert(t.L.rest);
   t.player.x=t.L.exit+20;t.player.y=428;advance(1);finishTalk();assert.equal(t.L.name,'腐水下水道');assert.equal(t.player.potions,2);assert.equal(t.embers,55);
 });
 test('the merchant sells healing for embers and you can walk away',()=>{
@@ -434,7 +442,23 @@ test('a defeated chapter boss unlocks a replay with a balanced fresh loadout',()
   t.reset();const idx=t.STAGES.findIndex(s=>s.bossKind==='lock');t.loadStage(idx);t.killEnemy(t.enemies[0]);assert.equal(storage['ember:unlocked'],'2');assert.equal(nodes['chapter-2'].disabled,false);assert.equal(nodes['chapter-3'].disabled,true);t.startChapter(2);assert.equal(t.L.chapter,2);assert(t.L.chapterStart);assert.equal(t.state,'talk');assert.equal(t.player.damage,23);assert.equal(t.player.hp,120);assert.equal(t.player.potions,2);assert.equal(t.bag.bomb,2);
 });
 test('all four boss arenas have an intro, a sealed exit and the correct continuation',()=>{
-  for(const arena of t.STAGES.filter(s=>s.arena)){t.reset();const index=t.STAGES.indexOf(arena);t.loadStage(index);t.player.x=arena.trigger+20;t.player.y=428;t.player.inv=100;advance(.03);assert.equal(t.state,'talk',arena.name+' has an introduction');assert(t.talk.arena);assert(!t.sceneArt);finishTalk();const b=t.enemies.find(e=>e.type==='boss');t.player.x=arena.seal+20;advance(.03);assert.equal(t.state,'play');assert.equal(t.stage,index);assert(t.player.x<=arena.seal);t.killEnemy(b);assert.equal(t.state,'cine',arena.name+' has a defeat scene');finishCine();assert.equal(t.state,'talk',arena.name+' has a conclusion');assert(t.talk.arena);assert(!t.sceneArt);finishTalk();t.player.x=arena.seal+20;advance(1.8);if(arena.bossKind==='warden'){finishCine();assert.equal(t.state,'win');}else{assert.equal(t.stage,index+1);assert(t.L.rest);}}
+  for(const arena of t.STAGES.filter(s=>s.arena)){
+    t.reset();const index=t.STAGES.indexOf(arena);t.loadStage(index);
+    t.player.x=arena.trigger+20;t.player.y=428;t.player.inv=100;advance(.03);
+    assert.equal(t.state,'talk',arena.name+' has an introduction');assert(t.talk.arena);assert(!t.sceneArt);finishTalk();
+    const boss=t.enemies.find(e=>e.type==='boss');t.player.x=arena.seal+20;advance(.03);
+    assert.equal(t.state,'play');assert.equal(t.stage,index);assert(t.player.x<=arena.seal);
+    t.killEnemy(boss);assert.equal(t.state,'cine',arena.name+' has a defeat scene');finishCine();
+    assert.equal(t.state,'talk',arena.name+' has a conclusion');assert(t.talk.arena);assert(!t.sceneArt);
+    finishTalk();assert.equal(t.state,'play','the death dialogue leaves the player free to walk');
+    t.player.x=arena.seal+20;advance(.1);
+    if(arena.bossKind==='warden'){
+      assert.equal(t.state,'cine');finishCine();assert.equal(t.state,'win');assert.equal(t.talk.lines,t.TALK.ending);
+    }else{
+      assertGateStory(index,3);assert.equal(JSON.parse(storage['ember:save']).coda,arena.bossKind);
+      finishTalk();advance(1);assert.equal(t.stage,index+1);assert(t.L.rest);
+    }
+  }
 });
 test('later chapters introduce their own story when entered from the waystation',()=>{
   for(const chapter of [2,3,4]){t.reset();const idx=t.STAGES.findIndex(s=>s.chapterStart&&s.chapter===chapter);t.loadStage(idx-1);assert(t.L.rest);t.player.x=t.L.exit+25;t.player.y=428;advance(1);assert.equal(t.stage,idx);assert.equal(t.state,'talk');assert(t.talk.lines.length>=3);finishTalk();assert.equal(t.state,'play');}
@@ -824,6 +848,49 @@ test('opening or leaving the title cannot manufacture a journey',()=>{
   storage['ember:save']=newer;listeners.pagehide();
   assert.equal(storage['ember:save'],newer,'a stale background tab preserves the newer save');
   t.showMenu();assert(nodes.panel.innerHTML.includes('data-menu="continue"'));
+});
+test('journey and free selection resume their own interrupted gate stories at the first line',()=>{
+  const bossStage=firstRest()-1,wallStage=stageOf('ramparts');
+  t.startJourney('bell',0);finishTalk();advance(1);t.loadStage(bossStage);
+  t.killEnemy(t.enemies.find(e=>e.type==='boss'));finishCine();finishTalk();
+  t.bag.frost=4;t.embers=117;t.player.x=t.L.seal+25;advance(.05);
+  assertGateStory(bossStage,3);const firstBossLine=t.talk.text;
+  press('KeyE');press('KeyE');assert.equal(t.talk.i,1);
+  listeners.pagehide();const journey=storage['ember:save'];assert.equal(JSON.parse(journey).coda,'lock');
+
+  t.showMenu();t.selectLevel(t.STAGES[wallStage]);finishTalk();
+  t.run.litWicks=t.L.wicks.length;t.run.doorLift=1;t.player.x=t.L.exit+25;advance(.05);
+  assertGateStory(wallStage,2);const firstBridgeLine=t.talk.text;assert.notEqual(firstBridgeLine,firstBossLine);
+  press('KeyE');press('KeyE');assert.equal(t.talk.i,1);
+  listeners.pagehide();const selected=storage['ember:selected-save'];assert.equal(JSON.parse(selected).coda,'ramparts');
+  assert.equal(storage['ember:save'],journey,'free selection preserves the interrupted journey');
+
+  t.showMenu();t.continueRun();assertGateStory(bossStage,3);
+  assert.equal(t.talk.i,0);assert.equal(t.talk.text,firstBossLine);assert.equal(t.bag.frost,4);assert.equal(t.embers,117);
+  advance(45);assert.equal(t.stage,bossStage+1);assert(t.L.rest);assert.equal(t.state,'play');
+  assert(!JSON.parse(storage['ember:save']).coda);assert.equal(storage['ember:selected-save'],selected);
+  t.showMenu();t.continueRun();assert.equal(t.stage,bossStage+1);assert(!t.talk);
+
+  t.showMenu();t.continueRun(true);assertGateStory(wallStage,2);
+  assert.equal(t.talk.i,0);assert.equal(t.talk.text,firstBridgeLine);
+  press('Escape');release('Escape');advance(1);assert.equal(t.stage,wallStage+1);assert(t.L.rest);
+  assert(!JSON.parse(storage['ember:selected-save']).coda);
+  t.showMenu();t.continueRun(true);assert.equal(t.stage,wallStage+1);assert(!t.talk);
+  t.showMenu();
+});
+test('interrupting the last gate replays the bells and ending with the actual loot and a single clear',()=>{
+  t.startJourney('lamp',0);finishTalk();advance(1);t.loadStage(FINAL);
+  t.killEnemy(t.enemies.find(e=>e.type==='boss'));finishCine();finishTalk();
+  const clears=t.clears;t.embers=147;t.bag.knife=7;t.player.x=t.L.seal+25;advance(.05);
+  assert.equal(t.state,'cine');assert.equal(JSON.parse(storage['ember:save']).coda,'warden');
+  finishCine();assert.equal(t.talk.lines,t.TALK.ending);const score=t.score;
+  press('KeyE');press('KeyE');assert.equal(t.talk.i,1);assert.equal(t.clears,clears);
+  listeners.pagehide();t.showMenu();t.continueRun();assert.equal(t.state,'cine');assert.equal(t.stage,FINAL);
+  finishCine();assert.equal(t.talk.lines,t.TALK.ending);assert.equal(t.talk.i,0);
+  assert.equal(t.embers,147);assert.equal(t.bag.knife,7);assert.equal(t.score,score);
+  press('Escape');release('Escape');assert(t.credits);assert.equal(t.clears,clears);
+  press('KeyE');release('KeyE');assert(!t.credits);assert.equal(t.clears,clears+1);assert(!storage['ember:save']);
+  t.showMenu();t.continueRun();assert.equal(t.state,'menu');assert.equal(t.clears,clears+1);
 });
 console.log('All '+passed+' gameplay checks passed.');
 
