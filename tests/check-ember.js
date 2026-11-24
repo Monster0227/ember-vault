@@ -114,6 +114,90 @@ test('attack recovery delays the next input without extending the swing or the b
   t.reset(true,'bow');press('KeyJ');assert.equal(t.player.chargeMax,.45);release('KeyJ');t.step(1/120);
   assert.equal(t.player.atkCd,8/60);t.reset(true,'lamp');
 });
+// The open stretch isolates targeting from the authored room's enemies and ledges.
+function aimPractice(hero,offsets){
+  t.reset(true,hero);
+  const p=t.player,guards=t.enemies.filter(e=>e.type==='guard').slice(0,offsets.length);
+  assert.equal(guards.length,offsets.length);
+  t.enemies.splice(0,t.enemies.length,...guards);
+  t.platforms.splice(0,t.platforms.length,{x:0,y:480,w:2000,h:120,groundBlock:true});
+  Object.assign(p,{x:260,y:480-p.h,face:1,ground:true,inv:10});
+  guards.forEach((e,i)=>Object.assign(e,{x:p.x+p.w/2+offsets[i]-e.w/2,y:480-e.h,floor:480,waitingForHit:true,cd:60}));
+  return {p,guards};
+}
+test('all three heroes turn their attack toward a target behind them, while retreat and roll keep their direction',()=>{
+  for(const hero of ['lamp','bell','bow']){
+    const {p,guards:[enemy]}=aimPractice(hero,[-50]);advance(.05);
+    assert.strictEqual(p.aimTarget,enemy);assert.equal(p.face,1,'idle targeting must not turn the player');
+    const x=p.x;press('KeyD');advance(.04);assert(p.x>x,'can walk away from the target');
+    release('KeyD');press('KeyJ');assert.equal(p.atkFace,-1);advance(.04);release('KeyJ');advance(.13);
+    assert(enemy.hp<enemy.max,hero+' connects behind the original facing');
+    press('KeyD');t.action('roll');release('KeyD');advance(.04);
+    assert.equal(p.rollDir,1,'roll follows retreat input instead of the enemy');assert(p.roll>0);
+  }
+});
+test('melee can mark an approaching enemy before reaching it, then prefers a hittable enemy',()=>{
+  const {p,guards:[far,near]}=aimPractice('lamp',[160,-48]);
+  const closeX=near.x;near.x=p.x+600;advance(.05);assert.strictEqual(p.aimTarget,far);assert.equal(p.aimReady,false);
+  t.action('attack');advance(.29);assert.equal(far.hp,far.max,'the target marker must not stretch a swing');
+  near.x=closeX;advance(.05);assert.strictEqual(p.aimTarget,near);assert.equal(p.aimReady,true);
+  t.action('attack');advance(.13);assert(near.hp<near.max);assert.equal(far.hp,far.max);
+});
+test('target selection resists small distance changes, switches to a clearly closer enemy and drops blocked or dead targets',()=>{
+  const {p,guards:[left,right]}=aimPractice('bow',[-96,185]);advance(.06);assert.strictEqual(p.aimTarget,left);
+  right.x=p.x+p.w/2+93-right.w/2;advance(.12);assert.strictEqual(p.aimTarget,left,'near-equal choices should not flicker');
+  right.x=p.x+p.w/2+37-right.w/2;advance(.1);assert.strictEqual(p.aimTarget,right);
+  right.dead=true;advance(.1);assert.strictEqual(p.aimTarget,left);
+  const wall={x:p.x-44,y:370,w:9,h:110,solid:true};t.platforms.push(wall);advance(.1);
+  assert.strictEqual(p.aimTarget,null,'opaque wall breaks the lock');
+  wall.off=true;advance(.1);assert.strictEqual(p.aimTarget,left,'collapsed wall no longer blocks sight');
+  left.x=p.x+625;advance(.1);assert.strictEqual(p.aimTarget,null,'a distant enemy is out of bow range');
+  p.face=-1;press('KeyJ');advance(.04);release('KeyJ');t.step(1/120);
+  const arrow=t.thrown.find(a=>a.k==='arrow');assert.equal(p.atkFace,-1);assert(arrow.vx<0);assert(Math.abs(arrow.vy)<1e-9);
+  left.x=p.x+p.w/2-96-left.w/2;wall.off=false;advance(.20);
+  assert(!t.thrown.includes(arrow));assert.equal(left.hp,left.max,'new cover stops an arrow already in flight');
+});
+test('untriggered, submerged and phase-invulnerable bosses do not draw a target marker',()=>{
+  t.reset(true,'bow');t.loadStage(FINAL);
+  const b=t.enemies.find(e=>e.type==='boss'),p=t.player;
+  Object.assign(p,{x:170,y:428,ground:true,inv:20});
+  Object.assign(b,{x:280,y:480-b.h,floor:480,frozen:30,cd:60});advance(.05);assert.strictEqual(p.aimTarget,null);
+  t.flags.boss=true;b.under=1;advance(.05);assert.strictEqual(p.aimTarget,null);
+  b.under=0;b.phaseInv=2;advance(.05);assert.strictEqual(p.aimTarget,null);
+  b.phaseInv=0;advance(.05);assert.strictEqual(p.aimTarget,b);
+});
+test('basic bow shots chip an approaching patrol shutter, flank it or hit the bright core',()=>{
+  for(const [face,phase,expected] of [[-1,'approach',4],[1,'approach',17],[-1,'open',34]]){
+    const {guards:[e]}=aimPractice('bow',[74]);
+    Object.assign(e,{ward:true,slot:0,phaseName:phase,face,frozen:5,hp:100,max:100,wick:t.L.wicks[0]});
+    t.run.wardParty=[100];
+    press('KeyJ');advance(.04);release('KeyJ');advance(.25);
+    assert.equal(100-e.hp,expected,phase+' seen from '+face);
+    assert.equal(t.run.wardParty[0],e.hp);
+  }
+});
+test('a bow aims above or below, keeps the released trajectory, and still accepts an explicit up shot',()=>{
+  for(const vertical of [-1,1]){
+    const {p,guards:[e]}=aimPractice('bow',[175]);
+    if(vertical<0){e.floor=403;e.y=e.floor-e.h;}
+    else{p.y-=80;p.ground=false;}
+    press('KeyJ');advance(.035);release('KeyJ');t.step(1/120);
+    const a=t.thrown.find(o=>o.k==='arrow');assert(a&&a.vx>0&&vertical*a.vy>0,'arrow aims at the target elevation');
+    advance(.28);assert(e.hp<e.max,'angled arrow reaches the target');
+  }
+  const {p,guards:[e]}=aimPractice('bow',[200]);e.floor=407;e.y=e.floor-e.h;
+  press('KeyJ');advance(.04);release('KeyJ');t.step(1/120);
+  const a=t.thrown.find(o=>o.k==='arrow'),vx=a.vx,vy=a.vy;
+  e.floor=275;e.y=e.floor-e.h;advance(.25);
+  assert.equal(a.vx,vx);assert.equal(a.vy,vy);assert.equal(e.hp,e.max,'moving away after release dodges the arrow');
+  press('KeyW');press('KeyJ');advance(.04);release('KeyJ');t.step(1/120);release('KeyW');
+  const up=t.thrown[t.thrown.length-1];assert.equal(up.vx,0);assert(up.vy<0);
+  assert.equal(p.slash,'up');
+  const drop=aimPractice('bow',[0]);drop.p.y-=46;drop.p.ground=false;press('KeyS');press('KeyJ');
+  assert.equal(drop.p.slash,'down');advance(.10);release('KeyJ');release('KeyS');
+  assert(drop.guards[0].hp<drop.guards[0].max);assert(drop.p.vy<0,'stomp bounces even with auto-aim');assert.equal(t.thrown.length,0);
+  t.reset(true,'lamp');
+});
 test('roll immunity, cooldown and damage recovery',()=>{
   t.action('roll');t.hurt(20,200);assert.equal(t.player.hp,100);
   advance(.4);t.hurt(20,200);assert.equal(t.player.hp,80);
@@ -989,6 +1073,44 @@ test('interrupting the last gate replays the bells and ending with the actual lo
   press('Escape');release('Escape');assert(t.credits);assert.equal(t.clears,clears);
   press('KeyE');release('KeyE');assert(!t.credits);assert.equal(t.clears,clears+1);assert(!storage['ember:save']);
   t.showMenu();t.continueRun();assert.equal(t.state,'menu');assert.equal(t.clears,clears+1);
+});
+function visitLampHook(restNo){
+  t.loadStage(t.STAGES.findIndex(s=>s.rest&&s.restNo===restNo));
+  t.player.x=t.L.shop+155-t.player.w/2;t.player.y=480-t.player.h;advance(.03);
+}
+test('the named shade survives a retry, gets a cord from the runner, and stays on its owner’s hook',()=>{
+  t.startJourney('lamp',0);finishTalk();advance(1);t.loadStage(stageOf('sewers'));
+  t.player.x=t.L.lore.x-t.player.w/2;t.player.y=480-t.player.h;
+  const purse=t.embers,reward=Math.round(25*t.L.hpK);
+  t.action('interact');finishTalk();assert(t.keepsakes.shade);assert.equal(t.embers,purse+reward);
+  t.retryStage();assert(t.keepsakes.shade&&t.flags.lore);assert.equal(t.embers,purse+reward);
+  t.showMenu();t.continueRun();assert(t.keepsakes.shade&&t.flags.lore);
+  t.loadStage(stageOf('ramparts'));
+  assert(talkToWayfarer().includes('阿苓'));assert(!t.run.found?.shadeCord);
+  t.showMenu();t.continueRun();
+  assert(talkToWayfarer().includes('阿苓'));press('Escape');release('Escape');
+  assert(t.run.found.shadeCord);assert(talkToWayfarer().includes('双扣'));finishTalk();
+  visitLampHook(2);assert.equal(nodes['chest-btn'].textContent,'挂灯罩');t.action('interact');
+  assert(t.keepsakes.shade);assert(t.talk.lines[1][1].includes('汤'));
+  t.showMenu();t.continueRun();assert(t.keepsakes.shade&&!t.run.found.shadeHome);
+  visitLampHook(2);t.action('interact');press('Escape');release('Escape');
+  assert(!t.keepsakes.shade);assert(t.codex.items.shade&&t.codex.lore.shadeHome&&t.run.found.shadeHome);
+  t.retryStage();assert(t.run.found.shadeHome&&!t.keepsakes.shade);
+  t.showMenu();t.continueRun();visitLampHook(3);assert.equal(nodes['chest-btn'].textContent,'看灯钩');
+  const before=t.embers;t.action('interact');assert.equal(t.talk.lines.length,1);finishTalk();assert.equal(t.embers,before);
+  t.loadStage(FINAL);t.enemies.find(e=>e.type==='boss').dead=true;t.player.x=t.L.seal+25;advance(.1);finishCine();
+  for(let i=0;i<8&&t.talk.i<2;i++)press('KeyE');
+  assert(t.talk.text.includes('你挂回去的灯罩亮了'));t.showMenu();
+});
+test('an old carried shade can be returned directly and the codex alone grants nothing in free selection',()=>{
+  t.startJourney('bell',0);finishTalk();advance(1);
+  t.keepsakes.shade=true;visitLampHook(3);t.showMenu();t.continueRun();visitLampHook(3);
+  assert(!t.run.found?.shadeCord);t.action('interact');assert(t.talk.lines[1][1].includes('勺绳'));finishTalk();
+  const journey=storage['ember:save'];assert(t.run.found.shadeHome&&!t.keepsakes.shade);
+  t.showMenu();t.selectLevel(t.STAGES[stageOf('ramparts')]);finishTalk();visitLampHook(2);
+  assert(t.codex.items.shade&&!t.keepsakes.shade);assert.equal(nodes['chest-btn'].textContent,'看灯钩');
+  t.action('interact');finishTalk();assert(!t.run.found?.shadeHome);assert.equal(storage['ember:save'],journey);
+  t.showMenu();t.continueRun();assert(t.run.found.shadeHome&&!t.keepsakes.shade);
 });
 console.log('All '+passed+' gameplay checks passed.');
 
