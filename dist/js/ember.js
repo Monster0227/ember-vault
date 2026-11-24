@@ -998,7 +998,21 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     // 换了说话人：名牌从左边滑进来，头像弹一下
     if(talk.i===0||talk.lines[talk.i-1][0]!==l[0]){talkBox.classList.remove('swap');try{void talkBox.offsetWidth;}catch(e){}talkBox.classList.add('swap');talk.swapT=.5;}
     if(talk.arena)sceneT=0;
-    const sc=talk.arena?'':l[2]!=null?l[2]:(talk.i?sceneA:'');if(sc!==sceneA){sceneB=sceneA;sceneA=sc;sceneT=0;}if(sceneA){talkBox.classList.add('over-art');messageT=0;notice.style.opacity=0;}else talkBox.classList.remove('over-art');}
+    const sc=talk.arena?'':l[2]!=null?l[2]:(talk.i?sceneA:'');
+    if(talk.lines===TALK.prologue&&talk.i===0){
+      scenePainting(ashPlateName('furnace'));scenePainting(ashPlateName('awaken'));
+    }
+    if(sc!==sceneA){
+      // Hold the outgoing pose during the dissolve, including the empty ledge after the fall.
+      talk.lastSceneTime=sceneT;
+      if((sc==='furnace'||sc==='awaken')&&sceneA&&canvas.width&&canvas.height){
+        const still=document.createElement('canvas');still.width=canvas.width;still.height=canvas.height;
+        const backing=still.getContext('2d');
+        if(backing){backing.drawImage(canvas,0,0);talk.ashFade=still;}
+      }
+      sceneB=sceneA;sceneA=sc;sceneT=0;
+    }
+    if(sceneA){talkBox.classList.add('over-art');messageT=0;notice.style.opacity=0;}else talkBox.classList.remove('over-art');}
   const esc=c=>c==='<'?'&lt;':c==='&'?'&amp;':c==='>'?'&gt;':c;
   // 每个字是一个 span：从上方落下来、由虚变实；带效果的字之后一直飘 / 抖 / 发光（delay 错开，像一条波浪）
   function chSpan(i,done){const k=talk.fx[i]||'';return'<span class="ch'+(k?' f'+k:'')+(done?' done':'')+'"'+(k==='w'||k==='s'?' style="animation-delay:0s,'+(-i*.11).toFixed(2)+'s"':'')+'>'+esc(talk.text.charAt(i))+'</span>';}
@@ -1096,7 +1110,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(rebinding){e.preventDefault();if(!e.repeat)finishRebind(e.code);return;}
     if(act||e.code==='Escape'||e.code==='Space')e.preventDefault();
     if(credits){if(!e.repeat)endCredits();return;}
-    if(talk){if(!e.repeat){if(e.code==='Escape')skipTalk();else if(e.code==='Space'||e.code==='Enter'||act==='interact'||act==='attack'||act==='jump')talkNext();}return;}
+    if(talk){if(!e.repeat){if(e.code==='Escape')skipTalk();else if(e.code==='Space'||e.code==='Enter'||act==='interact'||act==='attack'||act==='jump'){e.preventDefault();talkNext();}}return;}
     if(state==='cine'){if(!e.repeat&&cine&&(e.code==='Escape'||e.code==='Enter'))cine.skip=true;return;}
     if(state==='win'||state==='dead'){if(!e.repeat)menuKey(e);return;}
     if(state==='menu'||(paused&&panelView!=='pause')){if(!e.repeat)menuKey(e);return;}
@@ -1124,7 +1138,8 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   pad.addEventListener('pointerdown',e=>{e.preventDefault();if(stickId!==null)return;try{pad.setPointerCapture(e.pointerId);}catch(err){}stickId=e.pointerId;stickMove(e);});
   pad.addEventListener('pointermove',e=>{if(e.pointerId===stickId)stickMove(e);});
   ['pointerup','pointercancel','lostpointercapture'].forEach(n=>pad.addEventListener(n,e=>{if(e.pointerId===stickId)stickEnd();}));
-  document.getElementById('talk-skip').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();skipTalk();});talkBox.addEventListener('pointerdown',e=>{e.preventDefault();talkNext();});canvas.addEventListener('pointerdown',()=>{if(credits)endCredits();else if(talk)talkNext();});
+  // Change screens on the completed tap so its release cannot activate a newly exposed menu button.
+  document.getElementById('talk-skip').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();skipTalk();});talkBox.addEventListener('click',()=>talkNext());canvas.addEventListener('click',()=>{if(credits)endCredits();else if(talk)talkNext();});
   document.getElementById('quick-item').onclick=()=>openBag('bag');
   document.getElementById('bag-btn').onclick=()=>{if(state==='bag')closeBag();else openBag();};
   {const mb=document.getElementById('map-btn');if(mb)mb.onclick=()=>{if(state==='map')closeMap();else openMap();};}
@@ -2965,6 +2980,66 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     stageIn();
     if(!image)stageFill(stops);
   }
+  function ashPlateName(scene){
+    return (scene==='furnace'?'ash-gallery':'ash-vault')+(H>W?'-tall':'');
+  }
+  function ashRoomPlate(scene,t){
+    const hot=scene==='furnace',portrait=H>W;
+    const width=portrait?700:1100,height=width*(portrait?16/9:9/16);
+    const drift=1-Math.exp(-Math.max(0,t)*.39);
+    const scaleToRoom=Math.max(W/width,H/height)*(1.045+.035*drift);
+    // Both the stonework and the actors use the same lens; props stay registered to the painted floor.
+    ctx.translate(W/2+(hot?-6:-9)*drift*scaleToRoom,H/2+(hot?-7:8)*drift*scaleToRoom);
+    ctx.scale(scaleToRoom,scaleToRoom);
+    const image=scenePainting(ashPlateName(scene));
+    if(image){
+      ctx.save();ctx.imageSmoothingEnabled=true;
+      ctx.drawImage(image,-width/2,-height/2,width,height);ctx.restore();
+    }else{
+      stageFill(hot?[[0,'#172533'],[.61,'#67463e'],[1,'#443133']]:[[0,'#223249'],[.66,'#526074'],[1,'#373847']]);
+      for(let row=0;row<13;row++)for(let col=-5;col<6;col++){
+        const x=col*124+(row%2)*62,y=-height/2+row*height/13;
+        ctx.strokeStyle=hot?'#543c36':'#384553';ctx.lineWidth=2;ctx.strokeRect(x,y,123,height/13-1);
+      }
+      if(hot){
+        const x=portrait?-222:-310;
+        shape(()=>{ctx.moveTo(x-90,78);ctx.lineTo(x-90,-12);ctx.arc(x,-12,90,Math.PI,0);ctx.lineTo(x+90,78);ctx.closePath();},lg(0,-100,0,80,'#492e31','#ef9251'),'#574343',13);
+        for(let i=0;i<6;i++)fl(x-60+24*i,70,.75+.3*Math.sin(t*3+i));
+        poly([-width/2,88,176,75,176,94,-width/2,118],'#584b45','#302d30',3);
+        line([175,80,284,270],9,'#69554e');
+      }else{
+        const wx=width*.22,wy=portrait?-170:-108;
+        ctx.save();ctx.beginPath();ctx.moveTo(wx-64,wy+59);ctx.lineTo(wx-64,wy-16);ctx.arc(wx,wy-16,64,Math.PI,0);ctx.lineTo(wx+64,wy+59);ctx.closePath();ctx.clip();
+        box(wx-66,wy-85,132,155,lg(0,wy-85,0,wy+59,'#6e8ead','#e7c8a8'));
+        quayBell(wx+14,wy+64,.45,t,false);
+        for(let i=-1;i<=1;i++)line([wx+i*34,wy-85,wx+i*34-4,wy+66],3.5,'#42414b');
+        ctx.restore();
+        shape(()=>{ctx.moveTo(-width/2,195);ctx.quadraticCurveTo(-135,68,32,160);ctx.lineTo(width/2,240);ctx.lineTo(width/2,height);ctx.lineTo(-width/2,height);ctx.closePath();},lg(0,112,0,270,'#7d7883','#414453'));
+      }
+    }
+    if(portrait&&hot){ctx.translate(0,29);ctx.scale(.80,.80);}
+    if(!hot)ctx.translate(0,portrait?73:36);
+  }
+  function ashVaultAir(t){
+    const portrait=H>W;
+    const x=portrait?-164:-272,y=portrait?-119:-108;
+    // Grit left in the chute settles first. Fine dust drifts a little longer through the window light.
+    for(let i=0;i<(lowFx?8:18);i++){
+      const u=(Math.max(0,t)*.24+i*.073)%1;
+      const life=Math.max(0,1-t/5)*Math.sin(Math.PI*u);
+      if(life>0)oval(x+(i*17)%56-24+u*16,y+u*u*217,1.4+(i%3)*.55,1+(i%2)*.6,'rgba(176,171,180,'+(.54*life)+')');
+    }
+    for(let i=0;i<(lowFx?9:19);i++){
+      const u=(t*.075+i*.173)%1;
+      const px=(portrait?145:218)-u*238+((i*31)%93)-46;
+      const py=(portrait?-147:-114)+u*214+((i*17)%64)-32;
+      circle(px,py,.7+(i%3)*.37,'rgba(230,223,206,'+(.43*Math.sin(Math.PI*u))+')');
+    }
+    const signal=ashSignal(t);
+    if(signal>0){
+      ctx.save();ctx.translate(-25,103);ctx.scale(1,.21);bloom(0,0,96,'#b8d796',signal*.34);ctx.restore();
+    }
+  }
   function stageStars(n,seed,a){const r=rng(seed);ctx.fillStyle='#e8f0ff';for(let i=0;i<n;i++){const x=-760+r()*1520,y=-340+r()*300,s=.6+r()*1.6;ctx.globalAlpha=a*(.35+.65*Math.abs(Math.sin(time*1.3+i*1.7)));ctx.fillRect(x,y,s,s);}ctx.globalAlpha=1;}
   function bloom(x,y,r,c,a){ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=Math.min(1,Math.max(0,a));ctx.translate(x,y);ctx.scale(r,r);ctx.fillStyle=glowGrad(c);ctx.beginPath();ctx.arc(0,0,1,0,TAU);ctx.fill();ctx.restore();}
   function soulAt(x,y,s,a){if(a<=0)return;bloom(x,y,22*s,'#8be1ce',.35*a);ctx.globalAlpha=Math.min(1,a);fl(x,y+7*s,.45*s,['#2fa39b','#8be1ce','#effff9']);ctx.globalAlpha=1;}
@@ -3268,6 +3343,270 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     storySpirit('child',childX,52,1.58,1,t+2.4,null,true,lanternSignal(t));
   }
 
+  // The window light and the light in the palm share these two beats.
+  function ashPulse(t,center,width){
+    const x=clamp(1-Math.abs(t-center)/width,0,1);
+    return x*x*(3-2*x);
+  }
+  function ashSignal(t){
+    return .78*ashPulse(t,1.20,.31)+ashPulse(t,2.05,.36);
+  }
+  function drawAshAwakening(t){
+    const signal=ashSignal(t);
+    const step=(a,b)=>{const x=clamp((t-a)/(b-a),0,1);return x*x*(3-2*x);};
+    const P=heroPal(),rise=step(2.85,4.68),gaze=step(4.05,5.27);
+    const brace=step(2.56,3.18),wind=step(4.48,5.75),breath=Math.sin(t*2.08);
+    const reach=step(.42,1.05),curl=ashPulse(t,.68,.24)+.6*ashPulse(t,1.78,.20);
+    const hipX=-9-3*rise,hipY=-8+6*rise;
+    const angle=1.39-1.43*rise-.055*brace+breath*(.009+.011*rise);
+    const cos=Math.cos(angle),sin=Math.sin(angle);
+    const joint=(x,y)=>[hipX+x*cos-y*sin,hipY+x*sin+y*cos];
+    const neck=joint(0,-24),head=joint(1,-32-breath*.4),far=joint(-8,-22),near=joint(8,-19);
+    const palmX=hipX+48+4*reach-21*rise,palmY=-4.4-1.7*reach-29*rise+breath*.48*rise;
+    const handTurn=-.10-.16*rise+.18*curl;
+    const lightX=palmX+3.5,lightY=palmY-4;
+    ctx.save();ctx.translate(-115,105);ctx.scale(2.55,2.55);
+    oval(hipX+11,1,41-12*rise,3.1,'rgba(19,20,27,.40)');
+    oval(hipX+11,0,27-9*rise,1.65,'rgba(17,21,25,.50)');
+    // Loose ash under the fingers carries their first movement across the ground.
+    for(let i=0;i<(lowFx?6:11);i++){
+      const slide=step(.48+i*.028,.93+i*.043);
+      const x=hipX+38+(i*7)%17+slide*(1.2+(i%3)*.8),y=.1+(i%3)*.48;
+      oval(x,y,.6+(i%4)*.29,.34+(i%2)*.22,i%2?'#7c7771':'#565653');
+    }
+    // The back hand presses into the floor and takes the weight of the torso.
+    const propX=hipX+10-25*rise-4*brace;
+    sleeve(far[0],far[1],propX,-1.7,-3,P,true);
+    oval(propX-1.2,-.8,4.1,1.2,P.shade);
+    const tailX=hipX-28-20*wind,tailY=-1-rise*4-wind*(13+7*Math.sin(t*3.2-.85));
+    const foldY=tailY+wind*(11+5*Math.sin(t*3.2+.55));
+    const scarfShape=()=>{
+      ctx.moveTo(neck[0]-1,neck[1]);
+      ctx.bezierCurveTo(neck[0]-14,neck[1]-3,tailX+21,foldY+4,tailX,tailY);
+      ctx.quadraticCurveTo(tailX+3,tailY+3,tailX+5,tailY+4.2);
+      ctx.bezierCurveTo(tailX+23,foldY+9,neck[0]-12,neck[1]+4,neck[0],neck[1]+4);
+      ctx.closePath();
+    };
+    shape(scarfShape,P.scarfDark,'#303b40',.9);
+    shape(()=>{ctx.moveTo(neck[0]-3,neck[1]+1);ctx.bezierCurveTo(neck[0]-14,neck[1]-1,tailX+21,foldY+4,tailX+2,tailY+1);},null,P.scarf,1.35);
+    // Weight spreads the robe onto the floor; one folded knee remains visible under the hem.
+    if(rise>.01){
+      ctx.save();ctx.translate(hipX,0);ctx.scale(rise,rise);
+      shape(()=>{ctx.moveTo(-10,-7);ctx.quadraticCurveTo(-13,-1,-8,1);ctx.quadraticCurveTo(3,3,16,1);
+        ctx.quadraticCurveTo(21,1,22,-1);ctx.quadraticCurveTo(24,-5,20,-7.2);
+        ctx.quadraticCurveTo(16,-10,11,-6);ctx.quadraticCurveTo(2,-7,-10,-7);},
+        lg(0,-10,3,2,P.body,P.shade,'#899498'),'#394349',1.05);
+      shape(()=>{ctx.moveTo(22,-2);ctx.quadraticCurveTo(17,-1,14,-3);},null,'#909da0',.8);
+      ctx.restore();
+    }
+    ctx.save();ctx.translate(hipX,hipY);ctx.rotate(angle);
+    // The familiar three folds bunch at the grounded hip as the shoulders rise.
+    shape(()=>{ctx.moveTo(-8,-29);ctx.bezierCurveTo(-15,-26,-14,-12,-15,-5);
+      ctx.quadraticCurveTo(-16,1,-11,1);ctx.quadraticCurveTo(-7,4,-4,-2);
+      ctx.quadraticCurveTo(0,7,5,0);ctx.quadraticCurveTo(9,4,13,0);
+      ctx.quadraticCurveTo(17,-9,10,-25);ctx.quadraticCurveTo(6,-30,-8,-29);},
+      lg(-16,-8,12,-18,'#768487',P.shade,P.body),'#303b40',1.4);
+    shape(()=>{ctx.moveTo(-9,-19);ctx.quadraticCurveTo(-8,-7,-12,-3);ctx.quadraticCurveTo(-7,-4,-5,-13);},'#909da0');
+    shape(()=>{ctx.moveTo(1,-15);ctx.quadraticCurveTo(3,-7,1,-1);},null,P.shade,1.15);
+    ctx.restore();
+    ctx.save();ctx.translate(head[0],head[1]-gaze*1.4);
+    ctx.rotate(1.16*(1-rise)-.18*gaze+.035*breath);
+    const mask=()=>{ctx.moveTo(-13,3.2);ctx.bezierCurveTo(-15,-5,-10,-15,0,-15.5);
+      ctx.bezierCurveTo(10,-15.6,15,-8,14.3,.3);ctx.quadraticCurveTo(15,8.6,6,10);
+      ctx.quadraticCurveTo(-7,12,-13,3.2);ctx.closePath();};
+    shape(mask,lg(-12,7,9,-12,'#818e92',P.shade,P.body),'#303b40',1.45);
+    shape(()=>{ctx.moveTo(-11,-6);ctx.quadraticCurveTo(-14,3,-7,7.5);ctx.quadraticCurveTo(-3,10,3,8);
+      ctx.quadraticCurveTo(-7,8,-11,-6);},'#99a5a6');
+    // One eyelid catches first; only after the second signal does the gaze turn to the window.
+    const blink=t>6.6?1-.88*ashPulse(t,6.98+Math.floor((t-6.6)/4.7)*4.7,.13):1;
+    const eye=(x,y,open,size)=>{
+      const height=open*blink;
+      if(height<.13){
+        shape(()=>{ctx.moveTo(x-2,y-.35);ctx.quadraticCurveTo(x,y+1.2,x+2,y-.5);},null,'#485256',1.05);
+      }else{
+        oval(x+gaze*.8,y-gaze*.9,size*(.8+.2*height),2.95*height,P.eye);
+        if(height>.55)circle(x+.4+gaze*.8,y-.8-gaze*.9,.58,'#e3f3ea');
+      }
+    };
+    eye(2,-2,step(2.17,2.71),2.03);eye(9,-2.3,step(2.26,2.78),1.67);
+    for(let i=0;i<4;i++)oval(-8+i*2.2,3+(i%2)*1.2,.56,.34,'#867f73');
+    if(signal>.01){
+      ctx.save();ctx.globalAlpha*=signal;
+      shape(()=>{ctx.moveTo(7,8.6);ctx.quadraticCurveTo(12,7.6,13.5,3);},null,'#d9f4c6',1.3);ctx.restore();
+    }
+    ctx.restore();
+    ctx.save();ctx.translate(neck[0],neck[1]);ctx.rotate(angle);
+    ribbon(-9,-1,-2,3,10,-.4,4.9,3.8,P.scarf,'#3b4949',7);
+    if(p.char==='bell'){circle(-6,2.7,2.1,'#d7a75f','#6f573e',.7);line([-8,3,-4,3],.6,'#77573a');}
+    ctx.restore();
+    sleeve(near[0],near[1],palmX-3,palmY+1,2.5-3*rise,P,false);
+    ctx.save();ctx.translate(palmX,palmY);ctx.rotate(handTurn);
+    // The palm opens towards the viewer. Held low, its separated fingers read against the ash.
+    shape(()=>{ctx.moveTo(-5,1);ctx.quadraticCurveTo(-4,-1.8,-2,-2.7);
+      ctx.quadraticCurveTo(-.7,-3.4,-.7,-1.3);ctx.lineTo(1,-.6);
+      ctx.quadraticCurveTo(5,-.8,7,-2.9-curl);ctx.quadraticCurveTo(8,-3.3-curl,8,-1.7-curl);
+      ctx.quadraticCurveTo(6,2.5,1.5,3.2);ctx.quadraticCurveTo(-3,3.9,-5,1);ctx.closePath();},P.body,'#4a5657',.9);
+    shape(()=>{ctx.moveTo(1.9,.7);ctx.quadraticCurveTo(5,1,6.8,-1.4-curl*.7);},null,'#94a2a0',.62);
+    ctx.restore();
+    const coal=.09+.21*step(2.38,3.45),flame=coal+signal*.85;
+    bloom(lightX,lightY,6+signal*15,'#b1e598',.12+.44*signal);
+    ctx.save();ctx.translate(lightX+signal*1.4,lightY);ctx.rotate(.18*Math.sin(t*5)-.20*signal);
+    fl(0,1,.09+flame*.44,['#538e67','#a9df93','#ffefd0']);ctx.restore();
+    if(signal>.01){
+      ctx.save();ctx.globalAlpha*=signal*.63;
+      shape(()=>{ctx.moveTo(palmX-.8,palmY-.45);ctx.quadraticCurveTo(palmX+3,palmY+.3,palmX+6,palmY-2.25);},null,'#d8f4bb',1.05);
+      ctx.restore();
+    }
+    // Ash slips off the lifted shoulder once, then settles into the mound.
+    for(let i=0;i<(lowFx?5:10);i++){
+      const fall=step(3.03+i*.075,3.57+i*.085),u=(i*7)%9;
+      const x=hipX+12-i*1.1-fall*(6+u),y=(-9-i*.9)*(1-fall*fall)-2.5+fall*4;
+      oval(x,y,.52+(i%3)*.31,.35+(i%2)*.13,i%2?'#a69c89':'#7b7770');
+    }
+    ctx.restore();
+    return signal;
+  }
+  function furnaceJailer(x,t,reach,push){
+    const P=STORY_SPIRITS.warden,swing=Math.sin(t*2.8)*.075-.10*push;
+    ctx.save();ctx.translate(x,88);
+    oval(-3,0,44,4,'rgba(31,27,33,.36)');
+    shape(()=>{ctx.moveTo(-22,-98);ctx.bezierCurveTo(-38,-89,-36,-35,-49,-5);
+      ctx.lineTo(-28,-12);ctx.lineTo(-18,-2);ctx.lineTo(0,-10);ctx.lineTo(14,-4);
+      ctx.lineTo(25,-15);ctx.lineTo(39,-11);ctx.quadraticCurveTo(34,-57,24,-94);ctx.closePath();},
+      lg(-45,-26,25,-65,'#363741',P.shade,'#535360'),'#33303a',2.3);
+    shape(()=>{ctx.moveTo(-23,-91);ctx.quadraticCurveTo(-23,-52,-41,-10);
+      ctx.lineTo(-29,-16);ctx.quadraticCurveTo(-13,-52,-15,-85);ctx.closePath();},'#53515b');
+    shape(()=>{ctx.moveTo(3,-77);ctx.quadraticCurveTo(18,-44,20,-12);
+      ctx.lineTo(27,-20);ctx.quadraticCurveTo(24,-56,14,-82);ctx.closePath();},'#41434e');
+    line([-16,-79,-24,-47,-31,-18],1.5,'#787078');line([-2,-73,2,-51,9,-20],1.5,'#62606a');
+    ctx.save();ctx.translate(2+4*reach,-108+2*Math.sin(t*1.6));ctx.rotate(.12*reach);
+    shape(()=>{ctx.moveTo(-29,2);ctx.bezierCurveTo(-33,-19,-19,-33,-2,-33);
+      ctx.bezierCurveTo(18,-36,28,-22,28,-2);ctx.quadraticCurveTo(29,19,9,22);ctx.quadraticCurveTo(-18,25,-29,2);ctx.closePath();},
+      lg(-25,-15,24,7,'#3c414e',P.body,'#575864'),'#32313a',2);
+    shape(()=>{ctx.moveTo(-28,-16);ctx.quadraticCurveTo(-27,9,-13,15);
+      ctx.quadraticCurveTo(-6,19,5,19);ctx.quadraticCurveTo(-19,30,-28,10);ctx.closePath();},'#484653');
+    poly([-26,-16,-34,-40,-16,-28,-5,-48,7,-29,23,-40,24,-17,13,-22,-1,-17,-11,-22],
+      lg(-28,-39,19,-15,'#a6947c','#706860','#514e59'),'#49444b',1.55);
+    line([-30,-36,-18,-24,-11,-27],1.6,'#bca584');line([-6,-42,-3,-30],1.1,'#d1bb93');
+    line([-18,-17,-4,-12,15,-16,24,-17],2.4,'#49444c');
+    line([8,-4,14,-2],3.5,'#e9bd7b');line([20,-4,24,-4],2.6,'#e9bd7b');ctx.restore();
+    ribbon(-27,-83,-13,-69,23,-77,11,8,P.scarf,P.scarfDark,9);
+    for(let i=0;i<6;i++)link(-19+i*7,-80+4*Math.sin(i*.61),i%2?.25:1.65,'#9e8f80',2.7);
+    ribbon(-14,-79,-10,-56,31,-70,16,9,'#4b4b54','#34313b',9);
+    poly([24,-75,33,-77,39,-73,36,-66,28,-66],'#7c736d','#3b3438',1.8);
+    ctx.translate(34,-69);ctx.rotate(swing);
+    shape(()=>{ctx.moveTo(-12,10);ctx.quadraticCurveTo(-5,-13,1,-7);ctx.quadraticCurveTo(6,-10,12,10);},null,'#ac9372',2.6);
+    poly([-16,10,-11,5,12,5,17,10,12,38,1,45,-13,38],'#424c4d','#423c3c',2);
+    poly([-11,13,-1,12,-1,37,-8,34],lg(-10,10,1,36,'#80a694','#46665e'));
+    poly([2,12,12,13,9,34,2,38],'#5c8373');
+    fl(0,32,.52,['#66956d','#a5d9a3','#dfefbd']);
+    line([13,18,7,24,11,27,6,31],1.5,'#d2d8ad');line([-15,11,15,11],2.7,'#b29678');
+    ctx.restore();
+    return [x+34+11*Math.cos(swing)-24*Math.sin(swing),19+11*Math.sin(swing)+24*Math.cos(swing)];
+  }
+  function furnaceGauntlet(shoulder,x,y,pry,push,t){
+    const elbowX=(shoulder+x)*.5-7,elbowY=28+12*pry-9*push;
+    // The wrist turns while the two hooked fingertips try to get underneath the cupped hands.
+    ribbon(shoulder,-1,elbowX-22,elbowY-3,elbowX,elbowY,24,17,lg(0,-8,0,39,'#6a6366','#47434d'),'#38353c',12);
+    ribbon(elbowX,elbowY,elbowX+20,elbowY+13,x-14,y-4,21,14,lg(0,y-10,0,elbowY+11,'#817770','#565158','#403e47'),'#35313a',12);
+    ctx.save();ctx.translate(shoulder,-1);ctx.rotate(.14);
+    shape(()=>{ctx.moveTo(-16,-3);ctx.quadraticCurveTo(-10,-18,4,-17);
+      ctx.quadraticCurveTo(19,-14,23,-3);ctx.lineTo(10,4);ctx.quadraticCurveTo(-5,5,-16,-3);ctx.closePath();},
+      lg(-7,-18,8,5,'#a2937e','#706c6a','#504d55'),'#49424a',1.7);
+    line([-10,-5,3,-3,17,-5],1.3,'#c2af90');circle(1,-10,1.9,'#d2b997');ctx.restore();
+    circle(elbowX,elbowY,7.1,'#706a69','#403b45',1.5);circle(elbowX,elbowY,2.4,'#ad9980');
+    line([elbowX+8,elbowY+3,elbowX+19,elbowY+4,x-22,y-6],1.3,'#c3af94');
+    ctx.save();ctx.translate(x,y);ctx.rotate(-.22+.19*pry-.33*push);
+    poly([-31,-10,-17,-14,-9,-10,-12,8,-28,11],lg(-28,-11,-14,11,'#4d5057','#827366','#48474c'),'#302b30',2);
+    line([-27,-9,-29,7],3,'#af9275');circle(-17,-3,2.2,'#c4a077');
+    shape(()=>{ctx.moveTo(-16,-9);ctx.quadraticCurveTo(-7,-15,3,-11);ctx.lineTo(10,-4);
+      ctx.lineTo(7,5);ctx.quadraticCurveTo(-5,11,-16,5);ctx.closePath();},'#5f5c60','#302c31',1.8);
+    const grip=pry*(.66+.34*Math.sin(t*17));
+    for(let i=2;i>=0;i--){
+      const knuckle=5+i*1.3,top=-8+i*4.4,tip=17+5*(1-grip)-i*2;
+      line([knuckle,top,16-i,top-1,tip,top+2+6*grip],3.7,'#938578','#343038');
+      circle(16-i,top-1,1.15,'#c7ae8c');
+    }
+    line([-1,5,8,11,16-grip*3,8-grip*2],4,'#a39082','#302b30');
+    ctx.restore();
+  }
+  function furnaceBearer(x,y,tilt,t,cup,fall){
+    const P=heroPal(),hx=21-11*cup,hy=-15-6*cup,breath=Math.sin(t*3.1);
+    ctx.save();ctx.translate(x,y);ctx.rotate(tilt);ctx.scale(-2.48,2.48);
+    const tail=-29+18*fall,tailY=-15-36*fall+2.2*Math.sin(t*4);
+    ribbon(-5,-24,-22,-27-10*fall,tail,tailY,6.9,1.3,P.scarf,OL,10);
+    // Fingers remain on opposite sides of the wick, including during the fall.
+    sleeve(-7,-22,hx+4.3-2.2*cup,hy-2,cup-5,P,true);
+    shape(()=>{ctx.moveTo(-9,-29);ctx.quadraticCurveTo(-15,-24,-16,-5);
+      ctx.quadraticCurveTo(-12,-9,-9,-3);ctx.quadraticCurveTo(-5,0,-2,-6);
+      ctx.quadraticCurveTo(3,2,7,-4);ctx.quadraticCurveTo(12,0,14,-6);
+      ctx.quadraticCurveTo(14,-22,7,-29);ctx.closePath();},lg(-14,-6,13,-21,'#8b9698',P.shade,'#ebe1ca'),'#43454a',1.08);
+    shape(()=>{ctx.moveTo(-10,-20);ctx.quadraticCurveTo(-8,-10,-12,-6);
+      ctx.quadraticCurveTo(-7,-6,-5,-16);ctx.closePath();},'#8c9a9e');
+    shape(()=>{ctx.moveTo(1,-16);ctx.quadraticCurveTo(4,-9,0,-6);
+      ctx.quadraticCurveTo(6,-6,7,-12);ctx.closePath();},'#adbbbc');
+    line([-9,-21,-11,-14,-11,-9],.75,'#d2c5b5');line([9,-12,10,-7],.75,'#e7d5bf');
+    ctx.save();ctx.translate(1+3*cup,-33+4*cup+breath*.4);ctx.rotate(.13+.32*cup-.18*fall);
+    shape(()=>{ctx.moveTo(-13,2);ctx.bezierCurveTo(-16,-6,-10,-16,0,-16);
+      ctx.bezierCurveTo(12,-16,16,-6,14,2);ctx.quadraticCurveTo(14,11,3,11);
+      ctx.quadraticCurveTo(-8,12,-13,2);ctx.closePath();},lg(-12,8,10,-10,'#88949c',P.shade,P.body),'#41434a',1.17);
+    shape(()=>{ctx.moveTo(-12,-4);ctx.quadraticCurveTo(-14,5,-7,8);
+      ctx.quadraticCurveTo(-3,10,2,9);ctx.quadraticCurveTo(-8,8,-12,-4);ctx.closePath();},'#adb9b6');
+    shape(()=>{ctx.moveTo(7,-13);ctx.quadraticCurveTo(13,-10,13,-5);},null,'#f5e3c6',.8);
+    const blink=1-.75*Math.pow(Math.max(0,Math.sin(t*3.1-1.5)),12);
+    oval(3,1,2.2,3.1*blink,P.eye);oval(9.3,.8,1.9,2.9*blink,P.eye);
+    circle(3.6,1.4,.68,'#e6f7e4');circle(9.8,1,.53,'#e6f7e4');
+    line([6,7,9,6.5,11,4.8],1,'#bcddbf');ctx.restore();
+    ribbon(-11,-25,0,-20,10,-23,4.4,3,P.scarf,OL,8);
+    sleeve(4,-22,hx-3.4,hy+2.4,2.5+6*cup,P,false);
+    line([hx-3.5,hy+2.2,hx-1.8,hy+3.2,hx+.8,hy+1.9],1.9,P.body);
+    if(t>=1.08){
+      bloom(hx,hy-1,16,'#a3e5a0',.22+.10*cup);
+      fl(hx,hy+1,.45-.27*cup,['#54a970','#b8edac','#fff9cf']);
+    }
+    ctx.restore();
+  }
+  function furnaceFall(t){
+    ashRoomPlate('furnace',t);
+    const rise=(a,b)=>{const u=clamp((t-a)/(b-a),0,1);return u*u*(3-2*u);};
+    const catchFire=rise(.18,1.08),cup=rise(1.01,1.60),pry=rise(1.44,1.97)*(1-rise(2.55,2.84));
+    const reach=rise(1.44,1.97),shoulder=rise(2.54,2.82),shove=rise(2.82,3.13),withdraw=rise(3.28,4.35);
+    const air=Math.max(0,t-3.13),fall=clamp(air*1.8,0,1);
+    const x=95+6*pry+75*shove+Math.min(air,1.6)*132,y=78+4*pry-4*shove+16*air+208*air*air;
+    const tilt=-.11*catchFire+.13*pry+.37*shove+.66*fall;
+    // Loose ash catches on the upper edge of the painted chute and thins where the bearer steps off.
+    const jailerX=-137+77*reach+20*shoulder+90*shove-110*withdraw;
+    const source=furnaceJailer(jailerX,t,reach,shove-withdraw);
+    ctx.save();ctx.globalAlpha=.8-.27*shove;
+    shape(()=>{ctx.moveTo(28,79);ctx.quadraticCurveTo(61,78,86,73);
+      ctx.quadraticCurveTo(102,68,117,74);ctx.quadraticCurveTo(144,77,165,72);
+      ctx.lineTo(168,76);ctx.quadraticCurveTo(91,81,28,79);ctx.closePath();},lg(0,69,0,81,'#b9aba0','#706962'));
+    for(let i=0;i<16;i++){const xx=38+i*8.2,yy=77-3*Math.sin(i*.25);line([xx,yy,xx+3+(i%3),yy-1],1.3,i%3?'#a19486':'#5e5857');}
+    ctx.restore();
+    if(air<.47){ctx.save();ctx.globalAlpha=.35*(1-fall);oval(x+3,78,22,2.8,'#474043');ctx.restore();}
+    if(air<1.45)furnaceBearer(x,y,tilt,t,cup,fall);
+    if(catchFire<1){
+      const [sx,sy]=source,ex=95-21*2.48,ey=78-15*2.48;
+      const fx=sx+(ex-sx)*catchFire,fy=sy+(ey-sy)*catchFire-38*Math.sin(Math.PI*catchFire);
+      bloom(fx,fy,29,'#9ce995',.55);fl(fx,fy+4,.52,['#4aa465','#b8e9a2','#fffacc']);
+    }
+    const handX=-113+154*reach+38*shoulder+80*shove-157*withdraw,handY=-15+39*reach-16*shoulder+4*shove-28*withdraw;
+    furnaceGauntlet(jailerX+25,handX,handY,pry,shove-withdraw,t);
+    // At the shove, the coarser pieces tumble off first. Light flakes lag and settle in the chute.
+    for(let i=0;i<(lowFx?13:27);i++){
+      const age=t-2.97-(i%7)*.055;if(age<0||age>1.65)continue;
+      const px=156+(i%5)*4+(45+(i*37)%109)*age;
+      const py=75-(15+(i*13)%53)*age+(95+(i*29)%120)*age*age;
+      ctx.save();ctx.translate(px,py);ctx.rotate(i+age*(i%2?4:-3));
+      const size=1.4+(i%5)*.65;poly([-size,-1,0,-size*.6,size,0,size*.45,size*.6],i%9===0?'#bb8c63':i%3?'#97918a':'#544f4e');
+      ctx.restore();
+    }
+    if(air>.62){
+      const reflection=rise(3.71,4.18)*(.48+.26*Math.sin(t*2.7));
+      bloom(231,148,43,'#9bd09a',reflection*.55);
+      for(let i=0;i<6;i++){const u=(t*.32+i*.17)%1;circle(169+u*53+i*3,77+u*u*65,1+i%2,'rgba(174,167,145,'+(.35*(1-u))+')');}
+    }
+  }
   const SCENES={
     bell:quayWide,
     procession:quayCrossing,
@@ -3299,52 +3638,18 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       circle(150,206,8,'#584c42','#97806a',2);ctx.save();ctx.translate(56,250);padlock(LOCK,false,1.35);ctx.restore();ctx.restore();
       storySpirit('warden',270,192,3.6,-1,t);const lx=270-27*3.6,ly=192-15*3.6;bloom(lx,ly,110,'#8be1ce',.55);
       for(let i=0;i<7;i++){const u=(t*.18+i/7)%1,x=-480+u*(lx+480),y=-40+u*(ly+40)-Math.sin(u*Math.PI)*110+Math.sin(time*3+i)*10;soulAt(x,y,1-u*.4,Math.min(1,u*4)*(1-u*.6));}},
-    // 被扔进焚炉：小引灯人护着怀里那团小火，被扔向通红的炉口
-    furnace(t){storyInterior('furnace',[[0,'#16151a'],[1,'#37231e']],'rgba(30,16,21,.32)');const fx=180,fy=40;
-      poly([-600,-320,-251,-226,-241,-202,-600,-288],'#534039');
-      line([-569,-299,-265,-220],2,'#856855');
-      shape(()=>{ctx.moveTo(fx-230,330);ctx.lineTo(fx-230,fy-60);ctx.quadraticCurveTo(fx,fy-330,fx+230,fy-60);ctx.lineTo(fx+230,330);ctx.closePath();},'#2a1a14',OL,4);
-      // Wedge-shaped refractory bricks follow the actual curve of the mouth.
-      for(let i=0;i<15;i++){
-        const a=i/15,b=(i+1)/15;
-        const corner=(u,w,top,lift)=>[fx+(u*2-1)*w,fy+top-4*lift*u*(1-u)];
-        poly([...corner(a,230,-60,135),...corner(b,230,-60,135),...corner(b,160,-20,105),...corner(a,160,-20,105)],
-          ['#6e4939','#78503b','#654536','#85583c'][i%4],'#422f29',2);
-      }
-      for(const side of [-1,1])for(let k=0;k<6;k++){
-        const xx=side===1?fx+160:fx-230,yy=fy-34+k*57;
-        box(xx,yy,70,54,k%2?'#684838':'#74503c');line([xx+5,yy+2,xx+63,yy+2],1.5,'#977055');
-      }
-      shape(()=>{ctx.moveTo(fx-160,330);ctx.lineTo(fx-160,fy-20);ctx.quadraticCurveTo(fx,fy-230,fx+160,fy-20);ctx.lineTo(fx+160,330);ctx.closePath();},lg(0,fy-125,0,295,'#52332d','#c16b3e','#ffc46c'));
-      for(let k=0;k<5;k++){
-        const yy=52+k*39;line([fx-153,yy,fx-110,yy-17,fx+106,yy-17,fx+153,yy],2,'rgba(236,156,88,.27)');
-        for(let j=0;j<3;j++){const xx=fx-102+j*77+(k%2)*23;line([xx,yy-16,xx,yy+20],1.6,'rgba(96,57,44,.36)');}
-      }
-      for(const y of [72,158]){line([fx-159,y,fx+159,y],6,'#54392e');line([fx-158,y-2,fx+158,y-2],1,'#d8985b');}
-      ctx.globalAlpha=.85;for(let i=0;i<9;i++){const x=fx-140+i*35,h=90+Math.sin(time*6+i*1.7)*40;fl(x,330,h/20,['#c8401a','#ff8a2a','#ffe08a']);}ctx.globalAlpha=1;bloom(fx,fy+60,380,'#ff8a3a',.6);
-      for(let i=0;i<24;i++){const u=(time*.3+i*.137)%1;circle(fx-200+(i*97)%400,330-u*620,1.4+(i*7)%3,'rgba(255,200,120,'+(.9*(1-u)).toFixed(2)+')');}
-      const k=Math.min(1,t/4),gx=-120+k*120,gy=-60+k*90;ctx.save();ctx.translate(gx,gy);ctx.rotate(-.5+k*.6);ghostAt(0,0,2.2,1,GH,false);ctx.restore();soulAt(gx+16,gy-40,1.2,1);
-      ctx.fillStyle='#050303';ctx.beginPath();ctx.moveTo(-700,-400);ctx.quadraticCurveTo(-420,-260,-300,-220);ctx.quadraticCurveTo(-260,-200,-250,-170);ctx.lineTo(-300,-150);ctx.quadraticCurveTo(-440,-200,-700,-120);ctx.fill();},
+    furnace:furnaceFall,
     // 灰烬里，那团火又跳动起来
     ember(t){stageIn();stageFill([[0,'#030305'],[1,'#0b0a0c']]);const g=Math.min(1,t/5),pulse=.6+.4*Math.sin(time*3);
       shape(()=>{ctx.moveTo(-460,330);ctx.quadraticCurveTo(-220,130,0,118);ctx.quadraticCurveTo(240,130,460,330);ctx.closePath();},lg(0,118,0,330,'#3a3634','#1a1818'));{const r=rng(911);for(let i=0;i<90;i++){const x=-360+r()*720,y=130+r()*180,s=1+r()*2.4;if(y>128+Math.abs(x)*.5)circle(x,y,s,'rgba(120,112,104,.6)');}}
       bloom(0,110,90+160*g,'#ff9a3a',(.35+.4*g)*pulse);fl(0,122,.6+.9*g*pulse,['#c8401a','#ffb347','#fff1c2']);
       for(let i=0;i<14;i++){const u=(time*.22+i*.071)%1;circle(Math.sin(i*2.3+time)*30*u,110-u*320,1.2+u*1.4,'rgba(255,190,110,'+(g*(1-u)).toFixed(2)+')');}},
-    // 醒来：小幽灵站在灰堆上，青围巾飘着；高窗外远远能看见钟楼
-    awaken(t){storyInterior('prison',[[0,'#0a1018'],[1,'#141c26']],'rgba(9,17,26,.56)');
-      shape(()=>ctx.rect(150,-300,150,190),'#44474c',OL,3);
-      ctx.save();ctx.beginPath();ctx.rect(159,-291,132,172);ctx.clip();
-      box(159,-291,132,172,lg(0,-291,0,-119,'#506278','#bb9d8e'));
-      quayBell(225,-109,.65,t,false);ctx.restore();
-      for(let i=0;i<4;i++)box(168+i*36,-291,4,172,'#1b232c');box(159,-202,132,4,'#1b232c');
-      ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=.16;ctx.fillStyle='#bcd6ff';ctx.beginPath();ctx.moveTo(160,-120);ctx.lineTo(290,-120);ctx.lineTo(80,330);ctx.lineTo(-90,330);ctx.closePath();ctx.fill();ctx.restore();
-      shape(()=>{ctx.moveTo(-380,330);ctx.quadraticCurveTo(-130,166,40,160);ctx.quadraticCurveTo(230,166,400,330);ctx.closePath();},lg(0,160,0,330,'#3a3634','#141212'));
-      const sw=Math.sin(time*2.2);ribbon(-18,104,-58,90+sw*12,-104,106+sw*18,13,4,'#2fa39b',OL,12);
-      const pal=heroPal();ghostAt(0,162,2.6,1,pal,false);
-      ctx.save();ctx.translate(0,162);ctx.scale(2.6,2.6);heroGear(p.char);
-      if(p.char==='bow')bowW(11,-17,-.15,0);else if(p.char==='bell')hammer(11,-17,.7,25);else nail(11,-17,.7,pal,28);
-      ctx.restore();bloom(4+lanternSignal(t)*5,96,80,'#9be36a',.42);
-      for(let i=0;i<10;i++){const u=(time*.12+i*.1)%1;circle(-40+(i*53)%120,150-u*260,1.2,'rgba(255,220,170,'+(.7*(1-u)).toFixed(2)+')');}},
+    // Ash still falls from the same chute. The second pulse wakes the bearer beneath the bell window.
+    awaken(t){
+      ashRoomPlate('awaken',t);
+      ashVaultAir(t);
+      drawAshAwakening(t);
+    },
     // 结局一：钟响了。巨钟摆起来，金色的钟声一圈圈荡开；地上是典狱长碎掉的灯
     ring(t){storyInterior('tower',[[0,'#1a1008'],[.6,'#3a2412'],[1,'#1a1008']],'rgba(44,27,14,.32)');rings(0,-60,1.4,1);
       ctx.save();ctx.translate(0,-330);ctx.rotate(Math.sin(time*1.8)*.22);chain(-60,0,120,'#4a3a2a');chain(60,0,120,'#4a3a2a');ctx.translate(0,120);bigBell('#6a4420','#e6b060');shape(()=>ctx.ellipse(0,230,104,12,0,0,TAU),'#f0cf8a',OL,2);circle(Math.sin(time*1.8+1)*30,248,14,'#8a6230',OL,2);ctx.restore();bloom(0,-60,420,'#ffcf80',.5+.2*Math.sin(time*3.6));
@@ -4336,11 +4641,17 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   // 剧情插画：旁白的句子带着场景名时铺满画面，换场景时从黑场淡入
   function drawStory(){if(!talk||!sceneA||!SCENES[sceneA])return;ctx.save();ctx.setTransform(scale,0,0,scale,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
     const blend=sceneB?clamp(sceneT/.45,0,1):1;
-    if(blend<1&&SCENES[sceneB]){ctx.save();try{SCENES[sceneB](sceneT+1.4);}catch(e){}ctx.restore();}
-    ctx.save();ctx.globalAlpha=blend;try{SCENES[sceneA](sceneT);}catch(e){}ctx.restore();ctx.restore();
+    const still=talk.ashFade;
+    if(!still&&blend<1&&SCENES[sceneB]){ctx.save();try{SCENES[sceneB]((talk.lastSceneTime||0)+sceneT);}catch(e){}ctx.restore();}
+    ctx.save();ctx.globalAlpha=still?1:blend;try{SCENES[sceneA](sceneT);}catch(e){}ctx.restore();ctx.restore();
     ctx.setTransform(scale,0,0,scale,0,0);const bar=Math.max(26,Math.min(62,H*.072));ctx.fillStyle='#05070b';ctx.fillRect(0,0,W,bar);ctx.fillRect(0,H-bar,W,bar);ctx.fillStyle='rgba(232,214,176,.85)';ctx.fillRect(0,bar-1.5,W,1.5);ctx.fillRect(0,H-bar,W,1.5);
     ctx.save();ctx.globalCompositeOperation='lighter';for(let i=0;i<22;i++){const q=(time*.07+i*.053)%1;ctx.globalAlpha=Math.sin(q*Math.PI)*.45;circle((i*149.3)%W,H*q,1.2+(i%3)*.4,i%4?'#ffc98a':'#9ff3e0');}ctx.restore();
     const vg=ctx.createRadialGradient(W/2,H*.45,Math.min(W,H)*.18,W/2,H*.45,Math.max(W,H)*.62);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.58)');ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
+    if(still){
+      if(blend<1&&still.width===canvas.width&&still.height===canvas.height){
+        ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1-blend;ctx.drawImage(still,0,0);ctx.restore();
+      }else talk.ashFade=null;
+    }
   }
   // 每帧的计算 + 绘制累计 2 秒都超过 11ms（手机一帧预算的 2/3）就自动关掉光柱、雾、前景剪影，减少光源和飘尘。
   // 按实际耗时判断，不按帧间隔：iOS 省电模式之类把刷新率限在 30 帧时并不需要降特效

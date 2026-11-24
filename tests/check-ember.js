@@ -5,15 +5,34 @@ const vm = require('vm');
 const assert = require('assert');
 const listeners = {}, nodes = {}, storage = {'ember:intro-v3':'1','ember:tutorial':'1'};   // 开场旁白只在“第一次玩”时出现，测试里默认已看过
 const noop = () => {};
-const context = new Proxy({}, { get: (_, key) => key === 'measureText' ? () => ({width:0}) : noop, set: () => true });
+function canvasNode() {
+  const canvas = {width:300, height:150, paints:0, lastImage:null};
+  const gradient = () => ({addColorStop:noop});
+  const paint = () => {canvas.paints++;};
+  const alphaStack = [];
+  const context = new Proxy({
+    globalAlpha:1, measureText:() => ({width:0}),
+    createLinearGradient:gradient, createRadialGradient:gradient,
+    fill:paint, stroke:paint, fillRect:paint, strokeRect:paint,
+    save(){alphaStack.push(this.globalAlpha);},
+    restore(){if(alphaStack.length)this.globalAlpha=alphaStack.pop();},
+    drawImage(source){
+      canvas.lastImage={source, paints:source.paints, alpha:this.globalAlpha};
+      paint();
+    }
+  }, {get:(target,key) => key in target ? target[key] : noop});
+  canvas.getContext = kind => kind==='2d' ? context : null;
+  canvas.toDataURL = () => 'data:,';
+  return canvas;
+}
 function node(id) {
-  return nodes[id] || (nodes[id] = {
+  return nodes[id] || (nodes[id] = Object.assign(canvasNode(), {
     hidden:false, style:{}, classList:{add:noop, remove:noop}, textContent:'', innerHTML:'',
-    getContext:() => context, querySelectorAll:() => [], addEventListener:noop
-  });
+    querySelectorAll:() => [], addEventListener:noop
+  }));
 }
 const sandbox = {
-  document:{getElementById:node, querySelectorAll:() => [], addEventListener:noop},
+  document:{getElementById:node, createElement:tag => {assert.equal(tag,'canvas');return canvasNode();}, querySelectorAll:() => [], addEventListener:noop},
   innerWidth:1100, innerHeight:620, devicePixelRatio:1,
   localStorage:{getItem:k => storage[k], setItem:(k,v) => storage[k]=v, removeItem:k => {delete storage[k];}},
   addEventListener:(event,fn) => listeners[event]=fn,
@@ -29,7 +48,7 @@ sandbox.window=sandbox;
 sandbox.matchMedia=() => ({matches:false});
 let code=fs.readFileSync(require('path').join(__dirname,'../dist/js/ember.js'),'utf8');
 // Instrument only this VM instance; no test controls are shipped in the browser.
-code=code.replace(/\}\)\(\);\s*$/, 'window.test={step,action,selectLevel,renderChapters,showWinPanel,hurt,strike,hitEnemy,killEnemy,startChapter,finish,reset,respawn,loadStage,retryStage,STAGES,TALK,get bag(){return bag},get relics(){return relics},get keepsakes(){return keepsakes},get sel(){return sel},set sel(v){sel=v},get offers(){return offers},get flags(){return flags},get run(){return run},get codex(){return codex},get thrown(){return thrown},get breakables(){return breakables},get hazards(){return hazards},get loot(){return loot},get floats(){return floats},get gateK(){return gateK},get talk(){return talk},set introSeen(v){introSeen=v},get player(){return p},get enemies(){return enemies},get shots(){return shots},get waves(){return waves},get orbs(){return orbs},get fx(){return fx},get chunks(){return chunks},get platforms(){return platforms},get chests(){return chests},get state(){return state},get score(){return score},get stage(){return stage},get unlocked(){return unlocked},set unlocked(v){unlocked=v},get L(){return L},get embers(){return embers},set embers(v){embers=v},get checkpoint(){return checkpoint},get credits(){return credits},get sceneArt(){return sceneA},get cine(){return cine},get traps(){return traps},get clears(){return clears},set clears(v){clears=v},get cycle(){return cycle},set cycle(v){cycle=v},useSkill,get secrets(){return secrets},hasMap,parseLine,relicPool,gainShard,gainBlueprint,startTutorial,finishTutorial,TUTORIAL,CHARS,SKILLS,showMenu,startJourney,continueRun,finishRebind,SONGS,get settings(){return settings},get BIND(){return BIND},set rebinding(v){rebinding=v},get cam(){return cam},set cam(v){cam=v}};})();');
+code=code.replace(/\}\)\(\);\s*$/, 'window.test={SCENES,drawStory,ashSignal,step,action,selectLevel,renderChapters,showWinPanel,hurt,strike,hitEnemy,killEnemy,startChapter,finish,reset,respawn,loadStage,retryStage,STAGES,TALK,get bag(){return bag},get relics(){return relics},get keepsakes(){return keepsakes},get sel(){return sel},set sel(v){sel=v},get offers(){return offers},get flags(){return flags},get run(){return run},get codex(){return codex},get thrown(){return thrown},get breakables(){return breakables},get hazards(){return hazards},get loot(){return loot},get floats(){return floats},get gateK(){return gateK},get talk(){return talk},set introSeen(v){introSeen=v},get player(){return p},get enemies(){return enemies},get shots(){return shots},get waves(){return waves},get orbs(){return orbs},get fx(){return fx},get chunks(){return chunks},get platforms(){return platforms},get chests(){return chests},get state(){return state},get score(){return score},get stage(){return stage},get unlocked(){return unlocked},set unlocked(v){unlocked=v},get L(){return L},get embers(){return embers},set embers(v){embers=v},get checkpoint(){return checkpoint},get credits(){return credits},get sceneArt(){return sceneA},get cine(){return cine},get traps(){return traps},get clears(){return clears},set clears(v){clears=v},get cycle(){return cycle},set cycle(v){cycle=v},useSkill,get secrets(){return secrets},hasMap,parseLine,relicPool,gainShard,gainBlueprint,startTutorial,finishTutorial,TUTORIAL,CHARS,SKILLS,showMenu,startJourney,continueRun,finishRebind,SONGS,get settings(){return settings},get BIND(){return BIND},set rebinding(v){rebinding=v},get cam(){return cam},set cam(v){cam=v}};})();');
 vm.runInNewContext(code,sandbox);
 const t=sandbox.test;
 function advance(seconds) { for(let i=0;i<Math.ceil(seconds*120);i++)t.step(1/120); }
@@ -507,6 +526,36 @@ test('pickups show up as drawn items with a count, never as written names',()=>{
   const u=t.breakables.find(q=>q.kind===2);t.player.x=u.x-40;t.player.face=1;t.player.inv=100;t.action('attack');advance(.12);
   assert(t.floats.some(f=>f.art==='knife'&&f.t==='×2'),'a drawn knife bundle pops out');assert(!t.floats.some(f=>/飞刀/.test(f.t)),'no written name');assert(t.loot.some(o=>o.id==='knife'),'and flies to you');
   t.reset();t.player.x=t.L.npc-13;t.player.y=428;advance(.02);t.action('interact');finishTalk();assert(t.loot.some(o=>o.id==='bomb'),'the bellkeeper\'s fire flask flies over as a picture');
+});
+test('the furnace and awakening animate without paintings and dissolve from the last presented frame',()=>{
+  const world=nodes.world;
+  assert.equal(typeof sandbox.Image,'undefined','exercise the native scenery');
+  // Call the painters directly so drawStory's defensive catch cannot hide a broken pose.
+  for(const scene of ['furnace','awaken']){
+    for(const seconds of [0,.68,1.2,1.64,2.05,3.2,4.8,6.98,8]){
+      const before=world.paints;
+      t.SCENES[scene](seconds);
+      assert(world.paints>before,scene+' must paint at '+seconds+'s');
+    }
+  }
+  assert(t.ashSignal(1.2)>0&&t.ashSignal(2.05)>t.ashSignal(1.2));
+  assert.equal(t.ashSignal(1.64),0,'the two hand signals are separated');
+  t.startJourney('lamp',0);
+  for(let i=0;i<t.TALK.prologue.length&&t.sceneArt!=='furnace';i++){
+    press('KeyE');press('KeyE');
+  }
+  assert.equal(t.sceneArt,'furnace');
+  advance(.55);t.drawStory();
+  const presented=world.paints;
+  press('KeyE');press('KeyE');assert.equal(t.sceneArt,'awaken');
+  const still=t.talk.ashFade;
+  assert(still&&still!==world);
+  assert.equal(still.width,world.width);assert.equal(still.height,world.height);
+  assert.strictEqual(still.lastImage.source,world);assert.equal(still.lastImage.paints,presented);
+  advance(.2);t.drawStory();
+  assert.strictEqual(world.lastImage.source,still);
+  assert(world.lastImage.alpha>0&&world.lastImage.alpha<1);
+  advance(.3);t.drawStory();assert.equal(t.talk.ashFade,null);
 });
 test('exploration and boss music differ, and the girl signals once with two chimes',()=>{
   const notes=[];function FakeAudio(){this.state='running';this.currentTime=10;this.destination={};this.resume=()=>Promise.resolve();this.createBuffer=()=>({});this.createBufferSource=()=>({connect:noop,start:noop});this.createGain=()=>({gain:{setValueAtTime:noop,exponentialRampToValueAtTime:noop},connect:noop,disconnect:noop});this.createOscillator=()=>({frequency:{setValueAtTime:v=>notes.push(v),exponentialRampToValueAtTime:noop},connect:noop,start:noop,stop:noop});}
