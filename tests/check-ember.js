@@ -13,6 +13,8 @@ function canvasNode() {
   const context = new Proxy({
     globalAlpha:1, measureText:() => ({width:0}),
     createLinearGradient:gradient, createRadialGradient:gradient,
+    arc(x,y,r){assert(Number.isFinite(r)&&r>=0,'invalid arc radius');},
+    ellipse(x,y,rx,ry){assert(Number.isFinite(rx+ry)&&rx>=0&&ry>=0,'invalid ellipse radius');},
     fill:paint, stroke:paint, fillRect:paint, strokeRect:paint,
     save(){alphaStack.push(this.globalAlpha);},
     restore(){if(alphaStack.length)this.globalAlpha=alphaStack.pop();},
@@ -150,6 +152,38 @@ test('archers hold fire while off-screen and shoot once visible',()=>{
   t.player.x=1400;t.player.y=303;t.player.vy=0;t.player.inv=100;t.player.face=1;t.cam=1015;
   advance(1.2);assert.equal(t.shots.length,0);
   t.player.face=-1;advance(1.2);assert(t.shots.length>0);
+});
+test('a skeleton archer follows both axes, holds its final aim, and releases a dodgeable straight arrow',()=>{
+  const a=t.enemies.find(e=>e.type==='archer'),p=t.player,dt=1/60;
+  t.enemies.forEach(e=>{if(e!==a)e.dead=true;});a.cd=0;
+  function frame(x,y){Object.assign(p,{x,y,vx:0,vy:0,ground:false,inv:0});t.step(dt);}
+  frame(760,170);assert(a.wind>0&&a.face===-1&&Math.sin(a.aimAngle)<0);
+  frame(1160,303);assert(a.face===1&&Math.sin(a.aimAngle)>0,'crossing behind changes both bow and elevation');
+  for(let i=0;i<90&&a.wind>.2;i++)frame(1160,303);
+  assert(a.wind>0&&a.wind<=.2);const angle=a.aimAngle;
+  for(let i=0;i<30&&a.wind>0;i++){frame(760,170);assert.equal(a.aimAngle,angle);}
+  const arrow=t.shots.find(s=>s.k==='archerArrow');assert(arrow&&arrow.vx>0&&arrow.vy>0);
+  assert(Math.abs(Math.atan2(arrow.vy,arrow.vx)-angle)<1e-6);
+  const vx=arrow.vx,vy=arrow.vy,hp=p.hp;
+  for(let i=0;i<10;i++){frame(748,158);assert.equal(arrow.vx,vx);assert.equal(arrow.vy,vy);}
+  assert.equal(p.hp,hp,'moving away after the lock avoids the shot');
+});
+test('platforms block archer sight, walls stop a flying arrow, and collapsed cover lets the bow draw again',()=>{
+  const a=t.enemies.find(e=>e.type==='archer'),p=t.player;
+  t.enemies.forEach(e=>{if(e!==a)e.dead=true;});
+  function frame(x,y){Object.assign(p,{x,y,vx:0,vy:0,ground:false,inv:0});t.step(1/60);}
+  a.cd=0;
+  for(let i=0;i<90;i++)frame(a.x,342);
+  assert(!a.wind&&!t.shots.length,'no shot through the ledge beneath the archer');
+  const wall={x:a.x-62,y:190,w:8,h:100,solid:true};t.platforms.push(wall);
+  for(let i=0;i<90;i++)frame(750,226);
+  assert(!a.wind&&!t.shots.length,'no shot through a wall');
+  wall.off=true;
+  for(let i=0;i<120&&!t.shots.some(s=>s.k==='archerArrow');i++)frame(750,226);
+  assert(t.shots.some(s=>s.k==='archerArrow'));wall.off=false;
+  const hp=p.hp;
+  for(let i=0;i<40;i++)frame(750,226);
+  assert(!t.shots.some(s=>s.k==='archerArrow'));assert.equal(p.hp,hp);
 });
 test('boss enrages at half health, roars, then slams out shockwaves that can be jumped or rolled',()=>{
   t.loadStage(FINAL);t.flags.boss=true;const b=t.enemies.find(e=>e.type==='boss');b.hp=b.max/2;b.cd=0;t.player.x=b.x-80;t.player.inv=100;
@@ -531,7 +565,7 @@ test('the furnace and awakening animate without paintings and dissolve from the 
   const world=nodes.world;
   assert.equal(typeof sandbox.Image,'undefined','exercise the native scenery');
   // Call the painters directly so drawStory's defensive catch cannot hide a broken pose.
-  for(const scene of ['furnace','awaken']){
+    for(const scene of ['furnace','chute','awaken']){
     for(const seconds of [0,.68,1.2,1.64,2.05,3.2,4.8,6.98,8]){
       const before=world.paints;
       t.SCENES[scene](seconds);
@@ -547,7 +581,7 @@ test('the furnace and awakening animate without paintings and dissolve from the 
   assert.equal(t.sceneArt,'furnace');
   advance(.55);t.drawStory();
   const presented=world.paints;
-  press('KeyE');press('KeyE');assert.equal(t.sceneArt,'awaken');
+  press('KeyE');press('KeyE');assert.equal(t.sceneArt,'chute');
   const still=t.talk.ashFade;
   assert(still&&still!==world);
   assert.equal(still.width,world.width);assert.equal(still.height,world.height);
@@ -556,6 +590,8 @@ test('the furnace and awakening animate without paintings and dissolve from the 
   assert.strictEqual(world.lastImage.source,still);
   assert(world.lastImage.alpha>0&&world.lastImage.alpha<1);
   advance(.3);t.drawStory();assert.equal(t.talk.ashFade,null);
+  advance(5.6);assert.equal(t.sceneArt,'chute','the landing has time to settle');
+  advance(.75);assert.equal(t.sceneArt,'awaken','the slide leads into waking without another tap');
 });
 test('exploration and boss music differ, and the girl signals once with two chimes',()=>{
   const notes=[];function FakeAudio(){this.state='running';this.currentTime=10;this.destination={};this.resume=()=>Promise.resolve();this.createBuffer=()=>({});this.createBufferSource=()=>({connect:noop,start:noop});this.createGain=()=>({gain:{setValueAtTime:noop,exponentialRampToValueAtTime:noop},connect:noop,disconnect:noop});this.createOscillator=()=>({frequency:{setValueAtTime:v=>notes.push(v),exponentialRampToValueAtTime:noop},connect:noop,start:noop,stop:noop});}
@@ -731,14 +767,27 @@ function talkToWayfarer(){
   assert.equal(t.state,'talk');assert.equal(t.talk.lines[0][0],npc.name);
   return t.talk.lines[0][1];
 }
+test('walking out of the ash receiver leads to the mason and his clue changes the ferrier conversation',()=>{
+  t.startJourney('lamp',0);finishTalk();advance(1);
+  assert.equal(t.state,'play');
+  assert(t.player.x+180<t.L.wayfarer.x&&t.L.wayfarer.x<t.L.npc);
+  const knives=t.bag.knife,wx=t.L.wayfarer.x;
+  press('KeyD');
+  for(let i=0;i<360&&t.player.x+t.player.w/2<wx-18;i++)advance(1/120);
+  release('KeyD');t.action('interact');
+  assert.equal(t.talk?.lines[0][0],'补桥石匠');assert.equal(t.player.hp,t.player.max);
+  assert.equal(t.bag.knife,knives);finishTalk();
+  assert.equal(t.bag.knife,knives+2);assert(t.codex.lore.knocks);
+  t.loadStage(stageOf('sewers'));assert(talkToWayfarer().includes('桥头的石匠'));
+});
 test('roadside gifts arrive only when the first conversation finishes and persist exactly once',()=>{
   for(const [theme,item,count] of [['prison','knife',2],['sewers','frost',1],['tower','bomb',1]]){
     t.loadStage(stageOf(theme));
     const npc=t.L.wayfarer,start=t.bag[item];
-    assert.equal(talkToWayfarer(),npc.lines[0]);press('KeyE');press('KeyE');
+    const firstLine=talkToWayfarer();assert(firstLine.length>0);press('KeyE');press('KeyE');
     assert.equal(t.talk.i,1);assert.equal(t.bag[item],start,'the last line is still on screen');
     t.showMenu();t.continueRun();
-    assert.equal(t.bag[item],start);assert.equal(talkToWayfarer(),npc.lines[0],'interrupted meeting starts over');
+    assert.equal(t.bag[item],start);assert.equal(talkToWayfarer(),firstLine,'interrupted meeting starts over');
     finishTalk();assert.equal(t.bag[item],start+count);
     function checkRepeatVisit(){
       assert.equal(t.bag[item],start+count);
