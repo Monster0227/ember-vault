@@ -3,11 +3,16 @@ from pathlib import Path
 import math
 import os
 import subprocess
+import sys
+
+import score_waterways
+import score_wall_and_crypt
+import score_clocktower
 import numpy as np
 
 OUT = Path(__file__).resolve().parents[1] / 'dist/assets/music'
 SR = 24000
-SCALES = {'major': [0,2,4,5,7,9,11], 'dorian': [0,2,3,5,7,9,10],
+SCALES = {'lydian': [0,2,4,6,7,9,11], 'major': [0,2,4,5,7,9,11], 'dorian': [0,2,3,5,7,9,10],
           'minor': [0,2,3,5,7,8,10], 'mix': [0,2,4,5,7,9,10], 'phrygian': [0,1,3,5,7,8,10]}
 
 # Bars are written in scale degrees; / gives a note its length in beats and _ is a rest.
@@ -37,24 +42,15 @@ MAPS = {
     'rest': (60,'major',72,3,'felt',[0,2,5,3,0,6,1,4,5,3,2,4,0,5,4,0],[
         '4/1.5 2/.5 0','2/2 _','5/.5 4/.5 2 0','3/2 2','4/.5 7/.5 6/2','4/1.5 2/.5 1','2 3 5','4/2 _',
         '7/.5 8/.5 9/2','7/1.5 5/.5 3','4/2 2','1/.5 4/.5 2/2','0 2 4','5/1.5 2/.5 0','1/2 -1','0/2 _']),
-    'prison': (62,'dorian',78,4,'cello',[0,3,5,4,0,2,6,4,3,5,1,4,0,6,4,0],[
-        '_/.5 0 4/1.5 3/.5 2/.5','_ 3/.5 2/.5 0/2','5/1.5 4/.5 _ 2','-1/2.5 _/1.5',
-        '_/.5 -3/.5 0 2/2','4/1.5 2/.5 6/1.5 _/.5','3/.5 4/.5 1/2 _','4/2 _/2',
-        '7/1.5 _/.5 4 6','5/.5 6/.5 9/2 7','8/2 _ 4/.5 1/.5','2/1.5 1/.5 -1/2',
-        '_ 0/.5 4/.5 7/2','_/.5 5/1.5 2 0','1 4/1.5 -1/.5 _','0/2.5 _/1.5']),
-    'sewers': (60,'dorian',76,3,'flute',[0,6,3,0,5,3,1,4,3,5,6,2,0,3,4,0],[
-        '_/.5 4/.5 5/.5 4/.5 2','1/2 _','0/.5 2/.5 4/1.5 3/.5','2/3','_ 5/.5 6/.5 7','4/1.5 2/.5 3','1/.5 2/.5 4 1','-1/2 _',
-        '5/2 7','9/.5 8/.5 7/2','6/.5 7/.5 4/1.5 2/.5','4/2 _','0/1.5 4/.5 2','3/.5 2/.5 1/2','4/1.5 1/.5 -1','0/2 _']),
-    'ramparts': (65,'mix',103,3,'reed',[0,4,6,3,0,5,3,4,5,3,0,6,3,6,4,0],[
-        '0/.5 4/.5 7/1.5 6/.5','4 2 4','6/.5 6/.5 4/.5 2/.5 1','3/2 _','4/.5 5/.5 7 9','8/1.5 7/.5 5','3/.5 4/.5 1/2','4/2 2',
-        '5 7/.5 8/.5 9','7/1.5 5/.5 3','4/.5 5/.5 7/2','6/2 _','3/.5 4/.5 5 7','6/.5 4/.5 2/2','1/1.5 4/.5 -1','0/2 _']),
-    'ossuary': (57,'minor',66,4,'felt',[0,5,2,6,3,5,4,0,2,3,6,4,5,1,4,0],[
-        '4/2 _/.5 2/.5 0','-2/3 _','2/.5 4/.5 5/2 4','1/2.5 _/1.5','3/1.5 2/.5 1/2','0/2 -2 0','4/.5 3/.5 1/2 -1','0/3 _',
-        '7/2.5 6/.5 4','5/2 _ 5','6/.5 7/.5 4/2 1','-1/3 _','2/2 5 4','3/.5 2/.5 1/2 0','1 4 -1/2','0/3 _']),
-    'tower': (64,'dorian',108,4,'dulcimer',[0,1,3,4,5,3,6,4,0,5,3,4,1,6,4,0],[
-        '0/.5 4/.5 7/.5 _/.5 6 4','1/.5 2/.5 3 5/1.5 4/.5','3 5/.5 7/.5 9 7','4/2 _/.5 2/.5 1','5/.5 7/.5 9/.5 8/.5 7/2','6 5/.5 4/.5 3/2','6/.5 7/.5 4 2 1','4/3 _',
-        '7/.5 9/.5 11/2 9','8/.5 7/.5 5 7/2','3/.5 5/.5 7/1.5 5/.5 3','4 2/.5 1/.5 -1/2','1/.5 3/.5 5 8/2','6/1.5 4/.5 2/2','4/.5 3/.5 1/2 -1','0/3 _'])
+
 }
+
+# Each pair of regions has its own written score and accompaniment.
+CHAPTER_PARTS = {}
+for book in (score_waterways, score_wall_and_crypt, score_clocktower):
+    MAPS.update(book.SCORES)
+    for region_name in book.SCORES:
+        CHAPTER_PARTS[region_name] = book.accompany
 
 # The jail keys answer after three beats; the standard-bearer has a dotted march.
 # The mother and the warden get longer bowed notes. Both phases have their own composed B phrase.
@@ -109,6 +105,8 @@ def render(name,score):
     battle=name in BATTLES
     # Explore, develop, return in a second instrument. Encounters use a shorter written A/B form.
     order=list(range(len(bars)))+(list(range(8)) if region else list(range(4,8)) if battle else [])
+    if name in CHAPTER_PARTS:
+        order=list(range(len(bars)))+list(range(4))+list(range(len(bars)-4,len(bars)))
     beat=60/bpm
     # A small ritardando at each cadence gives the passage a pulse without gridlocked downbeats.
     bar_stretch=[(.985,.99,.975,1.05)[i%4] for i in range(len(order))]
@@ -128,10 +126,16 @@ def render(name,score):
         freq=440*2**((semitone-69)/12)
         length=beats*beat
         pluck=kind in ('lute','felt','dulcimer','water')
-        tail=.45 if pluck else .23
+        tail=1.1 if kind=='carillon' else .45 if pluck else .23
         t=np.arange(round((length+tail)*SR))/SR
         angle=2*np.pi*freq*t
-        if pluck:
+        if kind=='carillon':
+            # Cast-bell modes decay independently. The hum survives after the bright strike.
+            sig=np.zeros_like(t)
+            for ratio,amp,decay in ((.5,.36,1.1),(1,.82,1.45),(1.19,.19,2.6),(2,.28,3.2),(2.44,.13,4.7),(3,.08,6.2)):
+                sig+=amp*np.sin(angle*ratio)*np.exp(-t*decay)
+            env=np.minimum(1,t/.009)*np.exp(-np.maximum(0,t-length)/.35)
+        elif pluck:
             # A struck string has inharmonic partials and a second detuned course.
             brightness={'lute':.43,'felt':.22,'dulcimer':.49,'water':.19}[kind]
             sig=np.zeros_like(t)
@@ -162,7 +166,7 @@ def render(name,score):
         if kind=='skin':sig=(np.sin(2*np.pi*(79*t+.8*(1-np.exp(-26*t))))+.18*n*np.exp(-t*45))*np.exp(-t*22)
         else:sig=(.28*(n-np.roll(n,1))+.27*np.sin(2*np.pi*360*t))*np.exp(-t*(52 if kind=='rim' else 74))
         place(sig*np.minimum(1,t/.003)*volume,at,-.26 if kind=='rim' else .16)
-    answer={'lute':'flute','flute':'lute','cello':'flute','reed':'strings','felt':'cello','dulcimer':'reed','strings':'dulcimer'}[lead]
+    answer={'lute':'flute','flute':'lute','cello':'flute','reed':'strings','felt':'cello','dulcimer':'reed','strings':'dulcimer','carillon':'felt','water':'flute','air':'felt','bass':'reed'}[lead]
     for number,index in enumerate(order):
         start=number*meter; phrase=number%4
         middle=region and 8<=number<16
@@ -176,11 +180,16 @@ def render(name,score):
         swell=(.77,.93,1.05,.68)[phrase]
         melody_voice=answer if middle or (battle and number>=8) else lead
         if name=='quay-furnace' and index>=4:melody_voice='felt' if index<8 else 'flute'
+        if name in CHAPTER_PARTS:
+            melody_voice=lead
         for step,p,duration in notes(bars[index]):
             assert step+duration<=meter+.001,(name,index)
             accent=1 if step<.6 else .90 if duration<1 else .98
             tone(start+step+.012,p,duration*(.76 if duration<1.1 else .89),
                  melody_voice,.26*swell*accent,-.12 if middle else .10)
+        if name in CHAPTER_PARTS:
+            CHAPTER_PARTS[name](name,index,start,chord,meter,tone,tap)
+            continue
         # In a five-beat fight the key-ring answers on beat four. Other meters displace
         # the bass into the phrase or let the melody spend one bar entirely alone.
         if not exposed or (battle and phrase==0):
@@ -206,7 +215,14 @@ def render(name,score):
         elif region and not quiet and phrase==2 and number%8<4:
             tap(start+meter*.52,'skin',.068)
     wet=mix.copy()
-    for delay,gain in [(.073,.115),(.137,.092),(.231,.067),(.379,.047),(.533,.029)]:
+    reflections={
+        'prison': ((.052,.13),(.107,.08),(.209,.042)),
+        'sewers': ((.113,.15),(.263,.095),(.43,.045)),
+        'ramparts': ((.18,.055),(.34,.025)),
+        'ossuary': ((.14,.14),(.29,.11),(.52,.07),(.77,.045)),
+        'tower': ((.086,.11),(.193,.08),(.39,.048),(.61,.027)),
+    }
+    for delay,gain in reflections.get(name,((.073,.115),(.137,.092),(.231,.067),(.379,.047),(.533,.029))):
         wet+=np.roll(mix[:,::-1],int(delay*SR),axis=0)*gain
     rms_target=.084 if opening or quiet else .092 if battle else .089
     wet*=min(.66/np.max(abs(wet)),rms_target/np.sqrt(np.mean(wet*wet)))
@@ -215,4 +231,6 @@ def render(name,score):
     print(name,round(samples/SR,2),'seconds',dest.stat().st_size,flush=True)
 
 if __name__=='__main__':
-    for name,score in {**CUES,**MAPS,**BATTLES,**INTERLUDES}.items():render(name,score)
+    scores={**CUES,**MAPS,**BATTLES,**INTERLUDES}
+    for name in sys.argv[1:] or scores:
+        render(name,scores[name])

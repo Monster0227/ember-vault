@@ -627,9 +627,11 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       return true;
     }catch(e){return false;}
   }
+  const chapterMusic=new Set(['prison','sewers','ramparts','ossuary','tower']);
   function externalMusic(mode){
     const volume=MUSIC_TRACKS[mode];
-    const src=volume?'assets/music/'+(mode==='warden'?'epic-boss':mode)+'.mp3?v=waterline3':'';
+    const edition=chapterMusic.has(mode)?'chapters4':'waterline3';
+    const src=volume?'assets/music/'+(mode==='warden'?'epic-boss':mode)+'.mp3?v='+edition:'';
     if(fileMusic){const active=streamLocal(src,volume);setSynthAudible(!active,MUSIC_FADE);return active;}
     if(!volume){
       if(musicTrackId||musicLayers.length)stopBattleMusic(MUSIC_FADE);
