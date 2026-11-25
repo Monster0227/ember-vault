@@ -233,9 +233,17 @@ test('death, restart, victory and best-score storage',()=>{
   advance(4.2);assert.equal(t.state,'win');assert(t.talk&&t.talk.auto,'the ending narration plays by itself');
 });
 test('archers hold fire while off-screen and shoot once visible',()=>{
-  t.player.x=1400;t.player.y=303;t.player.vy=0;t.player.inv=100;t.player.face=1;t.cam=1015;
-  advance(1.2);assert.equal(t.shots.length,0);
-  t.player.face=-1;advance(1.2);assert(t.shots.length>0);
+  const a=t.enemies.find(e=>e.type==='archer'),p=t.player;
+  t.enemies.forEach(e=>{if(e!==a)e.dead=true;});
+  const leftEdge=a.x+a.w+3;
+  t.cam=leftEdge;p.x=leftEdge+465;p.inv=100;a.cd=0;
+  function frame(){p.y=a.y;p.vy=0;t.step(1/60);}
+  for(let i=0;i<90;i++){if(i===25)p.face=-1;frame();}
+  assert.equal(t.cam,leftEdge);assert(!a.wind&&!t.shots.length);
+  press('KeyA');let fired=false;
+  try{for(let i=0;i<125&&!fired;i++){frame();fired=t.shots.some(s=>s.k==='archerArrow');}}
+  finally{release('KeyA');}
+  assert(t.cam<leftEdge-3&&fired,'walking back reveals the archer and gives it time to draw');
 });
 test('a skeleton archer follows both axes, holds its final aim, and releases a dodgeable straight arrow',()=>{
   const a=t.enemies.find(e=>e.type==='archer'),p=t.player,dt=1/60;
@@ -323,11 +331,11 @@ test('slain enemies scatter embers that fly into the player',()=>{
   assert(e.dead);assert(t.orbs.length>=5);advance(2);assert.equal(t.orbs.length,0);
 });
 test('chest rewards mix an upgrade, an item and usually a relic, picked with 1 / 2 / 3',()=>{
-  const keys=['Digit1','Digit2','Digit3'],open=(x,y)=>{t.player.x=x;t.player.y=y;t.player.vy=0;t.action('interact');advance(1);assert.equal(t.state,'upgrade');};
-  open(600,318);assert.deepEqual(t.offers.slice(0,2).map(o=>o.kind),['up','use']);
+  const keys=['Digit1','Digit2','Digit3'],open=i=>{t.player.x=t.chests[i].x;t.player.y=t.chests[i].y-t.player.h;t.player.vy=0;t.action('interact');advance(1);assert.equal(t.state,'upgrade');};
+  open(0);assert.deepEqual(t.offers.slice(0,2).map(o=>o.kind),['up','use']);
   const u=t.offers[1],before=t.bag[u.id];press(keys[1]);assert.equal(t.state,'play');assert.equal(t.bag[u.id],before+u.n);assert.equal(t.sel,u.id);
-  open(2050,228);const up=t.offers[0],stat={blade:'damage',heart:'max',flask:'potions'}[up.id],v=stat?t.player[stat]:t.player.skills[up.id];press('Numpad1');assert((stat?t.player[stat]:t.player.skills[up.id])>v,'upgrade applied');
-  open(3000,228);const third=t.offers[2];press('Digit3');assert.equal(t.state,'play');if(third.kind==='relic')assert(t.relics[third.id]);
+  open(1);const up=t.offers[0],stat={blade:'damage',heart:'max',flask:'potions'}[up.id],v=stat?t.player[stat]:t.player.skills[up.id];press('Numpad1');assert((stat?t.player[stat]:t.player.skills[up.id])>v,'upgrade applied');
+  open(2);const third=t.offers[2];press('Digit3');assert.equal(t.state,'play');if(third.kind==='relic')assert(t.relics[third.id]);
 });
 test('holding up turns the swing into an up slash that reaches a guard above',()=>{
   const e=t.enemies[3];t.player.x=e.x+1;t.player.y=428;t.player.vy=0;t.player.face=1;t.player.inv=100;advance(.02);
@@ -359,12 +367,16 @@ test('heal is on L now, H does nothing',()=>{
 test('four chapters contain five maps, four dedicated boss arenas and four waystations',()=>{
   const maps=t.STAGES.filter(s=>!s.rest&&!s.arena),rests=t.STAGES.filter(s=>s.rest),arenas=t.STAGES.filter(s=>s.arena);
   assert.equal(maps.length,5);assert.equal(rests.length,4);assert.equal(arenas.length,4);assert.equal(new Set(arenas.map(s=>s.chapter)).size,4);
-  for(const map of maps)map.bands.forEach(([start],i)=>{
-    const end=map.bands[i+1]?.[0]??map.exit;
-    assert(map.ens.filter(([x])=>x>=start&&x<end).length>=3,map.name+' patrol density');
-  });
+  for(const map of maps){
+    const ground=map.ens.filter(([,y,type])=>y===480&&!['flyer','hanger'].includes(type));
+    assert(ground.length>map.ens.length/2,map.name+' has mostly grounded encounters');
+    assert(map.ens.every(([x])=>x>=500),map.name+' has an open approach');
+    assert(map.wicks.filter(w=>w.sentry).length<=2,map.name+' uses individual sentries sparingly');
+    assert(map.wicks.filter(w=>w.y===480&&!w.sentry).length>=Math.ceil(map.wicks.length/2));
+    for(const [start] of map.ens)assert(map.ens.filter(([x])=>x>=start&&x<start+550).length<=3);
+  }
   t.STAGES.forEach((s,i)=>{t.loadStage(i);assert.equal(t.state,'play');assert.equal(t.player.x,120);
-    if(s.rest)assert.equal(t.enemies.length,0);else if(s.arena)assert.equal(t.enemies.filter(e=>e.type==='boss').length,1);else assert(t.enemies.length>=8,s.name+' has enemies');
+    if(s.rest)assert.equal(t.enemies.length,0);else if(s.arena)assert.equal(t.enemies.filter(e=>e.type==='boss').length,1);else assert(t.enemies.length>=5,s.name+' has regular encounters');
     assert(s.arena?s.seal<s.w-100:s.exit<s.w-100,s.name+' has a way out');
     const floor=t.platforms.filter(a=>a.h>100&&!a.solid).reduce((n,a)=>n+a.w,0),gaps=s.gaps.reduce((n,g)=>n+g[1]-g[0],0);assert.equal(floor+gaps,s.w);});
 });
@@ -373,13 +385,16 @@ test('each main-map door stays shut until every wick catches in order',()=>{
     const index=t.STAGES.indexOf(room);t.loadStage(index);
     t.player.inv=100;
     for(const [i,wick] of room.wicks.entries()){
-      Object.assign(t.player,{x:room.exit-38,y:480-t.player.h,vy:0});
-      press('KeyD');advance(.5);release('KeyD');
-      assert.equal(t.stage,index);assert.equal(t.run.litWicks,i);
-      assert(t.player.x+t.player.w<=room.exit-10);
+      if(!wick.door||wick.sentry){
+        Object.assign(t.player,{x:room.exit-38,y:480-t.player.h,vy:0});
+        press('KeyD');advance(.5);release('KeyD');
+        assert.equal(t.stage,index);assert.equal(t.run.litWicks,i);
+        assert(t.player.x+t.player.w<=room.exit-10);
+      }
       Object.assign(t.player,{x:wick.x-98,y:480-t.player.h,vy:0});advance(.05);
-      for(let wave=0;wave<8&&t.run.wardParty?.some(hp=>hp>0);wave++){
-        for(const ward of t.enemies.filter(e=>e.ward&&!e.dead)){
+      const guards=t.enemies.filter(e=>e.ward&&!e.dead);
+      assert.equal(guards.length,wick.sentry?1:0,'only marked lamps have one defender');
+      for(const ward of guards){
           const hit=()=>t.hitEnemy(ward,10,1,false,ward.x,ward.y,0);
           const hp=ward.hp;hit();assert.equal(ward.hp,hp-10,'an arriving sentry is vulnerable');
           assert.equal(ward.hpBeforeHit,hp);assert(ward.hitT>0&&ward.hitDir===1);
@@ -388,28 +403,68 @@ test('each main-map door stays shut until every wick catches in order',()=>{
           assert(t.fx.some(f=>f.k==='contact'&&f.target===ward&&f.open));
           t.hitEnemy(ward,ward.max,1,false,ward.x,ward.y,0);
           assert(ward.dead);
-        }
-        Object.assign(t.player,{x:wick.x-98,y:480-t.player.h,vy:0});advance(.25);
       }
-      assert(!t.run.wardParty?.some(hp=>hp>0),'each patrol is finite');
+      Object.assign(t.player,{x:wick.x-98,y:480-t.player.h,vy:0});advance(.25);
+      assert(!t.enemies.some(e=>e.ward&&!e.dead),'cleared sentries get no reinforcements');
       if(wick.y<480-48){
         Object.assign(t.player,{x:wick.x-13,y:480-t.player.h,vy:0});advance(.04);
         assert.equal(t.run.litWicks,i,'a raised lamp needs a jump');
       }
       Object.assign(t.player,{x:wick.x-13,y:wick.y-t.player.h,vy:0});advance(.17);
       assert.equal(t.run.litWicks,i+1,room.name+' wick '+i);
+      if(wick.mechanism){
+        assert(t.flags.roadBridge&&t.platforms.some(a=>a.opened!=null),'lighting the switch lays the bridge');
+        assert(t.talk?.auto&&t.talk.lines.length===2);finishTalk();
+      }
     }
     advance(.5);assert.equal(t.run.doorLift,1);
     press('KeyD');advance(1.4);release('KeyD');
-    if(room.theme==='ramparts'){assertGateStory(index,2);finishTalk();advance(1);}
+    if(room.theme==='ramparts'){assertGateStory(index,4);finishTalk();advance(1);}
     assert.equal(t.stage,index+1);
   }
+});
+test('the gate latch opens the lower route and an elevated bridge fire restores safe footing',()=>{
+  const room=t.L,p=t.player,latch=t.breakables.find(b=>b.gate);
+  t.enemies.forEach(e=>e.dead=true);
+  Object.assign(p,{x:latch.x-45,y:480-p.h,face:1,ground:true});
+  t.action('attack');advance(.14);
+  assert(latch.broken&&!t.platforms.includes(latch.gate),'a normal swing clears the bars');
+  t.showMenu();t.continueRun();
+  assert(!t.platforms.some(a=>a.roadGate),'the opened gate persists');
+  const wick=room.roadLamp;
+  t.run.litWicks=room.wicks.indexOf(wick);t.player.x=wick.x-13;t.player.y=wick.y-t.player.h;advance(.05);finishTalk();
+  assert.equal(t.player.checkX,wick.x);
+  t.showMenu();t.continueRun();
+  const restored=t.player;
+  assert.equal(restored.y+restored.h,wick.y);advance(.08);assert(restored.ground);
+  assert(t.platforms.some(a=>a.x<room.roadBridge.x&&a.x+a.w>room.roadBridge.x+room.roadBridge.w));
+  restored.hp=20;restored.inv=0;t.hurt(1000,restored.x);t.respawn();
+  assert.equal(restored.y+restored.h,wick.y);advance(.08);assert(restored.ground);
+});
+test('each bearer can jump the three upper ledges without striking the lower latch',()=>{
+  for(const hero of ['lamp','bell','bow']){
+    t.reset(true,hero);t.enemies.forEach(e=>e.dead=true);
+    const p=t.player,x=t.L.roadGate.x;
+    Object.assign(p,{x:x-330,y:480-p.h,ground:true,vy:0});
+    for(const [dx,y] of [[-245,428],[-127,370],[0,310],[118,480]]){
+      const end=x+dx;
+      for(let frames=0;frames<175;frames++){
+        if(p.x<end-7)press('KeyD');else release('KeyD');
+        if(p.ground&&p.y+p.h>y+2&&p.x>end-125)t.action('jump');
+        t.step(1/60);
+        if(p.x>=end-12&&p.ground&&Math.abs(p.y+p.h-y)<1)break;
+      }
+      assert(p.x>=end-12&&p.ground&&Math.abs(p.y+p.h-y)<1,hero+' reaches the next landing: '+dx);
+    }
+    release('KeyD');assert(t.platforms.some(a=>a.roadGate),'the lower latch is still intact');
+  }
+  t.reset(true,'lamp');
 });
 test('the exit leads to a boss arena, then a waystation and the next chapter with stats kept',()=>{
   t.run.litWicks=t.L.wicks.length;t.run.doorLift=1;t.player.damage=40;t.player.potions=2;t.embers=55;t.player.x=t.L.exit+20;t.player.y=428;advance(1);
   assert(t.L.arena);assert.equal(t.player.damage,40);assert.equal(t.embers,55);
   t.enemies.find(e=>e.type==='boss').dead=true;t.player.x=t.L.seal+20;advance(.1);
-  assertGateStory(firstRest()-1,3);finishTalk();advance(1);assert(t.L.rest);
+  assertGateStory(firstRest()-1,5);finishTalk();advance(1);assert(t.L.rest);
   t.player.x=t.L.exit+20;t.player.y=428;advance(1);finishTalk();assert.equal(t.L.name,'腐水下水道');assert.equal(t.player.potions,2);assert.equal(t.embers,55);
 });
 test('the merchant sells healing for embers and you can walk away',()=>{
@@ -592,7 +647,7 @@ test('all four boss arenas have an intro, a sealed exit and the correct continua
     if(arena.bossKind==='warden'){
       assert.equal(t.state,'cine');finishCine();assert.equal(t.state,'win');assert.equal(t.talk.lines,t.TALK.ending);
     }else{
-      assertGateStory(index,3);assert.equal(JSON.parse(storage['ember:save']).coda,arena.bossKind);
+      assertGateStory(index,5);assert.equal(JSON.parse(storage['ember:save']).coda,arena.bossKind);
       finishTalk();advance(1);assert.equal(t.stage,index+1);assert(t.L.rest);
     }
   }
@@ -783,7 +838,7 @@ test('a shield jailer blocks frontal swings until a heavy third swing breaks its
   advance(.4);s.brk=0;s.face=1;s.turnT=0;const hp2=s.hp;t.player.x=s.x-45;t.action('attack');advance(.12);assert(s.hp<hp2,'hit in the back');
 });
 test('bats swoop, bone casters blink away and cast, bombers lob flasks that leave pools',()=>{
-  const f=t.enemies.filter(e=>e.type==='flyer')[1];t.enemies.forEach(e=>{if(e!==f)e.dead=true;});t.player.x=f.origin-150;t.player.y=428;t.player.inv=0;t.cam=f.origin-500;advance(.05);f.cd=0;advance(.05);assert(f.wind>0,'it rears back first');advance(1.4);assert(t.player.hp<100,'then dives into you');
+  const f=t.enemies.find(e=>e.type==='flyer');t.enemies.forEach(e=>{if(e!==f)e.dead=true;});t.player.x=f.origin-150;t.player.y=428;t.player.inv=0;t.cam=f.origin-500;advance(.05);f.cd=0;advance(.05);assert(f.wind>0,'it rears back first');advance(1.4);assert(t.player.hp<100,'then dives into you');
   t.loadStage(stageOf('ossuary'));const c=t.enemies.find(e=>e.type==='caster');t.cam=c.x-500;t.player.x=c.x-100;t.player.y=428;t.player.inv=100;advance(.05);assert(c.blink>0,'it blinks away when you get close');advance(.6);assert(Math.abs(c.x-t.player.x)>150);
   c.blinkCd=99;c.cd=0;t.player.x=c.x-300;advance(.05);assert(c.wind>0,'it raises its staff');advance(1);assert(t.shots.some(s=>s.k==='wisp')||t.hazards.some(h=>h.k==='spear'),'and casts');
   t.loadStage(stageOf('sewers'));const b=t.enemies.find(e=>e.type==='bomber');t.cam=b.x-500;t.player.x=b.x-200;t.player.y=428;t.player.inv=100;b.cd=0;advance(.05);assert(b.wind>0,'it swings its arm back');advance(.7);assert(t.shots.some(s=>s.k==='glob'&&s.g>0),'and lobs');t.player.x-=170;advance(1.6);assert(t.hazards.some(h=>h.k==='pool'),'leaving a pool');
@@ -796,7 +851,13 @@ test('lifts carry you, crumbling bridges drop away and grow back, vents lift you
 });
 test('five main routes keep their signature obstacles and an accessible exit',()=>{
   const kinds={prison:['tspike','pendulum'],sewers:['spout','vent'],ramparts:['wind','ballista'],ossuary:['jet'],tower:['piston','pendulum','vent']};
-  for(const th of Object.keys(kinds)){const s=t.STAGES[stageOf(th)];assert(s.exit>=3200&&s.exit<=4100,th+' main route');assert(s.ens.every(e=>e[0]<s.exit),th+' encounter before exit');const have=new Set(s.traps.map(q=>q.k));kinds[th].forEach(k=>assert(have.has(k),th+' has '+k));}
+  for(const th of Object.keys(kinds)){const s=t.STAGES[stageOf(th)];const gate=s.roadGate,lamp=s.roadLamp,bridge=s.roadBridge;
+    assert(gate&&lamp&&bridge&&120<gate.x&&gate.x+32<lamp.x&&lamp.x<bridge.x&&bridge.x+bridge.w<s.exit&&s.exit<s.w,th+' mechanisms lie in order before the door');
+    assert(s.plats.some(([x,y,w])=>y<=320&&x<=gate.x&&x+w>gate.x+32),th+' has a top crossing over the gate');
+    assert(s.terrain.some(([x,w,y])=>y===lamp.y&&x<=lamp.x&&x+w>=lamp.x+50),th+' supports the bridge lamp and respawn point');
+    assert(s.gaps.some(([a,b])=>a===bridge.x&&b===bridge.x+bridge.w),th+' bridge joins the banks of its opening');
+    assert(!s.gaps.some(([a,b])=>(bridge.x-5>a&&bridge.x-5<b)||(bridge.x+bridge.w+5>a&&bridge.x+bridge.w+5<b)),th+' both bridge ends meet solid ground');
+    assert(s.ens.every(e=>e[0]<s.exit),th+' encounter before exit');const have=new Set(s.traps.map(q=>q.k));kinds[th].forEach(k=>assert(have.has(k),th+' has '+k));}
   assert(t.STAGES[stageOf('prison')].movers.length&&t.STAGES[stageOf('ramparts')].crumbles.length&&t.STAGES[stageOf('ossuary')].dark,'lifts, crumbling bridges and darkness');
   const foes=new Set();t.STAGES.forEach(s=>s.ens.forEach(e=>foes.add(e[2])));['flyer','shield','caster','bomber'].forEach(k=>assert(foes.has(k),k+' appears'));
   ['lock','brood','standard','warden'].forEach(k=>assert(t.SONGS[k]&&t.SONGS[k+'2']&&t.SONGS[k].bpm<t.SONGS[k+'2'].bpm,k+' has a faster second phase theme'));
@@ -934,7 +995,7 @@ test('every boss leaves a lantern shard behind',()=>{
   t.strike({struck:false,x:e.x,w:30},0,0,9999,9999,14);assert.equal(t.player.soul,1,'once per roll');
 });
 test('a fatal moth dive names the attack in the result panel',()=>{
-  const f=t.enemies.filter(e=>e.type==='flyer')[1];
+  const f=t.enemies.find(e=>e.type==='flyer');
   t.enemies.forEach(e=>{if(e!==f)e.dead=true;});
   t.player.x=f.origin-150;t.player.hp=20;t.cam=f.origin-500;
   advance(.05);f.cd=0;advance(1.5);
@@ -948,15 +1009,20 @@ test('the ramparts shortcut carries a relit ember and a continued run remembers 
   t.retryStage();const kept=t.run.litWicks;assert.equal(kept,wall.wicks);t.player.x=wall.door-13;advance(.05);assert.equal(t.run.litWicks,kept);
   const attached=()=>assert(Math.abs(t.run.guideX-t.player.x-t.player.w/2)<=35);
   assert(t.player.x>=wall.dest-10);attached();
-  const wick=t.L.wicks[kept];t.player.x=wick.x-13;t.player.y=wick.y-t.player.h;advance(.05);
+  const wick=t.L.wicks.find((w,i)=>i>=kept&&w.sentry);
+  t.run.litWicks=t.L.wicks.indexOf(wick);t.player.x=wick.x-13;t.player.y=wick.y-t.player.h;advance(.05);
   const ward=t.enemies.find(e=>e.ward&&!e.dead);ward.phaseName='open';
   t.hitEnemy(ward,10,1,false,ward.x,ward.y,0);
   const saved=JSON.parse(storage['ember:save']);assert.equal(saved.run.wardParty[ward.slot],ward.max-20);
   t.showMenu();t.continueRun();attached();assert.deepEqual(Array.from(t.run.wardParty),saved.run.wardParty);
+  saved.v=6;saved.run.litWicks=wick.oldIndex;saved.checkX=t.L.compactChecks[wick.oldIndex-1];saved.run.wardParty=[0,28,56,56];storage['ember:save']=JSON.stringify(saved);
+  t.showMenu();t.continueRun();assert.deepEqual(Array.from(t.run.wardParty),[0],'an already defeated old guard pays for the lamp');
+  saved.run.wardParty=[36,56,56];storage['ember:save']=JSON.stringify(saved);
+  t.showMenu();t.continueRun();assert.deepEqual(Array.from(t.run.wardParty),[36],'carry partial damage when no guard was defeated');
   saved.v=5;delete saved.run.wardParty;saved.run.wardLeft=1;storage['ember:save']=JSON.stringify(saved);
   t.showMenu();t.continueRun();assert.equal(t.run.wardParty.filter(x=>x>0).length,1);assert.equal(t.run.wardParty.at(-1),ward.max);
   saved.v=4;delete saved.run.wardLeft;delete saved.run.guideX;storage['ember:save']=JSON.stringify(saved);
-  t.showMenu();t.continueRun();assert.equal(t.run.litWicks,kept);attached();
+  t.showMenu();t.continueRun();assert.equal(t.run.litWicks,t.L.wicks.indexOf(wick));attached();
   assert(t.run.guideX<t.L.exit);
   t.player.x=t.L.exit-40;press('KeyD');advance(1.4);release('KeyD');
   assert.equal(t.stage,saved.stage,'the remaining fires still secure the east door');
@@ -1036,24 +1102,24 @@ test('journey and free selection resume their own interrupted gate stories at th
   t.startJourney('bell',0);finishTalk();advance(1);t.loadStage(bossStage);
   t.killEnemy(t.enemies.find(e=>e.type==='boss'));finishCine();finishTalk();
   t.bag.frost=4;t.embers=117;t.player.x=t.L.seal+25;advance(.05);
-  assertGateStory(bossStage,3);const firstBossLine=t.talk.text;
+  assertGateStory(bossStage,5);const firstBossLine=t.talk.text;
   press('KeyE');press('KeyE');assert.equal(t.talk.i,1);
   listeners.pagehide();const journey=storage['ember:save'];assert.equal(JSON.parse(journey).coda,'lock');
 
   t.showMenu();t.selectLevel(t.STAGES[wallStage]);finishTalk();
   t.run.litWicks=t.L.wicks.length;t.run.doorLift=1;t.player.x=t.L.exit+25;advance(.05);
-  assertGateStory(wallStage,2);const firstBridgeLine=t.talk.text;assert.notEqual(firstBridgeLine,firstBossLine);
+  assertGateStory(wallStage,4);const firstBridgeLine=t.talk.text;assert.notEqual(firstBridgeLine,firstBossLine);
   press('KeyE');press('KeyE');assert.equal(t.talk.i,1);
   listeners.pagehide();const selected=storage['ember:selected-save'];assert.equal(JSON.parse(selected).coda,'ramparts');
   assert.equal(storage['ember:save'],journey,'free selection preserves the interrupted journey');
 
-  t.showMenu();t.continueRun();assertGateStory(bossStage,3);
+  t.showMenu();t.continueRun();assertGateStory(bossStage,5);
   assert.equal(t.talk.i,0);assert.equal(t.talk.text,firstBossLine);assert.equal(t.bag.frost,4);assert.equal(t.embers,117);
   advance(45);assert.equal(t.stage,bossStage+1);assert(t.L.rest);assert.equal(t.state,'play');
   assert(!JSON.parse(storage['ember:save']).coda);assert.equal(storage['ember:selected-save'],selected);
   t.showMenu();t.continueRun();assert.equal(t.stage,bossStage+1);assert(!t.talk);
 
-  t.showMenu();t.continueRun(true);assertGateStory(wallStage,2);
+  t.showMenu();t.continueRun(true);assertGateStory(wallStage,4);
   assert.equal(t.talk.i,0);assert.equal(t.talk.text,firstBridgeLine);
   press('Escape');release('Escape');advance(1);assert.equal(t.stage,wallStage+1);assert(t.L.rest);
   assert(!JSON.parse(storage['ember:selected-save']).coda);
@@ -1111,6 +1177,37 @@ test('an old carried shade can be returned directly and the codex alone grants n
   assert(t.codex.items.shade&&!t.keepsakes.shade);assert.equal(nodes['chest-btn'].textContent,'看灯钩');
   t.action('interact');finishTalk();assert(!t.run.found?.shadeHome);assert.equal(storage['ember:save'],journey);
   t.showMenu();t.continueRun();assert(t.run.found.shadeHome&&!t.keepsakes.shade);
+});
+test('the restored lamp leads to a fitted cart bell and a different dawn without a second gift',()=>{
+  t.startJourney('bell',0);finishTalk();advance(1);
+  t.loadStage(stageOf('tower'));talkToWayfarer();finishTalk();const count=t.bag.bomb;
+  t.keepsakes.shade=true;visitLampHook(3);t.action('interact');finishTalk();
+  t.loadStage(stageOf('tower'));talkToWayfarer();assert(t.talk.lines.at(-1)[1].includes('拧牢'));
+  t.showMenu();t.continueRun();assert(!t.run.found.supperCart);
+  talkToWayfarer();press('Escape');release('Escape');assert(t.run.found.supperCart);assert.equal(t.bag.bomb,count);
+  t.retryStage();assert(t.run.found.supperCart);assert(talkToWayfarer().includes('天没亮时'));finishTalk();
+  t.showMenu();t.continueRun();assert(t.run.found.supperCart);assert.equal(t.bag.bomb,count);
+  t.loadStage(FINAL);t.enemies.find(e=>e.type==='boss').dead=true;t.player.x=t.L.seal+25;advance(.1);finishCine();
+  for(let i=0;i<18&&t.talk.i<5;i++)press('KeyE');
+  assert.equal(t.talk.lines.length,7);assert(t.talk.text.includes('车把上的铜铃'));
+  t.showMenu();t.selectLevel(t.STAGES[stageOf('tower')]);finishTalk();assert(!t.run.found?.supperCart);
+  t.loadStage(FINAL);t.enemies.find(e=>e.type==='boss').dead=true;t.player.x=t.L.seal+25;advance(.1);finishCine();
+  for(let i=0;i<18&&t.talk.i<5;i++)press('KeyE');
+  assert(t.talk.text.includes('隔壁也推开了窗'));assert(!t.talk.text.includes('车把上的铜铃'));t.showMenu();
+});
+test('chapter approach art can paint every page without an image and restores the HUD on departure',()=>{
+  t.startJourney('bow',0);finishTalk();advance(1);
+  for(const [restNo,scenes] of [[0,['cistern','cistern','cistern','cistern']],[1,['wall','wall','wall','crypt']],[3,['spire','spire','spire','spire']]]){
+    t.loadStage(t.STAGES.findIndex(room=>room.rest&&room.restNo===restNo));
+    t.player.x=t.L.exit+22;t.player.y=428;advance(1);
+    assert.equal(t.state,'talk');assert(nodes.hud.hidden);assert.equal(t.talk.lines.length,scenes.length);
+    for(const scene of scenes){
+      assert.equal(t.sceneArt,scene);const before=nodes.world.paints;
+      t.SCENES[scene](1.5);assert(nodes.world.paints>before,scene+' must render the original chapter action');
+      if(t.talk.shown<t.talk.text.length)press('KeyE');press('KeyE');
+    }
+    assert.equal(t.state,'play');assert(!nodes.hud.hidden);
+  }
 });
 console.log('All '+passed+' gameplay checks passed.');
 
