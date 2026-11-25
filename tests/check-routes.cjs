@@ -19,7 +19,7 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
     const room = t.L, p = t.player;
     const ordinary = [...t.enemies], npc=room.wayfarer, chest=t.chests[0], lore={x:room.lore.x,y:480};
     const combat=mode==='combat';
-    t.settings.autoTalk=combat;
+    t.settings.subtitleAdvance=combat?'auto':'manual';
     let spoke=false, storyFrames=0, rewardFrames=0, interrupted=false;
     const roadFoes = ordinary.filter(e=>e.floor===480&&!['flyer','hanger'].includes(e.type)).sort((a,b)=>a.origin-b.origin);
     let frames = 0, deaths = 0, stalled = 0, lastX = p.x, lastLit = 0;
@@ -102,7 +102,7 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
       assert(spoke&&chest.open&&t.keepsakes[room.lore.id], 'normal route visits its contact, claims the first chest and reads the roadside relic');
       assert(frames/60>=65&&frames/60<=125,'ordinary combat route remains near the ninety second target');
     } else assert(frames/60<70,'all lamps can be lit quickly');
-    t.settings.autoTalk=false;
+    t.settings.subtitleAdvance='auto';
     if(mode==='combat')assert(roadFoes.every(e=>e.dead),theme+' engaged the ground encounters');
     // Finish the door fade before starting the next journey.
     for (let i=0; i<60; i++) t.step(1/60);

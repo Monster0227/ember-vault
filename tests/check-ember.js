@@ -870,12 +870,35 @@ test('the journey is saved at every door and can be continued from the title scr
   t.loadStage(stageOf('sewers'));const s=JSON.parse(storage['ember:save']);assert.equal(s.stage,stageOf('sewers'));assert.equal(s.char,'lamp');
   t.showMenu();assert.equal(t.state,'menu');t.continueRun();assert.equal(t.state,'play');assert.equal(t.stage,stageOf('sewers'));
 });
-test('dialogue types with pauses at punctuation, and auto mode turns the pages itself',()=>{
-  t.player.x=t.L.npc-13;t.player.y=428;advance(.02);t.action('interact');assert.equal(t.state,'talk');const line=t.talk.lines[0][1],comma=line.indexOf('，');
-  for(let i=0;i<2000&&t.talk.shown<=comma;i++)t.step(1/120);const at=t.talk.shown;assert.equal(at,comma+1);t.step(.05);assert.equal(t.talk.shown,at,'it pauses after a comma');
-  press('KeyE');assert.equal(t.talk.shown,line.length,'a press shows the whole line');
-  t.settings.autoTalk=true;const i0=t.talk.i;advance(5);assert(!t.talk||t.talk.i>i0,'auto mode turns the page');t.settings.autoTalk=false;finishTalk();
-});test('chapter one challenge does not force the first-run tutorial',()=>{t.startChapter(1);assert.equal(JSON.parse(storage['ember:save']).stage,0);assert.equal(t.stage,0);assert(!t.L.tutorial);assert.equal(t.state,'talk');finishTalk();assert.equal(t.state,'play');});
+test('dialogue waits for the whole line and a reading pause, then returns control and gives the reward',()=>{
+  const bombs=t.bag.bomb;
+  t.player.x=t.L.npc-13;t.player.y=428;t.action('interact');
+  assert.equal(t.state,'talk');
+  const line=t.talk.text,comma=line.indexOf('，');
+  for(let i=0;i<2000&&t.talk.shown<=comma;i++)t.step(1/120);
+  assert.equal(t.talk.shown,comma+1);t.step(.05);assert.equal(t.talk.shown,comma+1,'it pauses after a comma');
+  for(let i=0;i<2000&&t.talk.shown<line.length;i++)t.step(1/120);
+  assert.equal(t.talk.shown,line.length);advance(.25);
+  assert.equal(t.talk.i,0,'the completed subtitle stays on screen to read');
+  const pages=new Set(),pageCount=t.talk.lines.length;
+  for(let i=0;i<60*90&&t.talk;i++){
+    pages.add(t.talk.i);
+    assert.equal(t.bag.bomb,bombs,'the gift arrives after the last line');
+    t.step(1/60);
+  }
+  assert.equal(pages.size,pageCount);assert.equal(t.state,'play');assert.equal(t.bag.bomb,bombs+1);
+});
+test('manual subtitles keep their page, accept reveal and advance, and can skip directly to the gift',()=>{
+  const previous=t.settings.subtitleAdvance,knives=t.bag.knife;
+  try{
+    t.settings.subtitleAdvance='manual';talkToWayfarer();
+    press('KeyE');release('KeyE');assert.equal(t.talk.shown,t.talk.text.length);
+    advance(20);assert.equal(t.talk.i,0);
+    press('KeyE');release('KeyE');assert.equal(t.talk.i,1);assert.equal(t.bag.knife,knives);
+    press('Escape');release('Escape');assert.equal(t.state,'play');assert.equal(t.bag.knife,knives+2);
+  }finally{t.settings.subtitleAdvance=previous;}
+});
+test('chapter one challenge does not force the first-run tutorial',()=>{t.startChapter(1);assert.equal(JSON.parse(storage['ember:save']).stage,0);assert.equal(t.stage,0);assert(!t.L.tutorial);assert.equal(t.state,'talk');finishTalk();assert.equal(t.state,'play');});
 test('portrait starts playing immediately and rotation preserves the run',()=>{
   const x=t.player.x;t.settings.touch='show';sandbox.innerWidth=375;sandbox.innerHeight=812;listeners.resize();
   press('KeyD');advance(.5);release('KeyD');t.action('attack');assert(t.player.attack>0);assert(t.player.x>x);
@@ -1207,6 +1230,22 @@ test('chapter approach art can paint every page without an image and restores th
       if(t.talk.shown<t.talk.text.length)press('KeyE');press('KeyE');
     }
     assert.equal(t.state,'play');assert(!nodes.hud.hidden);
+  }
+});
+test('older settings start with automatic subtitles and an explicit manual preference survives reload',()=>{
+  for(const [saved,expected] of [
+    [{autoTalk:false},'auto'],[{autoTalk:true},'auto'],[{subtitleAdvance:'manual',autoTalk:true},'manual']
+  ]){
+    const profile={'ember:settings':JSON.stringify({...saved,music:.35})};
+    const boot={...sandbox,addEventListener:noop,localStorage:{
+      getItem:key=>profile[key],setItem:(key,value)=>{profile[key]=value;},removeItem:key=>{delete profile[key];}
+    }};
+    boot.window=boot;vm.runInNewContext(code,boot);
+    const game=boot.test;
+    assert.equal(game.settings.music,.35);
+    game.startJourney('lamp',0);
+    for(let i=0;i<60*18&&game.talk.i===0;i++)game.step(1/60);
+    assert.equal(game.talk.i,expected==='auto'?1:0,'first story page in '+JSON.stringify(saved));
   }
 });
 console.log('All '+passed+' gameplay checks passed.');

@@ -104,7 +104,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   const DEFAULT_KEYS={left:['KeyA','ArrowLeft'],right:['KeyD','ArrowRight'],up:['KeyW','ArrowUp'],down:['KeyS','ArrowDown'],jump:['Space'],attack:['KeyJ'],roll:['KeyK','ShiftLeft'],skill1:['Digit1','Numpad1'],skill2:['Digit2','Numpad2'],skill3:['Digit3','Numpad3'],heal:['KeyL'],use:['KeyU'],cycle:['KeyQ'],interact:['KeyE'],bag:['KeyB'],map:['KeyM','Tab']};
   const KEY_ORDER=['left','right','up','down','jump','attack','roll','skill1','skill2','skill3','heal','use','cycle','interact','bag','map'];
   const KEY_LABEL={left:'向左走',right:'向右走',up:'向上（上挑）',down:'向下（下劈 / 下落）',jump:'跳跃',attack:'攻击',roll:'翻滚',skill1:'技能一',skill2:'技能二',skill3:'技能三',heal:'治疗',use:'使用道具',cycle:'切换道具',interact:'交谈 / 开箱 / 查看',bag:'行囊',map:'地图'};
-  let settings={vol:1,music:.7,sfx:.8,fx:'auto',shake:true,nums:true,textSpeed:1,autoTalk:false,touch:'auto',minimap:true,buzz:true,touchA:1,touchX:0,touchY:0},BIND=JSON.parse(JSON.stringify(DEFAULT_KEYS)),codeAct={},rebinding=null;
+  let settings={vol:1,music:.7,sfx:.8,fx:'auto',shake:true,nums:true,textSpeed:1,subtitleAdvance:'auto',touch:'auto',minimap:true,buzz:true,touchA:1,touchX:0,touchY:0},BIND=JSON.parse(JSON.stringify(DEFAULT_KEYS)),codeAct={},rebinding=null;
   function rebuildKeys(){codeAct={};KEY_ORDER.forEach(a=>(BIND[a]||[]).forEach(c=>{if(c&&!codeAct[c])codeAct[c]=a;}));}
   try{const s=JSON.parse(localStorage.getItem('ember:settings')||'null');if(s){Object.keys(settings).forEach(k=>{if(s[k]!=null)settings[k]=s[k];});if(s.keys)KEY_ORDER.forEach(a=>{if(Array.isArray(s.keys[a])&&s.keys[a].length)BIND[a]=s.keys[a].slice(0,2);});}}catch(e){}
   rebuildKeys();
@@ -1126,7 +1126,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(!backing)return null;
     backing.drawImage(canvas,0,0);return still;
   }
-  function startTalk(lines,done,keep,opts){opts=opts||{};talk={lines:lines,i:0,n:0,shown:0,wait:opts.delay||0,hold:0,arena:!!opts.arena,auto:!!opts.auto,coda:opts.coda,started:time,done:done||null,keep:!!keep,text:'',fx:[],swapT:0};
+  function startTalk(lines,done,keep,opts){opts=opts||{};talk={lines:lines,i:0,n:0,shown:0,wait:opts.delay||0,hold:0,arena:!!opts.arena,scriptedAuto:!!opts.auto,coda:opts.coda,started:time,done:done||null,keep:!!keep,text:'',fx:[],swapT:0};
     const finale=lines===TALK.ending;
     chapterMarker.hidden=!talk.coda&&!finale;
     if(!chapterMarker.hidden){
@@ -1137,7 +1137,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(talk.coda||talk.arena||CHAPTERS.some(chapter=>chapter.story===lines)){touch.hidden=true;hud.hidden=true;}
     if(talk.coda)talkBox.classList.add('chapter-dialog');else talkBox.classList.remove('chapter-dialog');
     if(talk.arena)talkBox.classList.add('arena-dialog');else talkBox.classList.remove('arena-dialog');
-    if(!keep)state='talk';keys={};clearHeld();talkBox.hidden=false;if(talk.auto)talkBox.classList.add('auto');else talkBox.classList.remove('auto');sceneA='';sceneB='';showLine();}
+    if(!keep)state='talk';keys={};clearHeld();talkBox.hidden=false;sceneA='';sceneB='';showLine();}
   function showLine(){
     const l=talk.lines[talk.i],face=FACES[l[0]]||FACE_ART[l[0]];
     const returnedLamp=talk.lines===TALK.ending&&l[2]==='merchant'&&!l[0]&&run.found?.shadeHome;
@@ -1154,6 +1154,13 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(talk.i===0||talk.lines[talk.i-1][0]!==l[0]){talkBox.classList.remove('swap');try{void talkBox.offsetWidth;}catch(e){}talkBox.classList.add('swap');talk.swapT=.5;}
     if(talk.arena)sceneT=0;
     const sc=talk.arena?'':l[2]!=null?l[2]:(talk.i?sceneA:'');
+    const prologue=talk.lines===TALK.prologue;
+    const descent=prologue&&(sc==='furnace'||sc==='chute');
+    talk.auto=talk.scriptedAuto||descent||settings.subtitleAdvance!=='manual';
+    talkBox.classList[talk.auto?'add':'remove']('auto');
+    talk.readTime=(descent?1.25:1+P.text.length*.045+(l[2]?1.4:0))/(settings.textSpeed||1);
+    // Let the fall, the slide and the answer from the pipe finish before an automatic cut.
+    talk.minSceneTime=prologue?({furnace:4.22,chute:6.35,awaken:5.75}[sc]||0):0;
     if(talk.lines===TALK.prologue&&talk.i===0){
       scenePainting(ashPlateName('furnace'));scenePainting(ashPlateName('awaken'));
     }
@@ -1205,7 +1212,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     dialogueBus.connect(sfxBus||ac.destination);
     weighted(parts,dialogueBus);
   }
-  function typeTalk(dt){const l=talk.lines[talk.i],s=talk.text,len=s.length,sp=settings.textSpeed||1;if(talk.swapT>0){talk.swapT-=dt;if(talk.swapT<=0)talkBox.classList.remove('swap');}
+  function typeTalk(dt){const s=talk.text,len=s.length,sp=settings.textSpeed||1;if(talk.swapT>0){talk.swapT-=dt;if(talk.swapT<=0)talkBox.classList.remove('swap');}
     if(talk.lines===TALK.prologue){
       // Ring at the first apex of the quay bell. The chain closes after the cut inside.
       const cue=sceneA==='bell'?Math.PI/(2*QUAY_BELL_RATE):sceneA==='warden'?.48:0;
@@ -1219,12 +1226,11 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       while(talk.shown<Math.floor(talk.n)){const c=s.charAt(talk.shown);addChar(talk.shown++);if(PAUSE[c]&&talk.shown<len){talk.wait=PAUSE[c]/sp;talk.n=talk.shown;break;}}
       if(talk.shown>=len)talkBox.classList.remove('typing');return;}
     // 自动翻页：对话框底边一道细线慢慢走满，走满就翻页
-    const descent=talk.lines===TALK.prologue&&(sceneA==='furnace'||sceneA==='chute');
-    if(descent||talk.auto||settings.autoTalk){
+    if(talk.auto){
       talk.hold+=dt;
-      const need=descent?1.25/sp:(1+len*.045+(l[2]?1.4:0))/sp;
-      if(talkBar)talkBar.style.transform='scaleX('+Math.min(1,talk.hold/need).toFixed(3)+')';
-      if(talk.hold>need&&(!descent||sceneT>=(sceneA==='furnace'?4.22:6.35)))talkNext();
+      const duration=Math.max(talk.readTime,talk.hold+talk.minSceneTime-sceneT);
+      if(talkBar)talkBar.style.transform='scaleX('+Math.min(1,talk.hold/duration).toFixed(3)+')';
+      if(talk.hold>=talk.readTime&&sceneT>=talk.minSceneTime)talkNext();
     }}
   function talkNext(){if(!talk)return;if(talk.shown<talk.text.length){talk.n=talk.shown=talk.text.length;talk.wait=0;let h='';for(let i=0;i<talk.text.length;i++)h+=chSpan(i,true);talkText.innerHTML=h;if(!talkText.insertAdjacentHTML)talkText.textContent=talk.text;talkBox.classList.remove('typing');return;}talk.i++;if(talk.i<talk.lines.length){showLine();return;}
     if(talk.landInPrison&&sceneA==='awaken'&&sceneT>.1){
@@ -1517,7 +1523,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   // 设置：音量滑条、画面 / 对话选项、按键（每个动作两个键位，点一下再按新键）
   function renderSettings(from){const keymapOpen=!from&&panel.querySelector?.('.keyboard-options')?.open;panelView='settings';if(from)menuFrom=from;const opt=(k,label,vals)=>'<div class="opt"><span>'+label+'</span>'+vals.map(v=>'<button data-opt="'+k+'" data-v="'+v[0]+'"'+(String(settings[k])===String(v[0])?' class="on"':'')+'>'+v[1]+'</button>').join('')+'</div>',sl=(k,label)=>'<label class="slider"><span>'+label+'</span><input type="range" min="0" max="100" step="5" value="'+Math.round(settings[k]*100)+'" data-slider="'+k+'"><b>'+Math.round(settings[k]*100)+'</b></label>';
     const rows=KEY_ORDER.map(a=>'<div class="keyrow"><span>'+KEY_LABEL[a]+'</span>'+[0,1].map(i=>{const w=rebinding&&rebinding.a===a&&rebinding.i===i;return'<button data-bind="'+a+'" data-slot="'+i+'"'+(w?' class="wait"':'')+'>'+(w?'按下新按键…':keyName(BIND[a][i]))+'</button>';}).join('')+'</div>').join('');
-    panel.innerHTML='<div class="sheet wide settings"><span class="chapter">设置</span><h1>设置</h1><h3>声音</h3>'+sl('vol','总音量')+sl('music','音乐')+sl('sfx','音效')+'<h3>画面</h3>'+opt('fx','特效',[['auto','自动'],['high','全开'],['low','省电']])+opt('shake','屏幕震动',[[true,'开'],[false,'关']])+opt('buzz','震动',[[true,'开'],[false,'关']])+opt('nums','伤害数字',[[true,'显示'],[false,'隐藏']])+opt('minimap','小地图',[[true,'显示'],[false,'隐藏']])+'<h3>对话</h3>'+opt('textSpeed','文字速度',[[.6,'慢'],[1,'中'],[1.7,'快']])+opt('autoTalk','自动翻页',[[false,'关'],[true,'开']])+'<h3>操作</h3>'+opt('touch','屏幕按键',[['auto','自动'],['show','显示'],['hide','隐藏']])+sl('touchA','按键透明度')+'<label class="slider"><span>按键左右</span><input type="range" min="-80" max="80" step="4" value="'+(settings.touchX||0)+'" data-px="touchX"><b>'+(settings.touchX||0)+'</b></label><label class="slider"><span>按键上下</span><input type="range" min="-60" max="40" step="4" value="'+(settings.touchY||0)+'" data-px="touchY"><b>'+(settings.touchY||0)+'</b></label><details class="keyboard-options"'+(keymapOpen||rebinding||(!coarse()&&from)?' open':'')+'><summary>键盘按键</summary><p>选中一个动作，再按要使用的键。Esc 取消。</p><div class="keymap">'+rows+'</div><button class="secondary" id="keys-reset">恢复默认按键</button></details><button class="primary" data-back>返回 <span>↩</span></button></div>';
+    panel.innerHTML='<div class="sheet wide settings"><span class="chapter">设置</span><h1>设置</h1><h3>声音</h3>'+sl('vol','总音量')+sl('music','音乐')+sl('sfx','音效')+'<h3>画面</h3>'+opt('fx','特效',[['auto','自动'],['high','全开'],['low','省电']])+opt('shake','屏幕震动',[[true,'开'],[false,'关']])+opt('buzz','震动',[[true,'开'],[false,'关']])+opt('nums','伤害数字',[[true,'显示'],[false,'隐藏']])+opt('minimap','小地图',[[true,'显示'],[false,'隐藏']])+'<h3>对话</h3>'+opt('textSpeed','文字速度',[[.6,'慢'],[1,'中'],[1.7,'快']])+opt('subtitleAdvance','字幕翻页',[['auto','自动'],['manual','手动']])+'<h3>操作</h3>'+opt('touch','屏幕按键',[['auto','自动'],['show','显示'],['hide','隐藏']])+sl('touchA','按键透明度')+'<label class="slider"><span>按键左右</span><input type="range" min="-80" max="80" step="4" value="'+(settings.touchX||0)+'" data-px="touchX"><b>'+(settings.touchX||0)+'</b></label><label class="slider"><span>按键上下</span><input type="range" min="-60" max="40" step="4" value="'+(settings.touchY||0)+'" data-px="touchY"><b>'+(settings.touchY||0)+'</b></label><details class="keyboard-options"'+(keymapOpen||rebinding||(!coarse()&&from)?' open':'')+'><summary>键盘按键</summary><p>选中一个动作，再按要使用的键。Esc 取消。</p><div class="keymap">'+rows+'</div><button class="secondary" id="keys-reset">恢复默认按键</button></details><button class="primary" data-back>返回 <span>↩</span></button></div>';
     panel.hidden=false;
     panel.querySelectorAll('[data-opt]').forEach(b=>b.onclick=()=>{const k=b.dataset.opt,v=b.dataset.v;settings[k]=v==='true'?true:v==='false'?false:isNaN(+v)?v:+v;applySettings();saveSettings();beep(600,.04,'sine');renderSettings();});
     panel.querySelectorAll('[data-slider]').forEach(r=>{r.oninput=()=>{settings[r.dataset.slider]=r.value/100;r.nextElementSibling.textContent=r.value;applySettings();saveSettings();};r.onchange=()=>beep(660,.06,'sine');});
