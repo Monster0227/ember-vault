@@ -96,6 +96,7 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
     release('KeyA');release('KeyD');release('KeyS');release('KeyJ');
     assert.equal(t.stage,index+1,theme+' / '+character+' stopped at '+p.x+' feet '+(p.y+p.h)+' fire '+t.run.guideX+' lamps '+lastLit+' deaths '+deaths);
     assert.equal(lastLit,room.wicks.length);
+    assert.equal(deaths,0,theme+' / '+character+' / '+mode+' survived the full route');
     const kills=ordinary.filter(e=>e.dead).length;
     console.log(theme, character, mode, (frames/60).toFixed(1)+'s', ((frames-storyFrames-rewardFrames)/60).toFixed(1)+'s action', (storyFrames/60).toFixed(1)+'s dialogue', (rewardFrames/60).toFixed(1)+'s chest', kills+'/'+ordinary.length+' ordinary enemies', deaths+' deaths');
     if(combat){
@@ -109,6 +110,12 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
   }
 
   const oldExits = {prison:6000, sewers:6380, ramparts:6590, ossuary:6290, tower:6360};
+  // Published v8 starting fires, raised bridge lamps, easternmost fires and exits.
+  const v8Wicks={
+    prison:[900,1550,6855,7840,8470,8940],sewers:[1060,4730,5830,8440,9700],
+    ramparts:[1130,4690,5620,8218,9710,10200],ossuary:[990,4940,5320,5700,8500,9790,10260,10520],
+    tower:[980,4860,5600,6620,9196,10770]
+  };
   for (const [theme, oldExit] of Object.entries(oldExits)) {
     const index = stageOf(theme), room = t.STAGES[index];
     assert(room.exit >= t.STAGES[0].exit, 'first map is the shortest');
@@ -145,7 +152,7 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
       assert.equal(fog.length, Math.ceil(room.w/100));
       assert(fog[0] && fog[fog.length-1] && !fog[Math.floor(fog.length/2)]);
       const persisted = JSON.parse(storage[key]);
-      assert.equal(persisted.v, 8);
+      assert.equal(persisted.v, 9);
       const oldWicks=room.compactChecks.concat(room.compactExit);
       const next=oldWicks.filter(x=>x<=previousGuide+.5).length;
       assert.equal(persisted.run.litWicks,next===oldWicks.length?room.wicks.length:room.wicks.findIndex(w=>w.oldIndex===next));
@@ -177,8 +184,38 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
         assert.equal(t.run.doorLift,0);
         if(room.wicks[t.run.litWicks].sentry)assert.equal(t.run.wardParty[0],0);
       }
+
+      const oldFires=v8Wicks[theme];
+      for(let n=0;n<=oldFires.length;n++){
+        const old=JSON.parse(JSON.stringify(save));
+        old.v=8;
+        const last=Math.min(n,oldFires.length-1)-1;
+        old.checkX=last<0?null:oldFires[last];
+        old.run.guideX=old.checkX||120;
+        old.run.litWicks=n;
+        old.run.wardParty=[0];
+        for(const [other,fires] of Object.entries(v8Wicks)){
+          const fog=Array(Math.ceil((fires[fires.length-1]+180)/100)).fill(0);
+          fog[Math.floor(fires[1]/100)]=fog[fog.length-1]=1;
+          old.run.seen['s'+stageOf(other)]=fog;
+        }
+        old.run.found['bridge'+index]=n>room.roadBridge.wickIndex;
+        storage[key]=JSON.stringify(old);
+        t.showMenu();t.continueRun(selected);
+        assert.equal(t.run.litWicks,n);
+        assert.equal(t.player.checkX,last<0?null:room.wicks[last].x);
+        if(last===room.roadBridge.wickIndex)assert.equal(t.player.y+t.player.h,room.roadLamp.y);
+        assert.equal(t.run.doorLift,n===oldFires.length?1:0);
+        assert.equal(t.run.shortcut,theme==='ramparts');
+        assert.equal(!!t.flags.roadBridge,n>room.roadBridge.wickIndex);
+        for(const other of Object.keys(v8Wicks)){
+          const otherIndex=stageOf(other),otherRoom=t.STAGES[otherIndex],fog=t.run.seen['s'+otherIndex];
+          assert.equal(fog.length,Math.ceil(otherRoom.w/100));
+          assert(fog[Math.floor(otherRoom.wicks[1].x/100)]&&fog[fog.length-1]&&!fog[0]);
+        }
+      }
     }
-    console.log(theme, 'v2, v3 and v6 journey and selected-route saves migrated');
+    console.log(theme, 'v2, v3, v6 and v8 journey and selected-route saves migrated');
   }
 };
 

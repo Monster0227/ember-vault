@@ -10,7 +10,7 @@ const bootstrap=harness.replace('window.test={','window.test={armPose,drawHero,d
 const hooks=`
 const t=sandbox.test;
 const pen=nodes.world.getContext('2d');
-let matrix=[1,0,0,1], stack=[], bodies=0, bowAngle=null;
+let matrix=[1,0,0,1], stack=[], bodies=0, bowAngle=null, bladeAngle=null;
 pen.save=()=>stack.push(matrix.slice());
 pen.restore=()=>{matrix=stack.pop();};
 pen.rotate=a=>{
@@ -20,9 +20,10 @@ pen.rotate=a=>{
 pen.scale=(x,y)=>{matrix=[matrix[0]*x,matrix[1]*x,matrix[2]*y,matrix[3]*y];};
 const equal=(a,b,label)=>assert(Math.abs(a-b)<1e-7,label+': '+a+' vs '+b);
 sandbox.readPose=(kind,angle)=>{
-  if(kind==='bow'){
+  if(kind==='bow'||kind==='blade'){
     const c=Math.cos(angle),s=Math.sin(angle);
-    bowAngle=Math.atan2(matrix[1]*c+matrix[3]*s,matrix[0]*c+matrix[2]*s);
+    const worldAngle=Math.atan2(matrix[1]*c+matrix[3]*s,matrix[0]*c+matrix[2]*s);
+    if(kind==='bow')bowAngle=worldAngle;else bladeAngle=worldAngle;
     return;
   }
   equal(Math.hypot(matrix[0],matrix[1]),Math.hypot(matrix[2],matrix[3]),kind+' keeps rigid proportions');
@@ -49,20 +50,27 @@ for(const ch of ['lamp','bell','bow']){
       const aim=facing>0?-.48:-Math.PI+.48;
       Object.assign(p,normal,{charge:.42,chargeMax:.45,bowAngle:aim});bowAngle=null;t.drawHero();
       equal(bowAngle,aim,'visible arrow follows its launch angle');
+      for(const [slash,ground] of [['up',true],['down',true],['down',false]]){
+        Object.assign(p,normal,{attack:t.CHARS.bow.swing*.5,slash,ground,bowRecoil:.05});
+        bowAngle=null;bladeAngle=null;t.drawHero();
+        assert.equal(bowAngle,null,'the bow is put away during a cut');assert.notEqual(bladeAngle,null);
+        assert((slash==='up'?-1:1)*Math.sin(bladeAngle)>.55,'blade points toward the attack');
+        if(slash==='down'&&ground)assert(facing*Math.cos(bladeAngle)>.34,'ground cut reaches forward');
+      }
     }
   }
 }
 t.loadStage(0);const guard=t.enemies.find(e=>e.type==='guard');
 for(const dir of [-1,0,1]){Object.assign(guard,{hitT:.18,hitDir:dir});const count=bodies;t.drawEnemy(guard);assert(bodies>count);}
-assert.equal(stack.length,0);console.log('PASS fixed limb lengths, rigid hero and guard poses, and charged bow alignment');
+assert.equal(stack.length,0);console.log('PASS fixed limb lengths, rigid hero and guard poses, bow aim and three directional blade poses');
 `;
 
 // Observe the transforms before model-local art, including reflections facing left.
 const audit=bootstrap.replace('vm.runInNewContext(code,sandbox);',`
-  for(const [name,probe] of [['drawGhost','ghost'],['ghostBall','roll'],['drawStoryGuard','guard'],['bowW','bow']]){
+  for(const [name,probe] of [['drawGhost','ghost'],['ghostBall','roll'],['drawStoryGuard','guard'],['bowW','bow'],['nail','blade']]){
     const header=new RegExp('function '+name+'\\\\([^)]*\\\\)\\\\{');
     assert(header.test(code),'missing model '+name);
-    code=code.replace(header,match=>match+'window.readPose?.("'+probe+'"'+(probe==='bow'?',a':'')+');');
+    code=code.replace(header,match=>match+'window.readPose?.("'+probe+'"'+(['bow','blade'].includes(probe)?',a':'')+');');
   }
   vm.runInNewContext(code,sandbox);
 `);

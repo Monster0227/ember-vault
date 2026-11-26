@@ -50,7 +50,7 @@ sandbox.window=sandbox;
 sandbox.matchMedia=() => ({matches:false});
 let code=fs.readFileSync(require('path').join(__dirname,'../dist/js/ember.js'),'utf8');
 // Instrument only this VM instance; no test controls are shipped in the browser.
-code=code.replace(/\}\)\(\);\s*$/, 'window.test={SCENES,drawStory,ashSignal,step,action,selectLevel,renderChapters,showWinPanel,hurt,strike,hitEnemy,killEnemy,startChapter,finish,reset,respawn,loadStage,retryStage,STAGES,TALK,get bag(){return bag},get relics(){return relics},get keepsakes(){return keepsakes},get sel(){return sel},set sel(v){sel=v},get offers(){return offers},get flags(){return flags},get run(){return run},get codex(){return codex},get thrown(){return thrown},get breakables(){return breakables},get hazards(){return hazards},get loot(){return loot},get floats(){return floats},get gateK(){return gateK},get talk(){return talk},set introSeen(v){introSeen=v},get player(){return p},get enemies(){return enemies},get shots(){return shots},get waves(){return waves},get orbs(){return orbs},get fx(){return fx},get chunks(){return chunks},get platforms(){return platforms},get chests(){return chests},get state(){return state},get score(){return score},get stage(){return stage},get unlocked(){return unlocked},set unlocked(v){unlocked=v},get L(){return L},get embers(){return embers},set embers(v){embers=v},get checkpoint(){return checkpoint},get credits(){return credits},get sceneArt(){return sceneA},get cine(){return cine},get traps(){return traps},get clears(){return clears},set clears(v){clears=v},get cycle(){return cycle},set cycle(v){cycle=v},useSkill,get secrets(){return secrets},hasMap,parseLine,relicPool,gainShard,gainBlueprint,startTutorial,finishTutorial,TUTORIAL,CHARS,SKILLS,showMenu,startJourney,continueRun,finishRebind,SONGS,get settings(){return settings},get BIND(){return BIND},set rebinding(v){rebinding=v},get cam(){return cam},set cam(v){cam=v}};})();');
+code=code.replace(/\}\)\(\);\s*$/, 'window.test={bounds,SCENES,drawStory,ashSignal,step,action,selectLevel,renderChapters,showWinPanel,hurt,strike,hitEnemy,killEnemy,startChapter,finish,reset,respawn,loadStage,retryStage,STAGES,TALK,get bag(){return bag},get relics(){return relics},get keepsakes(){return keepsakes},get sel(){return sel},set sel(v){sel=v},get offers(){return offers},get flags(){return flags},get run(){return run},get codex(){return codex},get thrown(){return thrown},get breakables(){return breakables},get hazards(){return hazards},get loot(){return loot},get floats(){return floats},get gateK(){return gateK},get talk(){return talk},set introSeen(v){introSeen=v},get player(){return p},get enemies(){return enemies},get shots(){return shots},get waves(){return waves},get orbs(){return orbs},get fx(){return fx},get chunks(){return chunks},get platforms(){return platforms},get chests(){return chests},get state(){return state},get score(){return score},get stage(){return stage},get unlocked(){return unlocked},set unlocked(v){unlocked=v},get L(){return L},get embers(){return embers},set embers(v){embers=v},get checkpoint(){return checkpoint},get credits(){return credits},get sceneArt(){return sceneA},get cine(){return cine},get traps(){return traps},get clears(){return clears},set clears(v){clears=v},get cycle(){return cycle},set cycle(v){cycle=v},useSkill,get secrets(){return secrets},hasMap,parseLine,relicPool,gainShard,gainBlueprint,startTutorial,finishTutorial,TUTORIAL,CHARS,SKILLS,showMenu,startJourney,continueRun,finishRebind,SONGS,get settings(){return settings},get BIND(){return BIND},set rebinding(v){rebinding=v},get cam(){return cam},set cam(v){cam=v}};})();');
 vm.runInNewContext(code,sandbox);
 const t=sandbox.test;
 function advance(seconds) { for(let i=0;i<Math.ceil(seconds*120);i++)t.step(1/120); }
@@ -176,7 +176,7 @@ test('basic bow shots chip an approaching patrol shutter, flank it or hit the br
     assert.equal(t.run.wardParty[0],e.hp);
   }
 });
-test('a bow aims above or below, keeps the released trajectory, and still accepts an explicit up shot',()=>{
+test('a bow aims above or below and keeps the released trajectory',()=>{
   for(const vertical of [-1,1]){
     const {p,guards:[e]}=aimPractice('bow',[175]);
     if(vertical<0){e.floor=403;e.y=e.floor-e.h;}
@@ -190,12 +190,24 @@ test('a bow aims above or below, keeps the released trajectory, and still accept
   const a=t.thrown.find(o=>o.k==='arrow'),vx=a.vx,vy=a.vy;
   e.floor=275;e.y=e.floor-e.h;advance(.25);
   assert.equal(a.vx,vx);assert.equal(a.vy,vy);assert.equal(e.hp,e.max,'moving away after release dodges the arrow');
-  press('KeyW');press('KeyJ');advance(.04);release('KeyJ');t.step(1/120);release('KeyW');
-  const up=t.thrown[t.thrown.length-1];assert.equal(up.vx,0);assert(up.vy<0);
-  assert.equal(p.slash,'up');
-  const drop=aimPractice('bow',[0]);drop.p.y-=46;drop.p.ground=false;press('KeyS');press('KeyJ');
-  assert.equal(drop.p.slash,'down');advance(.10);release('KeyJ');release('KeyS');
-  assert(drop.guards[0].hp<drop.guards[0].max);assert(drop.p.vy<0,'stomp bounces even with auto-aim');assert.equal(t.thrown.length,0);
+});
+test('an archer uses the blade above, below and low in front, even with a ranged target available',()=>{
+  for(const [key,offset,elevation,air] of [['KeyW',-12,72,false],['KeyS',-37,0,false],['KeyS',0,0,true]]){
+    const {p,guards:[close,far]}=aimPractice('bow',[offset,180]);
+    if(air){p.y-=62;p.ground=false;}
+    close.y-=elevation;close.floor-=elevation;
+    press(key);press('KeyJ');release('KeyJ');release(key);
+    assert.equal(p.slash,key==='KeyW'?'up':'down');assert(p.attack>0&&!p.charge);
+    assert.strictEqual(p.aimTarget,close);if(offset<0)assert.equal(p.atkFace,-1);
+    advance(.04);assert.equal(close.hp,close.max,'windup cannot hit');
+    advance(.065);assert.equal(close.max-close.hp,p.damage,'blade connects once in its active window');
+    assert.equal(p.pogo,air);if(air)assert(p.vy<0,'airborne down slash rebounds');else assert(p.ground);
+    advance(.20);assert.equal(close.max-close.hp,p.damage);assert.equal(far.hp,far.max);
+    assert(!t.thrown.some(a=>a.k==='arrow'));
+  }
+  const {p,guards:[far]}=aimPractice('bow',[140]);press('KeyW');press('KeyJ');release('KeyJ');release('KeyW');
+  assert.strictEqual(p.aimTarget,null,'a vertical knife cannot lock across the room');
+  advance(.23);assert.equal(far.hp,far.max);assert(!t.thrown.some(a=>a.k==='arrow'));
   t.reset(true,'lamp');
 });
 test('roll immunity, cooldown and damage recovery',()=>{
@@ -371,6 +383,15 @@ test('four chapters contain five maps, four dedicated boss arenas and four wayst
     const ground=map.ens.filter(([,y,type])=>y===480&&!['flyer','hanger'].includes(type));
     assert(ground.length>map.ens.length/2,map.name+' has mostly grounded encounters');
     assert(map.ens.every(([x])=>x>=500),map.name+' has an open approach');
+    const encounters=[120,...map.ens.map(e=>e[0]).sort((a,b)=>a-b),map.exit];
+    assert(map.exit-120<=7500,map.name+' keeps a compact main route');
+    assert(encounters.slice(1).every((x,i)=>x-encounters[i]<=725),map.name+' keeps the next encounter close');
+    t.loadStage(t.STAGES.indexOf(map));
+    for(const e of t.enemies.filter(e=>['crawler','lurker'].includes(e.type))){
+      const [left,right]=t.bounds(e),aimY=e.y+e.h*.48;
+      assert(!t.platforms.some(a=>!a.off&&a.y<=aimY&&aimY<a.y+a.h&&a.x<=right+e.w/2&&a.x+a.w>left+e.w/2),
+        map.name+' low patrol stays visible and targetable along its entire ledge');
+    }
     assert(map.wicks.filter(w=>w.sentry).length<=2,map.name+' uses individual sentries sparingly');
     assert(map.wicks.filter(w=>w.y===480&&!w.sentry).length>=Math.ceil(map.wicks.length/2));
     for(const [start] of map.ens)assert(map.ens.filter(([x])=>x>=start&&x<start+550).length<=3);
@@ -1047,7 +1068,9 @@ test('every boss leaves a lantern shard behind',()=>{
 test('a fatal moth dive names the attack in the result panel',()=>{
   const f=t.enemies.find(e=>e.type==='flyer');
   t.enemies.forEach(e=>{if(e!==f)e.dead=true;});
-  t.player.x=f.origin-150;t.player.hp=20;t.cam=f.origin-500;
+  // Reproduce the dive over the flat starting floor, away from pits on the route.
+  Object.assign(f,{x:350,origin:350,hx:350,floor:480,y:310});
+  Object.assign(t.player,{x:200,y:480-t.player.h,hp:20,inv:0});t.cam=0;
   advance(.05);f.cd=0;advance(1.5);
   assert.equal(t.state,'dead');assert(nodes.panel.innerHTML.includes('被囚灯蛾俯冲击中'));
 });
