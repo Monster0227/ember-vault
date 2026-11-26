@@ -41,11 +41,12 @@ function sweepAABB(b,dx,dy,t,out){out.time=1;out.nx=0;out.ny=0;if((dx<=0&&b.x+b.
 class Physics {
   constructor(){this.hit={time:1,nx:0,ny:0};this.box={x:0,y:0,w:0,h:0};this.landed=null;}
   limitGroundRoll(p,dx,platforms){
-    // Follow shallow steps, but keep the centre of a grounded roll over a reachable surface.
+    // A lower landing also supports a roll. Only brake over an open drop.
     const centre=p.x+p.w/2,feet=p.y+p.h;
     let edge=centre;
     for(const a of platforms){
-      if(a.off||a===p.drop||a.y<feet-16||a.y>feet+32)continue;
+      const stepUp=a.solid||a.groundBlock?16:.01;
+      if(a.off||a===p.drop||a.y<feet-stepUp)continue;
       if(dx>0&&a.x<=p.x+p.w&&a.x+a.w>centre)edge=Math.max(edge,a.x+a.w-2);
       if(dx<0&&a.x+a.w>=p.x&&a.x<centre)edge=Math.min(edge,a.x+2);
     }
@@ -519,7 +520,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     chests:[],spikes:[[2140,9]],acid:[],gaps:[],caches:[2880],traps:[{k:'spout',x:2600,per:2.6,ph:0,h:170,fire:true}],
     signs:[{x:250,keys:['left','right'],t:()=>(coarse()?'左右推摇杆移动':K('left')+' / '+K('right')+' 左右移动')+'。这里的药瓶、道具和魂火用不完。'},
       {x:560,keys:['jump'],t:()=>(coarse()?'点「跳跃」':'按 '+K('jump')+' 起跳')+'。'+(p.char==='lamp'?'空中再按一次可以二段跳。':'按得越久，跳得越高。')},
-      {x:1330,keys:['down','jump'],t:()=>(coarse()?'摇杆向下推住，同时点「跳跃」':'按住 '+K('down')+' 再按 '+K('jump'))+'，就能穿过脚下的悬空平台。'},
+      {x:1330,keys:['down','jump'],t:()=>coarse()?'向下推住摇杆，点「跳跃」穿过木台。下面能落脚时，也可以向下翻滚。':'按住 '+K('down')+'，按 '+K('jump')+' 穿过木台。下面能落脚时，也可按 '+K('roll')+' 向下翻滚。'},
       {x:1530,keys:['attack'],t:()=>p.char==='bow'
         ?'按住'+(coarse()?'「攻击」':' '+K('attack')+' ')+'拉弓，松手放箭，蓄满能穿透。'+(coarse()?'摇杆朝上或朝下时点攻击':'按住上或下再攻击')+'会挥刀，空中下劈命中能弹起。'
         :'靠近有标记的木桩，'+(coarse()?'点「攻击」出招。上推摇杆可上挑，空中下推可下劈。':'按 '+K('attack')+' 出招。按住 '+K('up')+' 可上挑，空中按住 '+K('down')+' 可下劈。')},
@@ -1392,7 +1393,25 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   }
   function inArea(A,x0,y0,x1,y1){const dx=(clamp(A.x,x0,x1)-A.x)/A.rx,dy=(clamp(A.y,y0,y1)-A.y)/A.ry;return dx*dx+dy*dy<=1;}
   // 翻滚：朝按住的方向滚（没按就朝面向），先快后慢，全程无敌；画面上缩成一团正好转一圈
-  function roll(){if(p.rollCd>0)return;p.aimTarget=null;p.aimReady=false;p.charge=0;p.bowRecoil=0;p.perfect=false;p.face=p.nextRollDir;p.rollFromGround=p.ground;p.roll=ROLL;p.rollDir=p.face;p.rollCd=(relics.feather?.48:FEEL.dodgeCd)*(1-p.skills.dash*.13);p.inv=Math.max(p.inv,FEEL.dodge);p.attack=0;p.trail=[];p.trailT=0;dust(p.x+13,p.y+p.h,6,-(p.rollDir||p.face));beep(190,.1);}
+  function deckUnderfoot(){
+    return platforms.find(a=>!a.solid&&!a.groundBlock&&!a.off&&Math.abs(p.y+p.h-a.y)<3&&p.x+p.w>a.x+2&&p.x<a.x+a.w-2);
+  }
+  function dropThroughDeck(deck){
+    p.drop=deck;p.y+=3;p.vy=65;p.jumpRising=false;p.ground=false;p.coyote=0;p.jumps=1;p.buffer=0;p.on=null;
+  }
+  function roll(){
+    if(p.rollCd>0)return;
+    p.aimTarget=null;p.aimReady=false;p.charge=0;p.bowRecoil=0;p.perfect=false;
+    p.face=p.nextRollDir;p.rollFromGround=p.ground;p.roll=ROLL;p.rollDir=p.face;
+    p.rollCd=(relics.feather?.48:FEEL.dodgeCd)*(1-p.skills.dash*.13);
+    p.inv=Math.max(p.inv,FEEL.dodge);p.attack=0;p.trail=[];p.trailT=0;
+    const downRoll=(isKey('down')&&!isKey('up'))||(stick.y>.5&&stick.y>=Math.abs(stick.x));
+    if(p.ground&&downRoll){
+      const deck=deckUnderfoot(),centre=p.x+p.w/2;
+      if(deck&&platforms.some(a=>!a.off&&a.y>deck.y+3&&centre>=a.x&&centre<a.x+a.w))dropThroughDeck(deck);
+    }
+    dust(p.x+13,p.y+p.h,6,-p.rollDir);beep(190,.1);
+  }
   const picks={Digit1:0,Digit2:1,Digit3:2,Numpad1:0,Numpad2:1,Numpad3:2},buys=Object.assign({Digit4:3,Numpad4:3,Digit5:4,Numpad5:4,Digit6:5,Numpad6:5,Digit7:6,Numpad7:6},picks);
   // 按键都查 BIND（设置里可以改）；改键时下一个按下的键直接记下来
   addEventListener('keydown',e=>{unlockAudio();const act=codeAct[e.code];
@@ -2658,8 +2677,8 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     p.trail.forEach(t=>t.life-=dt);p.trail=p.trail.filter(t=>t.life>0);if(p.dtrail){p.dtrail.forEach(t=>t.life-=dt);p.dtrail=p.dtrail.filter(t=>t.life>0);}
     if(p.charge>0){aimAttack(p.slash,p.combo,p.face);if(isKey('attack')||down('attack')){p.charge=Math.min(p.chargeMax||.45,p.charge+dt);if(p.charge>=(p.chargeMax||.45)-.001)fireCharge(true);}else fireCharge(false);}
     else if(down('attack')||isKey('attack'))attack();
-    p.castCd=Math.max(0,p.castCd-dt);const stand=p.ground&&D.d&&platforms.find(a=>!a.solid&&!a.off&&a.h<100&&Math.abs(p.y+p.h-a.y)<3&&p.x+p.w>a.x+2&&p.x<a.x+a.w-2);
-    if(p.buffer>0&&stand){p.drop=stand;p.y+=3;p.vy=65;p.jumpRising=false;p.ground=false;p.coyote=0;p.jumps=1;p.buffer=0;p.on=null;dust(p.x+13,p.y+p.h,4,0);}
+    p.castCd=Math.max(0,p.castCd-dt);const stand=p.buffer>0&&p.ground&&D.d&&deckUnderfoot();
+    if(stand){dropThroughDeck(stand);p.rollFromGround=false;dust(p.x+13,p.y+p.h,4,0);}
     else if(p.buffer>0&&(p.coyote>0||(p.char==='lamp'&&p.jumps<2))){p.vy=p.cutQueued?-230:-FEEL.jumpSpeed-p.skills.spring*30;p.jumps=p.coyote>0?1:2;p.jumpRising=!p.cutQueued;p.cutQueued=false;p.ground=false;p.coyote=0;p.buffer=0;p.on=null;if(p.jumps>1)burst(p.x+13,p.y+44,'#9fe0d4',8);else dust(p.x+13,p.y+p.h,5,0);beep(340,.07);}
     const was=p.ground,fall=p.vy;
     if(p.drop&&p.y>=p.drop.y)p.drop=null;if(p.dash>0)p.vy=0;else p.vy+=(p.vy>40?FEEL.grav*FEEL.fall:FEEL.grav)*dt;
@@ -2670,7 +2689,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       travel+=(rope[0]-8-p.x)*Math.min(1,dt*10);
     }
     if(p.rollFromGround){
-      if(p.vy<0||p.drop||p.dash>0||(!wasRolling&&(l||r||!travel)))p.rollFromGround=false;
+      if(p.vy<0||rope||p.dash>0||(!wasRolling&&(l||r||!travel)))p.rollFromGround=false;
       else {
         const safe=physics.limitGroundRoll(p,travel,platforms);
         if(safe!==travel){travel=safe;p.vx=0;p.kickX=0;}
@@ -2678,6 +2697,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     }
     physics.move(p,travel,p.vy*dt,platforms,FLOOR,rope&&D.d?rope[2]:undefined);p.x=clamp(p.x,12,WORLD-45);lessonTick();guideTick(dt);p.on=null;
     if(p.kickX){p.kickX*=Math.pow(.0001,dt);if(Math.abs(p.kickX)<4)p.kickX=0;}
+    if(p.drop&&physics.landed)p.drop=null;
     const landed=physics.landed;if(landed){p.jumpRising=false;const a=landed;if(a.mv||a.cr)p.on=a;if(a.cr&&!a.cr.st){a.cr.st=1;a.cr.t=.5;beep(220,.05,'square',.02);}if(a.w>=120&&!a.mv&&!a.cr){p.safeX=clamp(p.x,a.x+40,a.x+a.w-p.w-40);p.safeY=a.y-p.h;}if(!rope)springPad();}
     const headroom=Math.min(128,H*.22),screenY=p.y-viewY;
     const cameraTarget=Math.min(verticalBase,viewY+screenY-clamp(screenY,headroom,headroom+75));
@@ -3599,6 +3619,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     for(let i=0;i<turns;i++){shape(()=>ctx.ellipse(2,-7-i*1.08,4,1.3,-.14,0,TAU),null,'#cc7566',1);}
     shape(()=>{ctx.moveTo(5,-7);ctx.quadraticCurveTo(10,-4+Math.sin(t*1.7),used?8:15,-1);},null,'#c37568',1);ctx.restore();
   }
+  const stallPositions={soup:[37,-70,20],flask:[64,-70,20],frost:[91,-70,20],bomb:[24,-46,19],knife:[47,-47,22],relic:[75,-47,22],whetstone:[99,-46,20]};
   function merchant(x){
     ctx.save();ctx.translate(x,FLOOR);
     oval(55,0,81,4,'rgba(12,9,7,.35)');
@@ -3609,7 +3630,6 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     // A rear shelf keeps the wares legible above the cloth, even beside the player.
     poly([22,-61,107,-61,113,-65,28,-65],'#a38460',OL,1);
     box(22,-60,85,4,'#60503e');
-    ['soup','flask','frost'].forEach((id,i)=>drawArt(id,37+i*27,-70,20));
     for(const foot of [14,107]){
       poly([foot,-34,foot+7,-34,foot+6,-1,foot,-1],'#68503a',OL,1);
       box(foot,-5,6,3,'#a1845a');
@@ -3620,9 +3640,12 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     box(10,-35,100,6,'#654934');
     poly([23,-35,72,-35,70,-16,45,-12,23,-16],'#813f3a',OL,1.2);
     line([25,-18,45,-15,68,-19],1.4,'#c1a775');
-    drawArt('bomb',24,-46,19);drawArt('knife',47,-47,22);
-    if(!flags.sold)drawArt(shopRelic||'whetstone',75,-47,22);
-    if(!flags.sharpened)drawArt('whetstone',99,-46,20);
+    for(const offer of SHOP){
+      const reason=unavailable(offer);
+      if(reason==='本站售罄')continue;
+      const [sx,sy,size]=stallPositions[offer.id];
+      drawArt(goodArt(offer),sx,sy,size,reason ? .34 : 1);
+    }
     const sway=Math.sin(time*1.3)*1.2;
     for(let i=0;i<6;i++){
       const back=10+i*18.7,front=i*22;

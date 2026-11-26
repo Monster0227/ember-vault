@@ -41,11 +41,12 @@ function sweepAABB(b,dx,dy,t,out){out.time=1;out.nx=0;out.ny=0;if((dx<=0&&b.x+b.
 class Physics {
   constructor(){this.hit={time:1,nx:0,ny:0};this.box={x:0,y:0,w:0,h:0};this.landed=null;}
   limitGroundRoll(p,dx,platforms){
-    // Follow shallow steps, but keep the centre of a grounded roll over a reachable surface.
+    // A lower landing also supports a roll. Only brake over an open drop.
     const centre=p.x+p.w/2,feet=p.y+p.h;
     let edge=centre;
     for(const a of platforms){
-      if(a.off||a===p.drop||a.y<feet-16||a.y>feet+32)continue;
+      const stepUp=a.solid||a.groundBlock?16:.01;
+      if(a.off||a===p.drop||a.y<feet-stepUp)continue;
       if(dx>0&&a.x<=p.x+p.w&&a.x+a.w>centre)edge=Math.max(edge,a.x+a.w-2);
       if(dx<0&&a.x+a.w>=p.x&&a.x<centre)edge=Math.min(edge,a.x+2);
     }

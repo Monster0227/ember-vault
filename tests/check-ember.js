@@ -670,7 +670,29 @@ test('raised terrain blocks walking through its side and can be jumped onto',()=
 test('enemies and caches start outside the new solid terrain',()=>{
   for(const i of ['prison','sewers','ramparts','ossuary','tower'].map(stageOf)){t.loadStage(i);for(const e of t.enemies)for(const a of t.platforms.filter(q=>q.solid))assert(!(e.floor>a.y&&e.origin+e.w>a.x&&e.origin<a.x+a.w),t.L.name+' enemy starts inside a solid');for(const b of t.breakables)for(const a of t.platforms.filter(q=>q.solid))assert(!(b.x>a.x-13&&b.x<a.x+a.w+13),t.L.name+' urn starts inside a solid');}
 });
-test('ground rolls stop at exposed banks and platform ends in both directions; a jump can leave them',()=>{
+test('ground rolls leave a raised platform in either direction when there is a floor below',()=>{
+  for(const hero of ['lamp','bell','bow'])for(const direction of [-1,1]){
+    t.reset(true,hero);t.enemies.forEach(e=>e.dead=true);
+    const p=t.player,deck={x:1900,y:370,w:190,h:22},floor={x:1550,y:480,w:900,h:160,groundBlock:true};
+    t.platforms.splice(0,t.platforms.length,deck,floor);
+    const x=direction>0?2045:1915;
+    Object.assign(p,{x,y:deck.y-p.h,face:direction,ground:true});t.action('roll');advance(.75);
+    assert((p.x-x)*direction>95);assert(p.ground&&Math.abs(p.y+p.h-floor.y)<.01);
+    const key=direction>0?'KeyD':'KeyA',landedX=p.x;
+    press(key);advance(.22);release(key);assert((p.x-landedX)*direction>15);
+  }
+});
+test('a downward roll drops through only the top deck and keeps its footing over a void',()=>{
+  for(const below of [true,false]){
+    t.reset();t.enemies.forEach(e=>e.dead=true);
+    const p=t.player,top={x:1600,y:370,w:750,h:22},lower={...top,y:404,off:!below};
+    t.platforms.splice(0,t.platforms.length,top,lower);
+    Object.assign(p,{x:1840,y:top.y-p.h,ground:true,face:1});
+    press('KeyS');t.action('roll');advance(.7);release('KeyS');
+    assert(p.ground);assert.equal(Math.round(p.y+p.h),below?404:370);assert.equal(p.drop,null);
+  }
+});
+test('ground rolls stop at exposed banks and unsupported platform ends in both directions; a jump can leave them',()=>{
   for(const hero of ['lamp','bell','bow'])for(const direction of [-1,1]){
     for(const raised of [false,true]){
       t.reset(true,hero);t.enemies.forEach(e=>e.dead=true);
