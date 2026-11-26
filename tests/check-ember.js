@@ -583,6 +583,33 @@ test('new relics reward soul casting, healthy swordplay and repeated kills',()=>
   t.reset();t.relics.hunter=true;const e=t.enemies[0];e.hp=100;e.cd=99;t.player.x=e.x-45;t.player.inv=100;t.action('attack');advance(.12);assert.equal(e.hp,100-Math.round(t.player.damage*1.3));
   t.reset();t.relics.salvager=true;for(const foe of t.enemies.slice(0,4))t.killEnemy(foe);assert.equal(t.bag.bomb,1);
 });
+test('climbing through the prison chest platform leaves its spring for ordinary landings',()=>{
+  const p=t.player,chest=t.chests[2];
+  const [ropeX]=t.L.climbs[0],[padX,padY,padWidth]=t.L.springs[0];
+  assert.equal(chest.y,padY);
+  assert(ropeX>=padX&&ropeX<=padX+padWidth,'the ladder meets the spring beside the chest');
+  const floor=t.platforms.find(a=>a.groundBlock&&a.x<=ropeX&&ropeX<a.x+a.w);
+  const feet=()=>p.y+p.h;
+  Object.assign(p,{x:ropeX-p.w/2,y:padY-p.h-18,vy:0,ground:false,inv:10});
+
+  press('KeyS');advance(.45);
+  assert(feet()>padY+15&&p.vy>0,'down climbs through the spring platform');
+  advance(2);release('KeyS');
+  assert.equal(feet(),floor.y);assert(p.ground,'the solid floor catches the player');
+
+  press('KeyW');
+  for(let frame=0;frame<180&&feet()>padY-28;frame++)t.step(1/60);
+  release('KeyW');
+  assert(feet()<=padY-28&&p.vy<0,'up climbs back past the same platform');
+  let falling=false,bounced=false;
+  for(let frame=0;frame<120&&!bounced;frame++){
+    t.step(1/60);
+    if(p.vy>0)falling=true;
+    if(falling&&p.vy<0&&Math.abs(feet()-padY)<1)bounced=true;
+  }
+  assert(bounced,'after letting go the next ordinary landing triggers the spring');
+  advance(.12);assert(feet()<padY-55,'the player rises clear of the spring');
+});
 test('down plus jump drops through only the current suspended platform',()=>{
   t.player.x=520;t.player.y=318;t.player.vy=0;t.player.ground=true;t.player.jumps=0;t.platforms.push({x:460,y:420,w:170,h:22});press('KeyS');press('Space');advance(.3);release('Space');release('KeyS');assert.equal(t.player.y,420-t.player.h);assert(t.player.ground,'landed on the lower platform');
 });
