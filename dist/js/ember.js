@@ -104,14 +104,35 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   let codex={seen:{},kills:{},items:{},lore:{},blue:{}};   // 图鉴跨局保存
   const stick={x:0,y:0};   // 触屏摇杆，-1~1
   // ---- 设置（存在 ember:settings）：音乐 / 音效音量、特效、震屏、伤害数字、文字速度、自动播放对话、按键 ----
-  const DEFAULT_KEYS={left:['KeyA','ArrowLeft'],right:['KeyD','ArrowRight'],up:['KeyW','ArrowUp'],down:['KeyS','ArrowDown'],jump:['Space'],attack:['KeyJ'],roll:['KeyK','ShiftLeft'],skill1:['Digit1','Numpad1'],skill2:['Digit2','Numpad2'],skill3:['Digit3','Numpad3'],heal:['KeyL'],use:['KeyU'],cycle:['KeyQ'],interact:['KeyE'],bag:['KeyB'],map:['KeyM','Tab']};
+  const DEFAULT_KEYS={left:['KeyA','ArrowLeft'],right:['KeyD','ArrowRight'],up:['KeyW','ArrowUp'],down:['KeyS','ArrowDown'],jump:['Space'],attack:['KeyJ'],roll:['KeyK','ShiftLeft'],skill1:['Digit1','Numpad1'],skill2:['Digit2','Numpad2'],skill3:['Digit3','Numpad3'],heal:['KeyL'],use:['KeyU'],cycle:['KeyQ'],interact:['KeyE'],bag:['Tab','KeyB'],map:['KeyM']};
   const KEY_ORDER=['left','right','up','down','jump','attack','roll','skill1','skill2','skill3','heal','use','cycle','interact','bag','map'];
   const KEY_LABEL={left:'向左走',right:'向右走',up:'向上（上挑）',down:'向下（下劈 / 下落）',jump:'跳跃',attack:'攻击',roll:'翻滚',skill1:'技能一',skill2:'技能二',skill3:'技能三',heal:'治疗',use:'使用道具',cycle:'切换道具',interact:'交谈 / 开箱 / 查看',bag:'行囊',map:'地图'};
   let settings={vol:1,music:.7,sfx:.8,fx:'auto',shake:true,nums:true,textSpeed:1,subtitleAdvance:'auto',touch:'auto',minimap:true,buzz:true,touchA:1,touchX:0,touchY:0},BIND=JSON.parse(JSON.stringify(DEFAULT_KEYS)),codeAct={},rebinding=null;
-  function rebuildKeys(){codeAct={};KEY_ORDER.forEach(a=>(BIND[a]||[]).forEach(c=>{if(c&&!codeAct[c])codeAct[c]=a;}));}
-  try{const s=JSON.parse(localStorage.getItem('ember:settings')||'null');if(s){Object.keys(settings).forEach(k=>{if(s[k]!=null)settings[k]=s[k];});if(s.keys)KEY_ORDER.forEach(a=>{if(Array.isArray(s.keys[a])&&s.keys[a].length)BIND[a]=s.keys[a].slice(0,2);});}}catch(e){}
+  function rebuildKeys(){
+    codeAct={};KEY_ORDER.forEach(a=>(BIND[a]||[]).forEach(c=>{if(c&&!codeAct[c])codeAct[c]=a;}));
+    for(const [action,label] of [['bag','背包'],['map','地图']]){
+      const keys=BIND[action].map(keyName).join(' / ');
+      document.getElementById(action+'-btn').title=keys?label+'（'+keys+'）':label;
+    }
+  }
+  try{
+    const s=JSON.parse(localStorage.getItem('ember:settings')||'null');
+    if(s){
+      Object.keys(settings).forEach(k=>{if(s[k]!=null)settings[k]=s[k];});
+      if(s.keys){
+        const legacy=s.keyLayout==null;
+        if(legacy){BIND.bag=['KeyB'];BIND.map=['KeyM','Tab'];}
+        for(const a of KEY_ORDER)if(Array.isArray(s.keys[a]))BIND[a]=s.keys[a].slice(0,2);
+        // Former defaults put Tab in the map's secondary slot. Keep explicit rebindings.
+        if(legacy&&BIND.map[1]==='Tab'&&BIND.bag.length===1&&!KEY_ORDER.some(a=>a!=='map'&&BIND[a].includes('Tab'))){
+          BIND.map.pop();
+          if(BIND.bag[0]==='KeyB')BIND.bag.unshift('Tab');else BIND.bag.push('Tab');
+        }
+      }
+    }
+  }catch(e){}
   rebuildKeys();
-  function saveSettings(){try{localStorage.setItem('ember:settings',JSON.stringify(Object.assign({},settings,{keys:BIND})));}catch(e){}}
+  function saveSettings(){try{localStorage.setItem('ember:settings',JSON.stringify(Object.assign({},settings,{keyLayout:2,keys:BIND})));}catch(e){}}
   function isKey(a){const b=BIND[a];return !!(b&&(keys[b[0]]||(b[1]&&keys[b[1]])));}
   function keyName(c){if(!c)return '—';if(/^Key/.test(c))return c.slice(3);if(/^Digit/.test(c))return c.slice(5);if(/^Numpad\d/.test(c))return '小键盘'+c.slice(6);return {Space:'空格',ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',ShiftLeft:'Shift',ShiftRight:'右 Shift',ControlLeft:'Ctrl',ControlRight:'右 Ctrl',AltLeft:'Alt',AltRight:'右 Alt',Enter:'回车',Tab:'Tab',Backspace:'退格',Comma:',',Period:'.',Slash:'/',Semicolon:';',Quote:"'",BracketLeft:'[',BracketRight:']',Minus:'-',Equal:'=',Backquote:'`',Backslash:'\\'}[c]||c;}
   const K=a=>keyName((BIND[a]||[])[0]);   // 提示文字里显示玩家现在用的按键
@@ -1382,8 +1403,8 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(state==='cine'){if(!e.repeat&&cine&&(e.code==='Escape'||e.code==='Enter'))cine.skip=true;return;}
     if(state==='win'||state==='dead'){if(!e.repeat)menuKey(e);return;}
     if(state==='menu'||(paused&&panelView!=='pause')){if(!e.repeat)menuKey(e);return;}
-    if(state==='map'){if(!e.repeat){if(e.code==='Escape'||act==='map')closeMap();else if(e.code==='ArrowRight'||e.code==='ArrowLeft'||act==='right'||act==='left'){mapTab=mapTab==='area'?'world':'area';renderMap();}}return;}
-    if(state==='bag'){if(!e.repeat){const tabs=['bag','dex','lore'],i=tabs.indexOf(bagTab);if(e.code==='Escape'||act==='bag')closeBag();else if(e.code==='ArrowRight'||act==='right'){bagTab=tabs[(i+1)%3];renderBag();}else if(e.code==='ArrowLeft'||act==='left'){bagTab=tabs[(i+2)%3];renderBag();}}return;}
+    if(state==='map'){if(!e.repeat){if(e.code==='Escape'||act==='map')closeMap();else if(act==='bag'){closeMap();openBag();}else if(e.code==='ArrowRight'||e.code==='ArrowLeft'||act==='right'||act==='left'){mapTab=mapTab==='area'?'world':'area';renderMap();}}return;}
+    if(state==='bag'){if(!e.repeat){const tabs=['bag','dex','lore'],i=tabs.indexOf(bagTab);if(e.code==='Escape'||act==='bag')closeBag();else if(act==='map'){closeBag();openMap();}else if(e.code==='ArrowRight'||act==='right'){bagTab=tabs[(i+1)%3];renderBag();}else if(e.code==='ArrowLeft'||act==='left'){bagTab=tabs[(i+2)%3];renderBag();}}return;}
     if(state==='chest')return;
     if(state==='shop'){if(!e.repeat){if(buys[e.code]!=null)buy(SHOP[buys[e.code]].id);else if(e.code==='Escape'||act==='interact')closeShop();}return;}
     if(state==='upgrade'&&picks[e.code]!=null){if(!e.repeat)pickOffer(picks[e.code]);return;}
@@ -1425,7 +1446,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   ['pointerup','pointercancel','lostpointercapture'].forEach(n=>pad.addEventListener(n,e=>{if(e.pointerId===stickId)stickEnd();}));
   // Change screens on the completed tap so its release cannot activate a newly exposed menu button.
   document.getElementById('talk-skip').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();skipTalk();});talkBox.addEventListener('click',()=>talkNext());canvas.addEventListener('click',()=>{if(credits)endCredits();else if(talk)talkNext();});
-  document.getElementById('quick-item').onclick=()=>openBag('bag');
+  document.getElementById('quick-item').onclick=()=>openBag();
   document.getElementById('bag-btn').onclick=()=>{if(state==='bag')closeBag();else openBag();};
   {const mb=document.getElementById('map-btn');if(mb)mb.onclick=()=>{if(state==='map')closeMap();else openMap();};}
   document.getElementById('pause').onclick=togglePause;muteBtn.onclick=()=>setMuted(!muted);
@@ -2203,7 +2224,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   const ICONS={bomb:'<path d="M22 14h4l2 5c6 3 9 9 7 15-2 8-19 8-22 0-2-6 1-12 7-15z" fill="#d65b30"/><path d="M22 14v-4h5v4M26 10q1-5 5-5"/><path d="M20 27q4-4 7-5-1 5 3 7-2 5-6 5-5-1-4-7z" fill="#ffd477"/>',knife:'<path d="M8 36 29 12 39 7 35 18 14 39z" fill="#c5dce4"/><path d="m10 31 7 7M12 34l-4 5"/>',frost:'<path d="M14 31q5-5 5-13a5 5 0 0 1 10 0q0 8 5 13z" fill="#85d5ee"/><path d="M21 34q3 5 6 0M24 20v9m-4-7 8 5m0-5-8 5"/>',leech:'<path d="M24 7q-14 8-8 20l8 11 8-11Q38 15 24 7z" fill="#bf668e"/><circle cx="24" cy="22" r="5" fill="#ffe4f3"/>',plate:'<path d="M9 11 24 6 39 11v12q-1 10-15 17Q10 34 9 23z" fill="#91a8b6"/><path d="M24 9v27M13 17l11 4 11-4"/>',feather:'<path d="M10 38Q10 13 38 7 35 34 10 38z" fill="#89d4ba"/><path d="M10 38 31 15M19 28l-1-7m7 1 7 1"/>',magnet:'<path d="M12 10v15a12 12 0 0 0 24 0V10h-8v15a4 4 0 0 1-8 0V10z" fill="#e78a58"/><path d="M12 16h8m8 0h8"/>',tassel:'<path d="M24 6v13m-5-8h10m-9 8h8l4 18-8-5-8 5z" fill="#e4c56b"/><path d="M24 21v10"/>',wind:'<path d="M7 19q18-18 30-4 4 6-4 8m-24 5q12-8 24-3 8 4 1 10M10 35h12" stroke="#b8e4f5" fill="none" stroke-width="3"/>',carving:'<path d="M13 37 31 10l7-3-2 8-18 26z" fill="#c5b695"/>',shade:'<path d="M12 19 24 8l12 11-4 18H16z" fill="#a7dc79"/><path d="M18 26q6-8 12 0-1 7-6 7t-6-7z" fill="#f0ffc1"/>',flag:'<path d="M13 40V7m1 3q10-5 21 1l-4 8 4 8q-12-5-21 1" fill="#bc5262"/>',beads:'<circle cx="24" cy="24" r="14" fill="none" stroke="#d8cfb8" stroke-width="6" stroke-dasharray="2 4"/><path d="M24 38v5m-3-2h6"/>',journal:'<path d="M11 9q7-4 13 1 6-5 13-1v28q-7-4-13 1-6-5-13-1z" fill="#b99059"/><path d="M24 10v28M15 17h5m8 0h5m-18 5h5m8 0h5"/>',blade:'<path d="M11 38 32 9l7-3-3 8-21 28z" fill="#dce7e8"/>',heart:'<path d="M24 38 11 25Q4 14 14 11q6-2 10 5 4-7 10-5 10 3 3 14z" fill="#e88776"/>',flask:'<path d="M20 8h8v7l6 6v16H14V21l6-6z" fill="#92d6ba"/><path d="M19 27h10m-5-5v10"/>',swift:'<path d="M7 16h15M5 23h13M8 30h12M23 36l9-27 7 1-10 28z" fill="#ddd9a2"/>',reach:'<path d="M7 37 32 9l7-3-3 8-25 27z" fill="#c6e9ed"/><path d="M5 14q12-10 25-8" fill="none"/>',dash:'<path d="M9 32q6-19 15-12l10 8-2 7H12z" fill="#99cdd5"/><path d="M6 21h11M4 27h9M9 15h11"/>',vigor:'<path d="M24 6q-5 9-9 14-8 13 9 20 17-7 9-20-4-5-9-14z" fill="#95d6b5"/><path d="M24 19v12m-6-6h12"/>',wick:'<path d="M14 19h20l-3 19H17z" fill="#83cbbb"/><path d="M24 6q-7 7 0 14 7-7 0-14z" fill="#e9ffdc"/>',hunter:'<path d="M24 5 39 13 35 31 24 40 13 31 9 13z" fill="#c4a25f"/><path d="M24 13v19M16 24h16"/>',salvager:'<path d="M13 17h22v22H13z" fill="#bd8f67"/><path d="M18 17v-4q6-7 12 0v4M13 24h22M22 22h4v6h-4z"/>',flame:'<path d="M24 5q-3 10-10 17-8 14 10 19 18-5 10-19-4-7-10-17z" fill="#78d9c8"/><path d="M24 24q-5 5 0 10 6-4 0-10z" fill="#eaffee"/>',spring:'<path d="M9 32q10-2 17-17l8 3-6 11 9 4v5H10z" fill="#a9d8d0"/><path d="m13 18 6-7 6 7M19 11v12" fill="none"/>'};
   function icon(id){return '<svg viewBox="0 0 48 48" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><g stroke="#302d35" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(ICONS[id]||ICONS.blade)+'</g></svg>';}
   function mark(id,off){const u=artURL(id,off);return '<i class="mark'+(off?' q':'')+'">'+(u?'<img alt="" src="'+u+'">':off?'?':icon(id))+'</i>';}
-  function openBag(tab){if(state!=='play'||paused)return;if(tab)bagTab=tab;state='bag';keys={};clearHeld();renderBag();beep(420,.08);}
+  function openBag(){if(state!=='play'||paused)return;bagTab='bag';state='bag';keys={};clearHeld();renderBag();beep(420,.08);}
   function closeBag(){if(state!=='bag')return;state='play';panel.hidden=true;keys={};clearHeld();hudKey='';}
   function cell(id){return'<div class="cell">'+mark(id)+'<b>'+ITEMS[id].name+'</b><small>'+(id==='shade'&&run.found?.shadeCord?'断提梁上系着旗卒的红线。捎到城墙后驿站的汤摊，把口信也交给她爹。':ITEMS[id].info)+'</small></div>';}
   function pips(n){let s='';for(let i=0;i<3;i++)s+='<i class="pip'+(i<n?' on':'')+'"></i>';return s;}

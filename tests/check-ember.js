@@ -570,6 +570,16 @@ test('relics: the plate blocks every third hit, second wind saves a ghost, and t
   t.reset();t.relics.wind=true;t.player.hp=20;t.hurt(50,0);assert.equal(t.player.hp,20);assert.equal(t.state,'play');t.player.inv=0;t.hurt(50,0);assert.equal(t.state,'dead');
   t.reset(false,'bell');t.relics.leech=true;t.player.hp=60;for(const e of t.enemies.slice(0,4))t.killEnemy(e);assert.equal(t.player.hp,80);t.reset(false,'lamp');
 });
+test('Tab toggles the inventory page and M switches to the map',()=>{
+  const tap=code=>{press(code);release(code);};
+  tap('Tab');assert.equal(t.state,'bag');assert(nodes.panel.innerHTML.includes('data-tab="bag" class="on"'));
+  listeners.keydown({code:'Tab',repeat:true,preventDefault:noop});assert.equal(t.state,'bag');
+  tap('ArrowRight');assert(nodes.panel.innerHTML.includes('data-tab="dex" class="on"'));
+  tap('Tab');assert.equal(t.state,'play');tap('Tab');
+  assert(nodes.panel.innerHTML.includes('data-tab="bag" class="on"'));
+  tap('KeyM');assert.equal(t.state,'map');tap('Tab');assert.equal(t.state,'bag');
+  tap('KeyB');assert.equal(t.state,'play');
+});
 test('the bag opens with B, and the codex keeps sightings, kills and items across runs',()=>{
   press('KeyB');release('KeyB');assert.equal(t.state,'bag');const x=t.enemies[0].x;advance(1);assert.equal(t.enemies[0].x,x);press('Escape');assert.equal(t.state,'play');
   t.cam=0;advance(.02);assert(t.codex.seen.guard);const k=t.codex.kills.guard||0,e=t.enemies[0];e.hp=1;t.player.x=e.x-45;t.player.face=1;t.player.inv=100;t.action('attack');advance(.12);
