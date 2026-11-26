@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   const art = new Image();
-  art.src = new URL('../assets/images/bellwatch.jpg', document.currentScript.src).href;
+  art.src = new URL('../assets/images/bellwatch.jpg?v=pr4-24', document.currentScript.src).href;
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   const portrait = matchMedia('(orientation: portrait)');
   let surface, ctx, scarf, bell, fog;

@@ -4084,16 +4084,6 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       shape(scarfShape,P.scarfDark,'#303b40',.9);
       shape(()=>{ctx.moveTo(neck[0]-3,neck[1]+1);ctx.bezierCurveTo(neck[0]-14,neck[1]-1,tailX+21,foldY+4,tailX+2,tailY+1);},null,P.scarf,1.35);
     }
-    // Weight spreads the robe onto the floor; one folded knee remains visible under the hem.
-    if(rise>.01){
-      ctx.save();ctx.translate(hipX,0);ctx.scale(rise,rise);
-      shape(()=>{ctx.moveTo(-10,-7);ctx.quadraticCurveTo(-13,-1,-8,1);ctx.quadraticCurveTo(3,3,16,1);
-        ctx.quadraticCurveTo(21,1,22,-1);ctx.quadraticCurveTo(24,-5,20,-7.2);
-        ctx.quadraticCurveTo(16,-10,11,-6);ctx.quadraticCurveTo(2,-7,-10,-7);},
-        lg(0,-10,3,2,P.body,P.shade,'#899498'),'#394349',1.05);
-      shape(()=>{ctx.moveTo(22,-2);ctx.quadraticCurveTo(17,-1,14,-3);},null,'#909da0',.8);
-      ctx.restore();
-    }
     ctx.save();ctx.translate(hipX,hipY);ctx.rotate(angle);
     // The familiar three folds bunch at the grounded hip as the shoulders rise.
     shape(()=>{ctx.moveTo(-8,-29);ctx.bezierCurveTo(-15,-26,-14,-12,-15,-5);
@@ -4678,9 +4668,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(ready){ctx.save();ctx.globalAlpha*=.35;const q=(time*.35)%1;circle(-8+Math.sin(time*2)*2,-21-q*21,(1-q)*1.1,'#ffe2aa');ctx.restore();}}
   // 翻滚时蜷成一团：围巾斜裹在身上，下摆从背后露出来
   function ghostBall(P,open=0){
-    const knee=10+4*open;
     ribbon(-6,3,-20,-4-open*4,-19-open*8,3-open*6,4.2,1,P.scarf,OL,7);
-    oval(-5,knee,5,3.5,P.shade);oval(3,knee+1,4.5,3,P.body);
     circle(0,-1,13.7,P.body,OL,1.8);ctx.save();ctx.beginPath();ctx.arc(0,-1,13,0,TAU);ctx.clip();
     oval(-9,3,9,12,P.shade);ctx.rotate(.37);box(-15,3,30,4.5,P.scarf);ctx.restore();
     oval(4,-4,2,2.7,P.eye);oval(9,-3.6,1.7,2.5,P.eye);circle(4.5,-5,.58,'#fff');
@@ -4749,9 +4737,8 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       bowW(x,y,a,q.pull);
       sleeve(5,-23,grip.hx,grip.hy,1,P,false,grip);
     }else if(q.kick){
-      bowW(-8,-19,1.08,0);sleeve(-6,-23,-8,-19,-3,P,true);
-      const foot=joint(3,-11,.2+q.wind-.3*q.hit,-.9+1.15*q.hit,9,10);
-      line([3,-11,...foot],5,P.shade,OL);boot(foot[2],foot[3],P.scarfDark);
+      const grip=armPose(-6,-23,-8+9*q.hit,-19-4*q.wind+12*q.hit,-1);
+      bowW(grip.hx,grip.hy,1.08-.7*q.hit,0);sleeve(-6,-23,grip.hx,grip.hy,-3,P,true,grip);
       sleeve(5,-23,9+q.wind*4,-21-q.hit*8,4,P,false);
     }else{
       const grip=armPose(6,-22,q.hx,q.hy,1),x=grip.hx,y=grip.hy;
@@ -4808,20 +4795,6 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(p.hurtT>0)lean=-.22;if(dash)lean=.44;
     const shift=pose?pose.x:dash?3:0,pivot=bob+(pose?pose.y:0)-11,cs=Math.cos(lean),sn=Math.sin(lean);
     drawScarf(dash?GH_SHADE:P,0,f,[shift-10*cs+10*sn,pivot-10*sn-10*cs]);
-    // During the support half of each stride the sole travels backwards at ground speed.
-    // The hip settles between two planted feet on impact; the head and robe keep their proportions.
-    for(const side of [-1,1]){
-      if(pose?.kick&&side===1)continue;
-      const phase=(stride/TAU+(side<0?.5:0))%1;
-      const strideX=phase<.5?8.2-32.8*phase:-8.2*Math.cos((phase-.5)*TAU);
-      const lift=phase<.5?0:4.5*Math.sin((phase-.5)*TAU);
-      const footX=air?side*(5+(p.vy<0?2:1)):side*(3.7+land*2.3)+strideX*move*Math.sign((p.vx||f)*f)+(pose?side*2:0);
-      const footY=air?-3-(p.vy<0?(side<0?6:2):1):-1.5-lift*move;
-      const hipX=shift+side*3,hipY=pivot+2;
-      const knee=armPose(hipX,hipY,footX,footY,-1,8.5,8.5);
-      line([hipX,hipY,knee.ex,knee.ey,knee.hx,knee.hy],2.5,side<0?P.shade:P.body);
-      oval(knee.hx+.7,knee.hy,3.8,1.65,side<0?P.shade:P.body);
-    }
     ctx.save();ctx.translate(shift,pivot);ctx.rotate(lean);ctx.translate(0,11);
     if(ch==='bow')quiver();drawGhost(dash?GH_SHADE:P,time*6+p.walk*1.2,D.u?-1.6:D.d?1.4:0);heroGear(ch);if((L.chapter||1)>1){circle(-8,-20,2.2,'#e3bb75',OL,1);if(L.chapter>2)poly([-10,-17,-7,-17,-6,-10,-10,-12],L.chapter>3?'#c898bc':'#a9d7cc',OL,1);}
     if(!dash&&p.hurtT<=.18)ghostEmber(P,ready);if(ready)oval(-10,-18+Math.sin(time*2.8)*.6,3.1,3.6,P.body);

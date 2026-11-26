@@ -596,7 +596,7 @@ html,body,#stage{max-width:100%;overflow:hidden}
 }
 .home-scene{
   position:absolute;inset:0;pointer-events:none;
-  background:url("../assets/images/bellwatch.jpg") center/cover no-repeat;
+  background:url("../assets/images/bellwatch.jpg?v=pr4-24") center/cover no-repeat;
 }
 #panel:has(>.home-menu)::before{
   content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
