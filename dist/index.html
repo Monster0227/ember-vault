@@ -7,7 +7,7 @@
 <meta name="format-detection" content="telephone=no">
 <meta name="description" content="原创横版动作小游戏：三位可选角色、五张各有机关的地图、四位首领与多周目，带着余火敲响沉钟。">
 <title>余烬地牢</title>
-<link rel="stylesheet" href="css/ember.css?v=pr4-24">
+<link rel="stylesheet" href="css/ember.css?v=pr4-26">
 <link rel="preload" as="image" href="assets/images/scenes/quay.webp">
 </head>
 <body>
@@ -25,10 +25,13 @@
 <div id="gain" hidden aria-live="polite"><img id="gain-art" alt=""><div><b id="gain-name"></b><small id="gain-info"></small></div></div>
 <div id="talk" hidden aria-live="polite"><canvas id="talk-face" width="160" height="160" aria-hidden="true" hidden></canvas><b id="talk-who"></b><p id="talk-text"></p><button id="talk-skip" aria-label="跳过本段对话">跳过 ›</button><small class="more" aria-hidden="true">▼</small><small class="auto-tag" aria-hidden="true">自动</small><i id="talk-bar" aria-hidden="true"></i></div>
 <nav id="touch" hidden aria-label="触屏操作"><div id="pad" aria-label="摇杆：左右移动；向下加跳跃可穿过悬空平台"><i id="knob"></i></div><button id="heal-btn" class="heal" data-action="heal" aria-label="治疗"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M19 7h10v7l5 6v18H14V20l5-6zM18 27h12M24 21v12"/></svg><b id="potion-count">1</b></button><button id="item-btn" class="item empty" data-action="use" aria-label="使用道具"><span id="item-name"></span><b id="item-count">0</b></button><button id="chest-btn" class="chest" data-action="interact" hidden>开箱</button><div class="actions"><button id="tsk1" class="sk t1" data-action="skill1" aria-label="技能一"></button><button id="tsk2" class="sk t2" data-action="skill2" aria-label="技能二"></button><button id="tsk3" class="sk t3" data-action="skill3" aria-label="技能三"></button><button class="roll" data-action="roll" aria-label="翻滚"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M12 29a13 13 0 1 0 3-14M9 10l6 5-6 5M15 31c5 2 14 2 18-3"/></svg></button><button class="jump" data-action="jump" aria-label="跳跃"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 36V10M14 20l10-10 10 10M12 37h24"/></svg></button><button class="attack" data-action="attack" aria-label="攻击"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M12 37 32 9l7-3-3 8-21 27zM11 30l8 7M9 39l3-3"/></svg></button></div></nav>
+<aside id="item-switch" hidden role="status" aria-live="polite" aria-atomic="true">
+  <div id="belt-slots" aria-hidden="true"></div><b id="belt-label"></b>
+</aside>
 <footer id="hint" hidden>穿过四章地牢，寻找回家的路。</footer>
 </main>
 <div id="scene-fade" hidden aria-hidden="true"></div>
 <script src="js/title-scene.js?v=pr4-24"></script>
-<script src="js/ember.js?v=pr4-25"></script>
+<script src="js/ember.js?v=pr4-26"></script>
 </body>
 </html>

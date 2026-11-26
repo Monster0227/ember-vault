@@ -200,6 +200,36 @@ h1{font:700 clamp(42px,6vw,78px)/1.2 Georgia,"SimSun",serif;letter-spacing:9px;m
 #gain b{display:block;font-size:16px;letter-spacing:2px;color:#f6deb0}
 #gain small{display:block;font-size:12px;line-height:1.6;color:#b9c2c4;margin-top:2px}
 #gain.pop{animation:gainpop .45s ease-out}
+#item-switch{
+  position:absolute;right:max(14px,env(safe-area-inset-right));top:calc(62px + env(safe-area-inset-top));
+  display:grid;justify-items:center;gap:4px;padding:6px 9px 5px;pointer-events:none;
+  color:#f7e4bb;background:linear-gradient(105deg,#292723f2,#11191cf2);
+  border:1px solid #887451;border-bottom:2px solid #ae9261;border-radius:3px 3px 6px 6px;
+  box-shadow:0 3px 10px #090e10a6;
+}
+#item-switch[hidden],#panel:not([hidden])~#item-switch,#talk:not([hidden])~#item-switch,#hud[hidden]~#item-switch{display:none}
+#stage.in-secret #item-switch{display:none}
+#stage:not(.touch-layout) #hud:has(#minimap:not([hidden]))~#item-switch{top:calc(147px + env(safe-area-inset-top))}
+#belt-slots{display:flex;gap:3px}
+#belt-slots span{position:relative;display:grid;place-items:center;width:38px;height:32px;border:1px solid #595246;border-radius:2px;background:#141b1e}
+#belt-slots img,#belt-slots svg{width:28px;height:28px}
+#belt-slots i{position:absolute;right:2px;bottom:0;color:#e6dbbf;font:600 10px/12px system-ui;text-shadow:0 1px 2px #000}
+#belt-slots .depleted{opacity:.42;filter:grayscale(.85)}
+#belt-slots .equipped{background:#493d2b;border-color:#edc888;box-shadow:inset 0 -2px #eccc92}
+#belt-slots .equipped img,#belt-slots .equipped svg{animation:belt-draw .23s ease-out}
+#belt-label{font-size:12px;line-height:16px;letter-spacing:.06em}
+@keyframes belt-draw{from{transform:translateY(4px) rotate(-9deg);opacity:.6}to{transform:none;opacity:1}}
+.touch-layout #item-btn.switchable::after{
+  content:'‹　›';position:absolute;bottom:1px;left:50%;transform:translateX(-50%);white-space:pre;color:#f7da9d;
+  font:bold 12px/12px system-ui;text-shadow:0 1px 3px #000;pointer-events:none;
+}
+.slot[data-sel][aria-pressed=true] .art::before{content:'✓';position:absolute;left:0;top:0;color:#ffe3a4;font:bold 14px/16px system-ui}
+@media(prefers-reduced-motion:reduce){#belt-slots .equipped :is(img,svg){animation:none}}
+@media(orientation:portrait){
+  #skill-practice:not([hidden])~#item-switch{top:calc(53px + env(safe-area-inset-top));grid-auto-flow:column;align-items:center;gap:6px;padding:3px 6px}
+  #skill-practice:not([hidden])~#item-switch #belt-slots span{width:27px;height:25px}
+  #skill-practice:not([hidden])~#item-switch #belt-slots :is(img,svg){width:23px;height:23px}
+}
 #skill-practice{position:absolute;top:max(14px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);width:min(340px,calc(100% - 24px));box-sizing:border-box;display:grid;grid-template-columns:42px minmax(0,1fr) auto;align-items:center;gap:9px;padding:8px 9px;border:1px solid #8b8265;border-left:3px solid #ebca86;border-radius:4px;background:linear-gradient(110deg,#252e33fa,#101b23f5);box-shadow:0 4px 15px #0005;color:#f1e4c9;pointer-events:none}
 #skill-practice[hidden],#stage:has(#panel:not([hidden]),#talk:not([hidden]),#hud[hidden]) #skill-practice{display:none}
 #skill-practice img{width:42px;height:42px}
@@ -245,6 +275,59 @@ h1{font:700 clamp(42px,6vw,78px)/1.2 Georgia,"SimSun",serif;letter-spacing:9px;m
 .good small{display:block;font-size:11px;color:#a6b3b7;min-height:16px}
 .good .price{display:block;margin-top:3px;color:#ffd38a;font-size:13px}
 .good .price img,.good .price svg{width:18px;height:18px;vertical-align:-4px;margin-right:2px}
+/* The counter stays in view while its shelves can scroll on a short screen. */
+#panel:has(>.shop){
+  padding:clamp(8px,3vh,28px) max(12px,env(safe-area-inset-right)) clamp(8px,3vh,28px) max(12px,env(safe-area-inset-left));
+  align-items:center;justify-content:center;overflow:hidden;background:linear-gradient(90deg,#0e100ee8,#181510d9 67%,#201b1680)
+}
+#panel>.sheet.shop{
+  width:min(100%,740px);max-width:740px;max-height:100%;margin:0;box-sizing:border-box;
+  display:grid;grid-template-rows:auto minmax(0,1fr) auto;padding:clamp(12px,2.5vw,24px);
+  color:#e4d5b7;background:linear-gradient(135deg,#302c24f7,#211f1bf8 48%,#242525f7);
+  border:1px solid #8a7653;border-top:3px solid #a86f52;border-radius:4px;box-shadow:0 10px 32px #0009,inset 0 0 0 3px #342f26
+}
+.shop header,.shop footer{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.shop header{padding-bottom:12px;border-bottom:1px solid #78684b}
+.shop .chapter{font:11px/1.3 "Microsoft YaHei",sans-serif;color:#c1a075;letter-spacing:2px}
+.shop header h1{font-size:clamp(23px,3.4vw,36px);margin:3px 0 0;line-height:1.15;letter-spacing:.08em}
+.shop .purse{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;text-align:right;margin:0;padding:0;border:0;background:none;font-size:13px}
+.shop .purse .chip{margin:0}.shop .purse .chip :is(img,svg){width:22px;height:22px;margin:0 2px 0 0}
+.shop .shop-cash{color:#f6c87d;font-size:12px}.shop-cash b{font-size:17px}
+.shop .goods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;gap:6px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#7b684e transparent;margin:8px 0;padding:2px}
+#panel .shop .goods .good{display:grid;grid-template-columns:44px minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0;min-height:70px;height:auto;width:100%;margin:0;padding:8px 10px 8px 8px;text-align:left;color:#f1debb;background:linear-gradient(110deg,#463c2f,#302d26);border:1px solid #71614c;border-radius:3px}
+#panel .shop .goods .good.off{opacity:1;background:#292925;border-color:#4d4c43}
+#panel .shop .goods .good:focus-visible{outline:2px solid #f0c989;outline-offset:-3px}
+.shop .good .art{width:44px;height:44px;margin:0;background:radial-gradient(ellipse at 50% 73%,#e5b57126,transparent 73%)}
+.shop .good .qty{right:-2px;bottom:0;min-width:16px;font-size:10px;line-height:14px;padding:0 2px}
+.shop .good .shop-description strong{font-size:14px;line-height:1.35}
+.shop .good small{min-height:0;font-size:11px;line-height:1.45;color:#c0b9a8}
+.shop .shop-tag{display:flex;flex-direction:column;align-items:flex-end;text-align:right;gap:2px;white-space:nowrap}
+.shop .good .price{margin:0;font-size:15px;line-height:1.3;font-weight:700;color:#ffce83}
+.shop .good .shop-tag small{color:#d5c4a4;font-size:10px}
+.shop .good.off .shop-tag small{color:#e6aa8f}
+.shop .good kbd{position:absolute;left:3px;top:2px;color:#bba784;font:9px/1.1 monospace}
+.shop footer{padding-top:9px;border-top:1px solid #78684b;min-height:52px}
+#shop-msg{min-width:0;display:flex;align-items:center;gap:8px;color:#bdb39f;font-size:12px;line-height:1.4}
+#shop-msg b,#shop-msg small{display:block}#shop-msg b{color:#f1ce91;font-size:13px}#shop-msg small{color:#c5c6ba;font-size:11px}
+.shop-stamp{display:grid;place-items:center;flex:none;width:34px;height:34px;border:1px solid #99845a;border-radius:50%;background:#473b2a}
+.shop-stamp :is(img,svg){width:26px;height:26px}.shop-stamp.declined{border-color:#ab7865;background:#42312b}
+#panel .shop #leave{flex:none;min-width:88px;width:auto;min-height:44px;margin:0;padding:8px 12px;color:#ead8b8;border-color:#7e735d;letter-spacing:.05em}
+.shop-handoff{position:fixed;left:0;top:0;width:28px;height:28px;z-index:2;pointer-events:none;filter:drop-shadow(0 0 5px #e7b768)}
+@keyframes shop-purchase{0%,28%{box-shadow:inset 0 0 0 2px #e9b668,0 0 10px #d4a66b55}100%{box-shadow:none}}
+@media(prefers-reduced-motion:no-preference){.shop .just-bought{animation:shop-purchase .62s ease-out}}
+@media(max-width:600px){
+  .shop .goods{grid-template-columns:1fr}
+  .shop header{padding-bottom:8px}.shop .purse{gap:4px;max-width:52%}
+  #panel .shop .goods .good{min-height:58px;padding:5px 9px;grid-template-columns:40px minmax(0,1fr) auto}
+  .shop .good .art{width:38px;height:38px}
+}
+@media(max-height:500px){
+  #panel>.sheet.shop{padding:8px 12px}
+  .shop header,.shop footer{padding-block:3px;min-height:0}.shop header h1{font-size:22px}
+  .shop .goods{gap:4px;margin:4px 0}#panel .shop .goods .good{min-height:52px;padding:4px 9px}
+  .shop .good .art{width:36px;height:36px}
+}
+@media(pointer:coarse){.shop .good kbd{display:none}}
 #panel .goods .num{position:absolute;left:6px;top:6px;width:18px;height:18px;line-height:18px;margin:0;font-size:10px}
 
 /* 行囊：一格格的道具和技能，图鉴里是一面画墙 */

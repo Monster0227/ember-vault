@@ -493,9 +493,12 @@ test('the merchant sells healing for embers and you can walk away',()=>{
   assert.equal(nodes['chest-btn'].hidden,false);assert.equal(nodes['chest-btn'].textContent,'商店');
   t.action('interact');assert.equal(t.state,'talk','he says hello first');finishTalk();assert.equal(t.state,'shop');assert(t.codex.lore.merchant);
   press('Digit1');assert.equal(t.player.hp,t.player.max);assert.equal(t.embers,60);
+  assert(nodes['shop-msg'].innerHTML.includes('生命已回满'));
   press('Digit1');assert.equal(t.embers,60,'no charge when already at full health');
+  assert(nodes['shop-msg'].innerHTML.includes('生命已满'));
   press('Digit2');assert.equal(t.player.potions,2);assert.equal(t.embers,0);
   press('Digit3');assert.equal(t.bag.bomb,0,'cannot afford it');
+  assert(nodes['shop-msg'].innerHTML.includes('还差 50 余烬'));
   const x=t.player.x;advance(.5);assert.equal(t.player.x,x,'the world waits while shopping');
   press('Escape');assert.equal(t.state,'play');assert(!sandbox.EmberGame.paused);
   t.action('interact');assert.equal(t.state,'shop','only one hello per visit');
@@ -545,6 +548,16 @@ test('each floor hides a keepsake that unlocks a page of lore',()=>{
   t.action('interact');finishTalk();assert(t.keepsakes[s.id]);assert(t.codex.lore[s.id]);assert(t.codex.items[s.id]);assert.equal(t.embers,25,'story discovery rewards exploration');
   advance(.02);assert.equal(nodes['chest-btn'].hidden,true,'nothing left to read here');
 });
+test('the quick belt skips empty slots, remembers the equipped item and updates after the last use',()=>{
+  Object.assign(t.bag,{bomb:1,knife:0,frost:1});t.loadStage(0,true);
+  t.action('cycle');assert.equal(t.sel,'frost');assert.equal(t.bag.frost,1);
+  assert.equal(nodes['item-switch'].hidden,false);assert(nodes['belt-label'].textContent.includes('寒霜铃'));
+  listeners.pagehide();t.showMenu();t.continueRun();assert.equal(t.sel,'frost');
+  t.action('use');assert.equal(t.bag.frost,0);assert.equal(t.sel,'bomb');
+  assert(nodes['belt-label'].textContent.includes('火油罐'));
+  t.action('use');assert.equal(t.bag.bomb,0);assert(nodes['belt-label'].textContent.includes('已用完'));
+  advance(2);assert.equal(nodes['item-switch'].hidden,true);
+});
 test('fire flasks burst on enemies, knives fly straight, the frost bell freezes',()=>{
   const e=t.enemies[0];e.cd=99;t.player.inv=100;t.player.face=1;t.player.x=e.x-240;e.max=e.hp=72;t.bag.bomb=1;t.sel='bomb';press('KeyU');release('KeyU');assert.equal(t.thrown.length,1);assert.equal(t.bag.bomb,0);
   advance(.9);assert.equal(t.thrown.length,0);assert.equal(e.hp,72-55);
@@ -573,6 +586,9 @@ test('the waystation sells items and one relic per visit',()=>{
   t.loadStage(firstRest());t.embers=1000;t.player.x=t.L.shop-13;t.player.y=428;advance(.02);t.action('interact');finishTalk();assert.equal(t.state,'shop');
   press('Digit3');press('Digit4');press('Digit5');assert.deepEqual([t.bag.bomb,t.bag.knife,t.bag.frost],[2,4,1]);
   const before=t.embers;press('Digit6');assert.equal(Object.keys(t.relics).length,1);const after=t.embers;assert(after<before);press('Digit6');assert.equal(t.embers,after,'sold out');
+  t.showMenu();t.continueRun();assert.deepEqual([t.bag.bomb,t.bag.knife,t.bag.frost],[2,4,1]);
+  assert.equal(t.embers,after);t.player.x=t.L.shop-13;t.action('interact');finishTalk();press('Digit6');
+  assert.equal(t.embers,after,'the paid-for goods and the empty shelf both survive a reload');
 });
 test('soul charges only from melee and casts a damaging projectile at three charges',()=>{
   const e=t.enemies[0];e.hp=e.max=200;e.cd=99;t.player.inv=100;t.player.x=e.x-45;t.player.face=1;
@@ -699,6 +715,27 @@ test('all four boss arenas have an intro, a sealed exit and the correct continua
       finishTalk();advance(1);assert.equal(t.stage,index+1);assert(t.L.rest);
     }
   }
+});
+test('boss health scales by encounter and cycle and preserves wounded saves at the same fraction',()=>{
+  const health={lock:[330,370],brood:[446,540],standard:[677,840],warden:[792,1040]};
+  for(const [kind,[oldMax,firstMax]] of Object.entries(health)){
+    const index=t.STAGES.findIndex(room=>room.bossKind===kind);
+    for(const cycle of [0,1,4]){
+      t.cycle=cycle;t.loadStage(index);
+      const max=Math.round(firstMax*(1+.35*cycle));
+      assert.equal(t.enemies[0].max,max);
+      const save=JSON.parse(storage['ember:save']);
+      const old=Math.round((cycle?330*t.L.hpK:oldMax)*(1+.35*cycle));
+      save.boss={hp:Math.round(old*.47),max:old,phase:1,rage:true,phase3:false};
+      storage['ember:save']=JSON.stringify(save);
+      t.showMenu();t.continueRun();
+      const restored=Math.round(max*save.boss.hp/old);
+      assert.equal(t.enemies[0].hp,restored);assert.equal(t.enemies[0].phase,1);assert(t.enemies[0].rage);
+      t.respawn();t.showMenu();t.continueRun();
+      assert.equal(t.enemies[0].hp,restored,'a new save must not apply the change twice');
+    }
+  }
+  t.cycle=0;
 });
 test('later chapters introduce their own story when entered from the waystation',()=>{
   for(const chapter of [2,3,4]){t.reset();const idx=t.STAGES.findIndex(s=>s.chapterStart&&s.chapter===chapter);t.loadStage(idx-1);assert(t.L.rest);t.player.x=t.L.exit+25;t.player.y=428;advance(1);assert.equal(t.stage,idx);assert.equal(t.state,'talk');assert(t.talk.lines.length>=3);finishTalk();assert.equal(t.state,'play');}
