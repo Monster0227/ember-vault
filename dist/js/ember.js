@@ -566,7 +566,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     toast(id,'获得 '+it.name,effect);
   }
   function artImg(id,dark){const u=artURL(id,dark);return u?'<img alt="" src="'+u+'">':icon(id);}
-  function chip(id,v){return'<span class="chip">'+artImg(id)+'<b>'+v+'</b></span>';}
+  function chip(id,v,label,tip,keyBadge){const t=tip?' title="'+tip+'" aria-label="'+tip+'"':'',lbl=label?'<small class="chip-label">'+label+'</small>':'',kb=keyBadge?'<kbd class="hud-key">'+keyBadge+'</kbd>':'';return'<span class="chip"'+t+'>'+artImg(id)+lbl+'<b>'+v+'</b>'+kb+'</span>';}
   // 场景里冒出来的道具：画 + 数量（不写名字）
   function popArt(id,label,x,y){floats.push({x:x,y:y,art:id,t:label||'',c:'#f6e6c4',life:1.2,big:false});}
   const coarse=()=>settings.touch==='show'||(settings.touch!=='hide'&&window.matchMedia('(pointer:coarse)').matches);
@@ -1305,7 +1305,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(talk.landInPrison&&sceneA==='awaken'&&sceneT>.1){
       const still=copyStoryFrame();if(still)prisonReveal={still,at:time};
     }
-    stopDialogueCue();const done=talk.done,keep=talk.keep;talk=null;talkBox.hidden=true;talkBox.classList.remove('auto');talkBox.classList.remove('swap');sceneA=sceneB='';if(!keep){hud.hidden=false;touch.hidden=!coarse();state='play';}hudKey='';keys={};clearHeld();if(done)done();}
+    stopDialogueCue();const wasArena=!!talk.arena,done=talk.done,keep=talk.keep;talk=null;talkBox.hidden=true;talkBox.classList.remove('auto');talkBox.classList.remove('swap');sceneA=sceneB='';if(!keep){hud.hidden=false;touch.hidden=!coarse();state='play';if(!wasArena&&p&&!L?.rest&&!L?.tutorial)p.inv=Math.max(p.inv,.8);}hudKey='';keys={};clearHeld();if(done)done();}
   function skipTalk(){if(!talk)return;talk.i=talk.lines.length-1;talk.n=talk.shown=1e9;talkNext();}
   // 敌人血量随层数变厚；精英是放大一圈的守卫，带光环
   // 首领各有体型：守锁兽又宽又矮、溺灯高高浮着、旗手瘦长、典狱长最高
@@ -1471,7 +1471,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(state==='upgrade'&&picks[e.code]!=null){if(!e.repeat)pickOffer(picks[e.code]);return;}
     if(e.code==='Escape'&&!e.repeat){togglePause();return;}if(paused){if(!e.repeat)menuKey(e);return;}if(e.repeat)return;keys[e.code]=true;if(act)action(act);});
   // 松开跳跃键时还在上升，就把上升速度砍掉一半：轻点是小跳，按住是大跳
-  function jumpRelease(){if(!p||state!=='play')return;if(secretRoom){secretRoom.vy=Math.max(secretRoom.vy,-200);return;}if(p.buffer>0)p.cutQueued=true;else if(p.jumpRising&&p.vy<-230)p.vy=-230;p.jumpRising=false;}
+  function jumpRelease(){if(!p||state!=='play')return;if(secretRoom){secretRoom.vy=Math.max(secretRoom.vy,-200);return;}if(p.buffer>0)p.cutQueued=true;else if(p.jumpRising&&p.vy<-320)p.vy=-320;p.jumpRising=false;}
   addEventListener('keyup',e=>{delete keys[e.code];if(codeAct[e.code]==='jump')jumpRelease();});
   addEventListener('blur',()=>{keys={};clearHeld();if(state==='play'&&!paused)togglePause();});
   addEventListener('pagehide',saveActiveJourney);
@@ -1562,7 +1562,8 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     panel.innerHTML='<div class="home-scene" aria-hidden="true"><canvas></canvas></div><div class="home-menu"><div class="home-wordmark"><span class="home-seal" aria-hidden="true">'+EMBLEM+'</span><span lang="en">Ember Vault</span></div>'
       +'<h1>余烬地牢</h1><nav class="home-journeys" aria-label="开始游玩">'+journeys+'</nav>'
       +'<nav class="home-tools" aria-label="其他选项">'+tools+'</nav>'
-      +(best||clears?'<p class="home-record">'+(clears?'通关 '+clears+' 次　':'')+'最高 '+best+' 分</p>':'')+'</div>';
+      +(best||clears?'<p class="home-record">'+(clears?'通关 '+clears+' 次　':'')+'最高 '+best+' 分</p>':'')
+      +'<p class="home-version">v'+VERSION+'</p></div>';
     panel.hidden=false;window.EmberTitle?.mount(panel.querySelector('.home-scene canvas'));panel.querySelectorAll('[data-menu]').forEach(b=>b.onclick=()=>menuPick(b.dataset.menu));focusFirst();}
   function menuPick(id){unlockAudio();beep(620,.05,'sine');if(id==='continue')continueRun();else if(id==='new')renderChars();else if(id==='prologue'){panel.hidden=true;startTalk(TALK.prologue,showMenu);}else if(id==='tutorial')startTutorial();else if(id==='chapters')renderChapters();else if(id==='codex'){panelView='codex';bagTab='dex';renderBag(true);}else if(id==='settings')renderSettings('menu');}
   // In v8 the same gate and lamp stood farther apart. The stairs and bridge keep their original widths.
@@ -1725,24 +1726,23 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   }
   // 选角色：没解锁的画成剪影，写着解锁条件；通关过就能挑周目
   let pickChar='lamp',pickCycle=0;
-  function renderChars(focusPicked=false){panelView='chars';if(!charOpen(pickChar))pickChar=lastChar();pickCycle=Math.min(pickCycle,Math.min(clears,4));const bar=(t,v)=>'<span class="bar"><em>'+t+'</em><i><u style="width:'+Math.round(v*100)+'%"></u></i></span>';
+  function renderChars(focusPicked=false){const detailsOpen=!!panel.querySelector?.('.journey-details')?.open;panelView='chars';if(!charOpen(pickChar))pickChar=lastChar();pickCycle=Math.min(pickCycle,Math.min(clears,4));const bar=(t,v)=>'<span class="bar"><em>'+t+'</em><i><u style="width:'+Math.round(v*100)+'%"></u></i></span>';
     const card=id=>{const c=CHARS[id],open=charOpen(id);return'<button class="char-card'+(id===pickChar?' on':'')+(open?'':' locked')+'" data-char="'+id+'" aria-pressed="'+(id===pickChar)+'"'+(open?'':' disabled')+'><span class="portrait">'+(open?'<canvas width="240" height="240" data-idle="'+id+'" aria-label="'+c.name+'动态待机" style="width:100%;height:100%;display:block"></canvas>':'<img alt="" src="'+charPortrait(id,true)+'">')+'</span><b>'+(open?c.name:'？？？')+'</b><small class="role">'+(open?c.title:c.unlockText)+'</small>'+(open?'<span class="bars">'+bar('生命',c.hp/7)+bar('攻击',c.power)+bar('速度',c.speedK)+'</span>':'')+'</button>';};
     const C=CHARS[pickChar],cyc=clears?'<div class="cycle-pick"><span>周目</span>'+Array.from({length:Math.min(clears,4)+1},(_,i)=>'<button data-cycle="'+i+'"'+(i===pickCycle?' class="on"':'')+'>'+(i?'第 '+(i+1)+' 周目':'一周目')+'</button>').join('')+'<small>'+(pickCycle?'敌人更硬、出手更快，余烬也更多':'第一次的旅程')+'</small></div>':'';
     const skillRows=C.skills.map((id,i)=>'<div class="sk-row">'+artImg('sk_'+id)+'<b>'+(i+1)+' · '+SKILLS[id].name+'</b><i>'+'●'.repeat(SKILLS[id].cost)+'</i><small>'+SKILLS[id].info+'</small></div>').join('');
-    panel.innerHTML='<div class="sheet wide chars"><h1>谁来引灯</h1><div class="char-cards">'+Object.keys(CHARS).filter(charOpen).map(card).join('')+'</div>'
-      +cyc+'<div class="journey-actions"><button class="primary" id="go">出发 <span>↗</span></button><button class="secondary" data-back>返回</button></div>'
-      +'<details class="journey-details"><summary>'+C.name+'的招式</summary><div class="char-info"><p>'+C.info+'</p><div class="skill-list">'+skillRows+'</div></div></details></div>';
+    panel.innerHTML='<div class="sheet wide chars"><div class="modal-head"><div><span class="chapter">新的旅程</span><h1>谁来引灯</h1></div><button class="secondary modal-close" data-back>返回 ↩</button></div><div class="modal-body"><div class="char-cards">'+Object.keys(CHARS).filter(charOpen).map(card).join('')+'</div>'
+      +cyc+'<details class="journey-details"'+(detailsOpen?' open':'')+'><summary>'+C.name+'的招式</summary><div class="char-info"><p>'+C.info+'</p><div class="skill-list">'+skillRows+'</div></div></details></div><div class="modal-foot"><div class="journey-actions"><button class="primary" id="go">出发 <span>↗</span></button><button class="secondary" data-back>返回</button></div></div></div>';
     panel.hidden=false;panel.querySelectorAll('[data-char]').forEach(b=>b.onclick=()=>{pickChar=b.dataset.char;beep(560,.05,'sine');renderChars(true);});panel.querySelectorAll('[data-cycle]').forEach(b=>b.onclick=()=>{pickCycle=+b.dataset.cycle;renderChars();});
     document.getElementById('go').onclick=()=>{unlockAudio();startJourney(pickChar,pickCycle);};bindBack();
     if(focusPicked&&!coarse())panel.querySelector('.char-card.on').focus();else focusFirst();}
   // 设置：音量滑条、画面 / 对话选项、按键（每个动作两个键位，点一下再按新键）
-  function renderSettings(from){const keymapOpen=!from&&panel.querySelector?.('.keyboard-options')?.open;panelView='settings';if(from)menuFrom=from;const opt=(k,label,vals)=>'<div class="opt"><span>'+label+'</span>'+vals.map(v=>'<button data-opt="'+k+'" data-v="'+v[0]+'"'+(String(settings[k])===String(v[0])?' class="on"':'')+'>'+v[1]+'</button>').join('')+'</div>',sl=(k,label)=>'<label class="slider"><span>'+label+'</span><input type="range" min="0" max="100" step="5" value="'+Math.round(settings[k]*100)+'" data-slider="'+k+'"><b>'+Math.round(settings[k]*100)+'</b></label>';
+  function renderSettings(from){const keymapOpen=!from&&panel.querySelector?.('.keyboard-options')?.open;panelView='settings';if(from)menuFrom=from;const opt=(k,label,vals)=>'<div class="opt"><span>'+label+'</span>'+vals.map(v=>'<button data-opt="'+k+'" data-v="'+v[0]+'"'+(String(settings[k])===String(v[0])?' class="on"':'')+'>'+v[1]+'</button>').join('')+'</div>',sl=(k,label)=>'<label class="slider"><span>'+label+'</span><input type="range" min="0" max="100" step="5" value="'+Math.round(settings[k]*100)+'" data-slider="'+k+'"><b>'+Math.round(settings[k]*100)+'%</b></label>',touchActive=coarse();
     const rows=KEY_ORDER.map(a=>'<div class="keyrow"><span>'+KEY_LABEL[a]+'</span>'+[0,1].map(i=>{const w=rebinding&&rebinding.a===a&&rebinding.i===i;return'<button data-bind="'+a+'" data-slot="'+i+'"'+(w?' class="wait"':'')+'>'+(w?'按下新按键…':keyName(BIND[a][i]))+'</button>';}).join('')+'</div>').join('');
-    panel.innerHTML='<div class="sheet wide settings"><span class="chapter">设置</span><h1>设置</h1><h3>声音</h3>'+sl('vol','总音量')+sl('music','音乐')+sl('sfx','音效')+'<h3>画面</h3>'+opt('fx','特效',[['auto','自动'],['high','全开'],['low','省电']])+opt('shake','屏幕震动',[[true,'开'],[false,'关']])+opt('buzz','震动',[[true,'开'],[false,'关']])+opt('nums','伤害数字',[[true,'显示'],[false,'隐藏']])+opt('minimap','小地图',[[true,'显示'],[false,'隐藏']])+'<h3>对话</h3>'+opt('textSpeed','文字速度',[[.6,'慢'],[1,'中'],[1.7,'快']])+opt('subtitleAdvance','字幕翻页',[['auto','自动'],['manual','手动']])+'<h3>操作</h3>'+opt('touch','屏幕按键',[['auto','自动'],['show','显示'],['hide','隐藏']])+sl('touchA','按键透明度')+'<label class="slider"><span>按键左右</span><input type="range" min="-80" max="80" step="4" value="'+(settings.touchX||0)+'" data-px="touchX"><b>'+(settings.touchX||0)+'</b></label><label class="slider"><span>按键上下</span><input type="range" min="-60" max="40" step="4" value="'+(settings.touchY||0)+'" data-px="touchY"><b>'+(settings.touchY||0)+'</b></label><details class="keyboard-options"'+(keymapOpen||rebinding||(!coarse()&&from)?' open':'')+'><summary>键盘按键</summary><p>选中一个动作，再按要使用的键。Esc 取消。</p><div class="keymap">'+rows+'</div><button class="secondary" id="keys-reset">恢复默认按键</button></details><button class="primary" data-back>返回 <span>↩</span></button></div>';
+    panel.innerHTML='<div class="sheet wide settings"><div class="modal-head"><div><span class="chapter">偏好与按键</span><h1>设置</h1></div><button class="secondary modal-close" data-back>返回 ↩</button></div><div class="modal-body"><h3>声音</h3>'+sl('vol','总音量')+sl('music','音乐')+sl('sfx','音效')+'<h3>画面</h3>'+opt('fx','特效',[['auto','自动'],['high','全开'],['low','省电']])+opt('shake','屏幕震动',[[true,'开'],[false,'关']])+opt('nums','伤害数字',[[true,'显示'],[false,'隐藏']])+opt('minimap','小地图',[[true,'显示'],[false,'隐藏']])+'<h3>对话</h3>'+opt('textSpeed','文字速度',[[.6,'慢'],[1,'中'],[1.7,'快']])+opt('subtitleAdvance','字幕翻页',[['auto','自动'],['manual','手动']])+'<h3>操作</h3>'+opt('buzz','设备震动',[[true,'开'],[false,'关']])+opt('touch','屏幕按键',[['auto','自动'],['show','显示'],['hide','隐藏']])+'<div class="touch-sliders'+(touchActive?'':' is-inactive')+'">'+(touchActive?'':'<p class="touch-sliders-note">当前未启用屏幕按键；选择「显示」或在触屏上游玩时生效。</p>')+sl('touchA','按键透明度')+'<label class="slider"><span>按键左右</span><input type="range" min="-80" max="80" step="4" value="'+(settings.touchX||0)+'" data-px="touchX"><b>'+(settings.touchX||0)+'px</b></label><label class="slider"><span>按键上下</span><input type="range" min="-60" max="40" step="4" value="'+(settings.touchY||0)+'" data-px="touchY"><b>'+(settings.touchY||0)+'px</b></label></div><details class="keyboard-options"'+(keymapOpen||rebinding||(!coarse()&&from)?' open':'')+'><summary>键盘按键</summary><p>选中一个动作，再按要使用的键。Esc 取消。</p><div class="keymap">'+rows+'</div><button class="secondary" id="keys-reset">恢复默认按键</button></details></div><div class="modal-foot"><p class="footnote">'+(coarse()?'':'Esc 返回')+'</p><button class="primary" data-back>返回 <span>↩</span></button></div></div>';
     panel.hidden=false;
     panel.querySelectorAll('[data-opt]').forEach(b=>b.onclick=()=>{const k=b.dataset.opt,v=b.dataset.v;settings[k]=v==='true'?true:v==='false'?false:isNaN(+v)?v:+v;applySettings();saveSettings();beep(600,.04,'sine');renderSettings();});
-    panel.querySelectorAll('[data-slider]').forEach(r=>{r.oninput=()=>{settings[r.dataset.slider]=r.value/100;r.nextElementSibling.textContent=r.value;applySettings();saveSettings();};r.onchange=()=>beep(660,.06,'sine');});
-    panel.querySelectorAll('[data-px]').forEach(r=>{r.oninput=()=>{settings[r.dataset.px]=+r.value;r.nextElementSibling.textContent=r.value;applySettings();saveSettings();};});
+    panel.querySelectorAll('[data-slider]').forEach(r=>{r.oninput=()=>{settings[r.dataset.slider]=r.value/100;r.nextElementSibling.textContent=r.value+'%';applySettings();saveSettings();};r.onchange=()=>beep(660,.06,'sine');});
+    panel.querySelectorAll('[data-px]').forEach(r=>{r.oninput=()=>{settings[r.dataset.px]=+r.value;r.nextElementSibling.textContent=r.value+'px';applySettings();saveSettings();};});
     panel.querySelectorAll('[data-bind]').forEach(b=>b.onclick=()=>{rebinding={a:b.dataset.bind,i:+b.dataset.slot};renderSettings();});
     document.getElementById('keys-reset').onclick=()=>{BIND=JSON.parse(JSON.stringify(DEFAULT_KEYS));rebuildKeys();saveSettings();renderSettings();};bindBack();if(!rebinding)focusFirst();}
   function applySettings(){buses();resize();touch.hidden=!coarse()||state!=='play';if(settings.fx==='low')lowFx=true;else if(settings.fx==='high')lowFx=false;const root=document.documentElement;if(root&&root.style){root.style.setProperty('--touch-a',String(settings.touchA==null?1:settings.touchA));root.style.setProperty('--touch-x',(settings.touchX||0)+'px');root.style.setProperty('--touch-y',(settings.touchY||0)+'px');}}
@@ -1754,7 +1754,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     else if(e.code==='ArrowUp'||act==='up'||(e.code==='Tab'&&e.shiftKey)){e.preventDefault();btns[(i-1+btns.length*2)%btns.length].focus();}
     else if(e.code==='Escape'){if(state==='menu'&&panelView==='menu')return;if(panelView==='codex'){renderMenu();return;}menuBack();}
     else if(e.code==='Space'&&document.activeElement&&document.activeElement.tagName==='BUTTON'){e.preventDefault();document.activeElement.click();}}
-  function showPanel(title,t,label,fn,alts){alts=alts||[];panel.innerHTML='<div class="sheet"><span class="chapter">余烬地牢 · '+(L.rest?L.name:L.n+' · '+L.name)+'</span><h1>'+title+'</h1><p class="intro">'+t+'</p><button class="primary" id="main-action">'+label+' <span>↗</span></button>'+alts.map((a,i)=>'<button class="secondary" id="alt-'+i+'">'+a.label+'</button>').join('')+'<p class="keys">击败 '+kills+'　·　得分 '+score+'　·　最高 '+best+'</p></div>';panel.hidden=false;document.getElementById('main-action').onclick=fn;alts.forEach((a,i)=>{document.getElementById('alt-'+i).onclick=a.fn;});}
+  function showPanel(title,t,label,fn,alts){alts=alts||[];panel.innerHTML='<div class="sheet dialog-panel"><span class="chapter">余烬地牢 · '+(L.rest?L.name:L.n+' · '+L.name)+'</span><h1>'+title+'</h1><p class="intro">'+t+'</p><div class="panel-actions"><button class="primary" id="main-action">'+label+' <span>↗</span></button>'+alts.map((a,i)=>'<button class="secondary" id="alt-'+i+'">'+a.label+'</button>').join('')+'</div><p class="keys">击败 '+kills+'　·　得分 '+score+'　·　最高 '+best+'</p></div>';panel.hidden=false;document.getElementById('main-action').onclick=fn;alts.forEach((a,i)=>{document.getElementById('alt-'+i).onclick=a.fn;});}
   // 第六格供应护符，集齐护符后供应磨刀石。第六与第七格每站各限一次。
   // 价格跟着刚走出来的那一层涨（后面几层掉的余烬也更多）
   const relicSlot=()=>shopRelic?{name:ITEMS[shopRelic].name,info:ITEMS[shopRelic].info.replace(/。$/,'')}:{name:'磨刀石',info:'攻击伤害 +8'};
@@ -1866,9 +1866,24 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       return;
     }
     if(nearMapStand()){useMapStand();return;}
-    const c=nearbyChest();if(!c){if(!L.arena)say(L.rest?'走到烛叟身边再交易':'靠近平台上的铜色宝箱再开启',2);return;}
+    const c=nearbyChest();
+    if(!c){
+      if(!L.arena){
+        const px=p.x+p.w/2,key=K('interact');
+        const hint=(button,action)=>coarse()?'点「'+button+'」':'按 '+key+' '+action;
+        if(L.rest)say('靠近篝火休息，或走到烛叟身边交易',2);
+        else if(L.wayfarer&&Math.abs(L.wayfarer.x-px)<170)say('靠近'+L.wayfarer.name+'，'+hint('交谈','交谈'),2);
+        else if(chests.some(box=>!box.open&&Math.abs(box.x-px)<240))say('跳到宝箱旁的平台，'+hint('开箱','开箱'),2);
+        else if(L.lore&&!flags.lore&&Math.abs(L.lore.x-px)<180)say('靠近发光的旧物，'+hint('查看','查看'),2);
+        else if(L.mapStand!=null&&Math.abs(L.mapStand-px)<180)say('靠近路图匣，'+(hasMap()?hint('看图','看图'):hint('购图','购图')),2);
+        else if(L.npc!=null&&Math.abs(L.npc-px)<180)say('靠近守钟人，'+hint('交谈','交谈'),2);
+        else say('附近没有可互动的对象',1.6);
+      }
+      return;
+    }
     // 开箱：先播 0.85 秒开盖动画（世界停住），再弹出三选一
     c.open=true;c.openT=0;chestC=c;nearChest=false;nearKind='';chestBtn.hidden=true;state='chest';keys={};clearHeld();offers=makeOffers(c);beep(180,.3,'square');}
+  function canUseBolt(){return CHARS[p.char].skills.includes('bolt')&&(!run.guided||(run.awakened||0)>=3);}
   // 宝箱三选一：一项强化、一样道具，第三项多半是还没拿到的护符
   const chestBenefits={spring:'跳得更高',dash:'翻滚冷却缩短',heart:'生命上限 +1',flask:'药瓶 +2',blade:'攻击 +12'};
   function chestUpgrade(c){return p.skills[c.upgrade]>=3?'blade':c.upgrade;}
@@ -1877,7 +1892,11 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(c.kind==='winch')return run.found?.['latch'+stage]?'绞盘匣':'绞盘匣 · 升闸';
     return '桥头补给箱';
   }
-  function makeOffers(c){const r=rng(runSeed+stage*97+Math.round(c.x)),pick=a=>a[Math.floor(r()*a.length)],free=relicPool().filter(id=>!relics[id]),ups=['blade','heart','flask'].concat(Object.keys(p.skills).filter(id=>p.skills[id]<3)),a=chestUpgrade(c);
+  function makeOffers(c){
+    const r=rng(runSeed+stage*97+Math.round(c.x)),pick=list=>list[Math.floor(r()*list.length)];
+    const boltReady=canUseBolt(),free=relicPool().filter(id=>!relics[id]&&(id!=='wick'||boltReady));
+    const ups=['blade','heart','flask'].concat(Object.keys(p.skills).filter(id=>p.skills[id]<3&&(id!=='flame'||boltReady)));
+    const a=chestUpgrade(c);
     const o=[{kind:'up',id:a},Object.assign({kind:'use'},pick([{id:'bomb',n:2},{id:'knife',n:4},{id:'frost',n:1}]))];
     o.push(free.length&&r()<.8?{kind:'relic',id:pick(free)}:{kind:'up',id:pick(ups.filter(u=>u!==a))});return o;}
   function offerText(o){if(o.kind==='up'){const u=UPS.find(q=>q.id===o.id);return{name:u.name+(p.skills[o.id]!=null?' · '+(p.skills[o.id]+1)+'级':''),info:u.info,tag:p.skills[o.id]!=null?'被动修炼':'强化'};}const it=ITEMS[o.id];return{name:it.name+(o.n>1?' ×'+o.n:''),info:it.info,tag:o.kind==='use'?'道具':'护符'};}
@@ -1975,7 +1994,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   }
   document.getElementById('practice-later').onclick=()=>endPractice(false);
   function lastChar(){let c='lamp';try{c=localStorage.getItem('ember:char')||'lamp';}catch(e){}return charOpen(c)?c:'lamp';}
-  function useSkill(i){if(state!=='play'||paused||!p)return;if(run.guided&&i>run.awakened)return;const id=CHARS[p.char].skills[i-1],S=SKILLS[id];if(id==='bolt'){castSoul();return;}if(p.castCd>0||p.roll>0||p.dash>0)return;if(p.soul<S.cost){say('魂火不够（还差 '+(S.cost-p.soul)+' 格）· 攻击命中敌人来积攒',1.4);beep(140,.08,'square');return;}
+  function useSkill(i){if(state!=='play'||paused||!p)return;if(run.guided&&i>run.awakened){say('该技能尚未觉醒，继续深入即可领悟',1.6);return;}const id=CHARS[p.char].skills[i-1],S=SKILLS[id];if(id==='bolt'){castSoul();return;}if(p.castCd>0||p.roll>0||p.dash>0)return;if(p.soul<S.cost){say('魂火不够（还差 '+(S.cost-p.soul)+' 格）· 攻击命中敌人来积攒',1.4);beep(140,.08,'square');return;}
     if(!L.tutorial)p.soul-=S.cost;p.castCd=L.tutorial?0:.35;hudKey='';if(relics.echo){p.echoN=(p.echoN||0)+1;if(p.echoN%3===0){p.soul=Math.min(3,p.soul+S.cost);pop(p.x+13,p.y-14,'回音','#9ff3e0');beep(990,.2,'sine');}}const f=p.face,cx=p.x+p.w/2,cy=p.y+p.h/2,gy=p.y+p.h;
     if(id==='shade'){p.dash=.2;p.dashHit=new Set();p.inv=Math.max(p.inv,.3);p.attack=0;beep(300,.12,'sawtooth');beep(620,.1,'sine');}
     else if(id==='ring'){p.ringT=5;beep(520,.2,'sine');beep(780,.25,'sine');}
@@ -2112,10 +2131,11 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function rememberSecret(s,value){rememberDiscovery('s'+stage+':'+secrets.indexOf(s),value);}
   function nearbyWayfarer(){
     const npc=L.wayfarer;
-    if(npc&&Math.abs(p.x+p.w/2-npc.x)<58&&Math.abs(p.y+p.h-npc.y)<37)return npc;
+    if(npc&&Math.abs(p.x+p.w/2-npc.x)<82&&Math.abs(p.y+p.h-npc.y)<52)return npc;
     return null;
   }
   function speakWayfarer(npc){
+    enemies.forEach(e=>{if(!e.dead&&Math.abs(e.x-p.x)<220){e.wind=0;e.cd=Math.max(e.cd,.8);}});
     const key='road:'+npc.id;
     const visited=!!run.found?.[key];
     if(npc.id==='runner'&&keepsakes.shade&&!run.found?.shadeCord){
@@ -2432,17 +2452,17 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   const LORE_ART={prologue:'fire',keeper:'bell',carving:'carving',lock:'key',merchant:'soup',shade:'shade',shadeHome:'shade',brood:'glass',flag:'flag',aling:'wick',beads:'beads',standard:'ribbon',journal:'journal',warden:'chain',ending:'bell'};
   // 行囊：背包是一格格画出来的道具；图鉴里道具是一面画墙（没得到的只剩剪影），点一下看说明
   function renderBag(fromMenu){let body='';const menuView=state==='menu';if(menuView&&bagTab==='bag')bagTab='dex';
-    if(bagTab==='bag'){const own=ALL_RELICS.filter(id=>relics[id]),keep=Object.keys(ITEMS).filter(id=>ITEMS[id].kind==='memento'&&keepsakes[id]),C=CHARS[p.char];
-      body='<div class="purse">'+chip('heart',(p.hp/LIFE)+' / '+(p.max/LIFE))+chip('blade',p.damage)+chip('flask',p.potions)+chip('ember',embers)+chip('flame',p.soul+' / 3')+chip('shard',((p.shards||0)%3)+' / 3')+chip('blueprint',BLUEPRINTS.filter(b=>codex.blue[b]).length+' / '+BLUEPRINTS.length)+(L.mapStand!=null?chip('map',hasMap()?'✓':'—'):'')+'</div>'
+    if(bagTab==='bag'){const own=ALL_RELICS.filter(id=>relics[id]),keep=Object.keys(ITEMS).filter(id=>ITEMS[id].kind==='memento'&&keepsakes[id]),C=CHARS[p.char],awakened=run.guided?(run.awakened||0):3,boltReady=canUseBolt();
+      body='<div class="purse">'+chip('heart',(p.hp/LIFE)+' / '+(p.max/LIFE),'生命','生命：'+(p.hp/LIFE)+' / '+(p.max/LIFE)+' 个小幽灵')+chip('blade',p.damage,'攻击','攻击伤害：'+p.damage)+chip('flask',p.potions,'药瓶','治疗药瓶：'+p.potions+' 瓶（'+(coarse()?'点药瓶治疗':'按 '+K('heal')+' 治疗')+'）')+chip('ember',embers,'余烬','余烬：'+embers+'（可在篝火驿站向烛叟购买补给）')+chip('flame',p.soul+' / 3','魂火','魂火：'+p.soul+' / 3（攻击命中积攒，技能消耗）')+chip('shard',((p.shards||0)%3)+' / 3','碎片','魂灯碎片：'+((p.shards||0)%3)+' / 3（集齐 3 片提升 1 点生命上限）')+chip('blueprint',BLUEPRINTS.filter(b=>codex.blue[b]).length+' / '+BLUEPRINTS.length,'图纸','护符图纸：已解锁 '+BLUEPRINTS.filter(b=>codex.blue[b]).length+' / '+BLUEPRINTS.length)+(L.mapStand!=null?chip('map',hasMap()?'✓':'—','路图',hasMap()?'已拥有本层全层路图':'尚未获得本层全层路图'):'')+'</div>'
         +'<h3>道具 <small>'+(coarse()?'点选装备 · 战斗中横滑道具键也可切换':K('use')+' 使用 · '+K('cycle')+' 切换')+'</small></h3><div class="slots">'+USES.map(id=>'<button data-sel="'+id+'" aria-pressed="'+(sel===id&&!!bag[id])+'"'+(bag[id]?'':' disabled')+' class="slot'+(sel===id&&bag[id]?' on':'')+(bag[id]?'':' off')+'"><span class="art">'+artImg(id)+'<i class="qty">'+(L.tutorial?'∞':bag[id])+'</i></span><b>'+ITEMS[id].name+'</b></button>').join('')+'</div><p class="detail">'+ITEMS[sel].info+'</p>'
-        +'<h3>'+C.name+'的技能 <small>攻击命中积攒魂火，'+(coarse()?'点右边的技能键':'按 '+K('skill1')+' / '+K('skill2')+' / '+K('skill3'))+'花魂火释放</small></h3><div class="slots skills">'+C.skills.slice(0,run.guided?run.awakened:3).map((s,i)=>'<button type="button" data-practice="'+(i+1)+'" class="slot"><span class="art">'+artImg('sk_'+s)+'<i class="qty">'+(coarse()?i+1:K('skill'+(i+1)))+'</i></span><b>'+SKILLS[s].name+'</b><span class="pips">'+pips(SKILLS[s].cost)+'</span><small>'+SKILLS[s].info+'</small><strong class="practice-link">练习此招 ›</strong></button>').join('')+'</div>'
-        +'<h3>修炼 <small>宝箱里的强化</small></h3><div class="slots skills">'+Object.keys(p.skills).map(id=>{const u=UPS.find(q=>q.id===id);return'<div class="slot'+(p.skills[id]?'':' off')+'"><span class="art">'+artImg(id)+'</span><b>'+u.name+'</b><span class="pips">'+pips(p.skills[id])+'</span><small>'+u.info.replace(/，最多 3 级$/,'')+'</small></div>';}).join('')+'</div>'
+        +'<h3>'+C.name+'的技能 <small>攻击命中积攒魂火，'+(coarse()?'点右边的技能键':'按 '+K('skill1')+' / '+K('skill2')+' / '+K('skill3'))+' 花魂火释放</small></h3><div class="slots skills">'+C.skills.map((s,i)=>{const unlockedSlot=i<awakened,keyLbl=coarse()?i+1:K('skill'+(i+1));if(!unlockedSlot)return'<div class="slot off locked"><span class="art">'+artImg('sk_'+s,true)+'<i class="qty">'+keyLbl+'</i></span><b>'+SKILLS[s].name+'</b><span class="pips">'+pips(SKILLS[s].cost)+'</span><small>'+SKILLS[s].info+'</small><span class="locked-tag">尚未觉醒 · 继续深入解锁</span></div>';return'<button type="button" data-practice="'+(i+1)+'" class="slot"><span class="art">'+artImg('sk_'+s)+'<i class="qty">'+keyLbl+'</i></span><b>'+SKILLS[s].name+'</b><span class="pips">'+pips(SKILLS[s].cost)+'</span><small>'+SKILLS[s].info+'</small><strong class="practice-link">练习此招 ›</strong></button>';}).join('')+'</div>'
+        +'<h3>修炼 <small>宝箱里的强化</small></h3><div class="slots skills">'+Object.keys(p.skills).map(id=>{const u=UPS.find(q=>q.id===id),noteLock=id==='flame'&&!boltReady&&!p.skills.flame?'（需先解锁魂火弹）':'';return'<div class="slot'+(p.skills[id]?'':' off')+'"><span class="art">'+artImg(id)+'</span><b>'+u.name+'</b><span class="pips">'+pips(p.skills[id])+'</span><small>'+u.info.replace(/，最多 3 级$/,'')+noteLock+'</small></div>';}).join('')+'</div>'
         +'<h3>护符</h3>'+(own.length?'<div class="grid">'+own.map(cell).join('')+'</div>':'<p class="empty">还没有护符。宝箱和烛叟那里都能得到。</p>')
         +'<h3>珍藏</h3>'+(keep.length?'<div class="grid">'+keep.map(cell).join('')+'</div>':'<p class="empty">路上有些旧物还泛着光。靠近后'+(coarse()?'点「查看」':'按 '+K('interact')+' 查看')+'。</p>');}
     else if(bagTab==='dex'){body='<h3>敌人</h3><div class="grid">'+FOES.map(d=>{const s=codex.seen[d.id],img=s&&portrait(d.id);return'<div class="cell foe">'+(img?'<img alt="" src="'+img+'">':'<i class="mark q">?</i>')+'<b>'+(s?d.name:'？？？')+'</b><small>'+(s?d.info+'<br>已击倒 '+(codex.kills[d.id]||0):'还没遇见过。')+'</small></div>';}).join('')+'</div>'
         +'<h3>道具 <small>'+Object.keys(ITEMS).filter(id=>codex.items[id]).length+' / '+Object.keys(ITEMS).length+' · 点一下看说明</small></h3><p class="detail" id="dex-detail">得到过的东西会画在这面墙上。</p><div class="gallery">'+Object.keys(ITEMS).map(id=>{const f=codex.items[id];return'<button class="pic'+(f?'':' off')+'" data-dex="'+id+'"><span class="art">'+artImg(id,!f)+'</span><b>'+(f?ITEMS[id].name:'？？？')+'</b></button>';}).join('')+'</div>';}
     else body='<div class="lore">'+LORE.map(l=>codex.lore[l.id]?'<p>'+mark(LORE_ART[l.id]||'bell')+'<b>'+l.title+'</b>'+l.text+'</p>':'<p class="off">'+mark(LORE_ART[l.id]||'bell',true)+'<b>？？？</b>还没读到这段往事。</p>').join('')+'</div>';
-    panel.innerHTML='<div class="sheet wide"><div class="tabs">'+(menuView?[['dex','图鉴'],['lore','传说']]:[['bag','背包'],['dex','图鉴'],['lore','传说']]).map(t=>'<button data-tab="'+t[0]+'"'+(bagTab===t[0]?' class="on"':'')+'>'+t[1]+'</button>').join('')+'</div>'+body+'<button class="secondary" id="bag-close">'+(menuView?'返回':'合上行囊')+'</button><p class="footnote">'+(coarse()?'':menuView?'Esc 返回':K('bag')+' / Esc 合上 · ← → 切换页签')+'</p></div>';
+    panel.innerHTML='<div class="sheet wide bagview"><div class="modal-head"><div class="tabs">'+(menuView?[['dex','图鉴'],['lore','传说']]:[['bag','背包'],['dex','图鉴'],['lore','传说']]).map(t=>'<button data-tab="'+t[0]+'"'+(bagTab===t[0]?' class="on"':'')+'>'+t[1]+'</button>').join('')+'</div><button class="secondary modal-close" id="bag-close">'+(menuView?'返回 ↩':'合上行囊')+'</button></div><div class="modal-body">'+body+'</div><div class="modal-foot"><p class="footnote">'+(coarse()?'':menuView?'Esc 返回 · ← → 切换页签':K('bag')+' / Esc 合上 · ← → 切换页签')+'</p></div></div>';
     panel.hidden=false;panel.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{bagTab=b.dataset.tab;renderBag();});panel.querySelectorAll('[data-sel]').forEach(b=>b.onclick=()=>{selectItem(b.dataset.sel);renderBag();panel.querySelector?.('[data-sel="'+sel+'"]')?.focus({preventScroll:true});});
     panel.querySelectorAll('[data-practice]').forEach(b=>b.onclick=()=>{closeBag();run.practiceSlot=Number(b.dataset.practice);hudKey='';syncHud();saveRun();});
     panel.querySelectorAll('[data-dex]').forEach(b=>b.onclick=()=>{const id=b.dataset.dex,f=codex.items[id],d=document.getElementById('dex-detail');d.innerHTML=f?'<b>'+ITEMS[id].name+'</b>　'+ITEMS[id].info:'还没得到过这样东西。';});document.getElementById('bag-close').onclick=menuView?renderMenu:closeBag;}
@@ -2537,17 +2557,17 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       hudView.progress=progress;
     }
     const skillKeys=K('skill1')+'|'+K('skill2')+'|'+K('skill3');
-    const itemKey=sel+'|'+bag.bomb+'|'+bag.knife+'|'+bag.frost+'|'+!!L.tutorial;
+    const itemKey=sel+'|'+bag.bomb+'|'+bag.knife+'|'+bag.frost+'|'+!!L.tutorial+'|'+K('use')+'|'+K('cycle')+'|'+coarse();
     const skillArt=p.char+'|'+skillKeys+'|'+!!L.tutorial;
-    const skillState=skillArt+'|'+p.soul+'|'+!!run.guided+'|'+run.awakened+'|'+run.practiceSlot;
-    const lifeKey=p.hp+'|'+p.max,purseKey=embers+'|'+p.potions;
+    const skillState=skillArt+'|'+p.soul+'|'+!!run.guided+'|'+(run.awakened||0)+'|'+run.practiceSlot;
+    const lifeKey=p.hp+'|'+p.max,purseKey=embers+'|'+p.potions+'|'+K('heal')+'|'+coarse();
     const key=lifeKey+'|'+purseKey+'|'+itemKey+'|'+skillState+'|'+coarse()+'|'+!!secretRoom;
     if(key===hudKey)return;
     hudKey=key;renderPractice();updateItemReceipt();
     if(itemKey!==hudView.item){
       const quick=document.getElementById('quick-item'),current=ITEMS[sel].name+' · '+itemStock(sel),qty=L.tutorial?'∞':bag[sel];
       document.getElementById('item-name').innerHTML=artImg(sel);
-      quick.innerHTML=artImg(sel)+'<b>'+qty+'</b>';quick.title=current+' · 打开行囊选择';
+      quick.innerHTML=artImg(sel)+(coarse()?'':'<kbd class="hud-key">'+K('use')+'</kbd>')+'<b>'+qty+'</b>';quick.title=current+(coarse()?' · 打开行囊选择':' · 按 '+K('use')+' 使用 · '+K('cycle')+' 切换 · 点击打开行囊');
       if(quick.setAttribute)quick.setAttribute('aria-label',quick.title);
       if(itemBtn.setAttribute)itemBtn.setAttribute('aria-label','使用'+current+'，左右滑动切换');
       document.getElementById('item-count').textContent=qty;
@@ -2564,21 +2584,23 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(skillState!==hudView.skills){
       const skills=CHARS[p.char].skills;
       for(let i=1;i<=3;i++){
-        const id=skills[i-1],skill=SKILLS[id],ready=p.soul>=skill.cost;
+        const id=skills[i-1],skill=SKILLS[id],locked=!!run.guided&&i>(run.awakened||0),ready=!locked&&p.soul>=skill.cost;
         for(const touchSkill of [false,true]){
           const button=document.getElementById((touchSkill?'tsk':'sk')+i);
           if(!button)continue;
           if(skillArt!==hudView.skillArt){
             const cost=L.tutorial?'∞':'<u></u>'.repeat(skill.cost);
             button.innerHTML=artImg('sk_'+id)+'<i>'+(touchSkill?i:K('skill'+i))+'</i><em>'+cost+'</em>';
-            button.title=skill.name+'（'+skill.cost+' 格魂火）：'+skill.info;
           }
-          button.hidden=!!run.guided&&i>run.awakened;
+          button.title=locked?skill.name+'（尚未觉醒，继续推进旅程后解锁）':skill.name+'（'+skill.cost+' 格魂火）：'+skill.info;
+          button.hidden=touchSkill?locked:false;
+          button.disabled=locked;
+          button.classList[locked?'add':'remove']('locked');
           button.classList[ready?'add':'remove']('ready');
           button.classList[run.practiceSlot===i?'add':'remove']('practicing');
           if(button.setAttribute){
-            button.setAttribute('data-soul',p.soul);
-            button.setAttribute('aria-label',skill.name+'，'+(ready?'可施放':'还差 '+(skill.cost-p.soul)+' 格魂火'));
+            button.setAttribute('data-soul',locked?0:p.soul);
+            button.setAttribute('aria-label',locked?skill.name+'，尚未觉醒':skill.name+'，'+(ready?'可施放':'还差 '+(skill.cost-p.soul)+' 格魂火'));
           }
         }
       }
@@ -2591,7 +2613,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       document.getElementById('stats').textContent=alive+' / '+count;hudView.life=lifeKey;
     }
     if(purseKey!==hudView.purse){
-      document.getElementById('chips').innerHTML=chip('flask',p.potions)+chip('ember',embers);
+      document.getElementById('chips').innerHTML=chip('flask',p.potions,'',coarse()?'治疗药瓶':'治疗药瓶 · 按 '+K('heal')+' 治疗',coarse()?'':K('heal'))+chip('ember',embers,'','余烬：可在篝火驿站向烛叟购买补给');
       document.getElementById('potion-count').textContent=p.potions;
       healBtn.classList[p.potions?'remove':'add']('empty');hudView.purse=purseKey;
     }
@@ -2927,11 +2949,14 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   }
   function currentBand(x=p?.x??cam){if(!L||!L.bands)return null;let b=L.bands[0];for(const q of L.bands)if(x>=q[0])b=q;return b;}
   function noteBand(){const b=currentBand();if(!b||state!=='play')return;if(!bandId){bandId=b[2];return;}if(b[2]!==bandId){bandId=b[2];say(b[1],2.2);}}
-  function step(dt){if(passage){passageTick(dt);musicTick();return;}const rdt=dt;if(cine&&cine.slow&&cine.t<cine.slow)dt*=.3;if(slowMo>0){slowMo-=rdt;dt*=.35;}time+=dt;if(messageT>0){messageT-=rdt;notice.style.opacity=messageT>0?1:0;}if(gainT>0){gainT-=rdt;if(gainT<=0){gainBox.hidden=true;if(toastQ.length)toastNow(toastQ.shift());}}if(flashT>0)flashT=Math.max(0,flashT-rdt);if(state==='dead'&&deathT<9)deathT+=rdt;
-    if(!itemBelt.hidden&&state==='play'&&!paused&&(beltTime-=rdt)<=0)itemBelt.hidden=true;
-    musicTick(rdt);
-    if(credits){credits.t+=rdt;if(credits.t>credits.dur)endCredits();return;}
+  function step(dt){if(passage){passageTick(dt);musicTick();return;}const rdt=dt;
+    musicTick();
+    if(credits){time+=rdt;credits.t+=rdt;if(credits.t>credits.dur)endCredits();return;}
     if(paused||state==='upgrade'||state==='shop'||state==='bag'||state==='map')return;
+    if(cine&&cine.slow&&cine.t<cine.slow)dt*=.3;
+    if(slowMo>0){slowMo-=rdt;dt*=.35;}
+    time+=dt;if(messageT>0){messageT-=rdt;notice.style.opacity=messageT>0?1:0;}if(gainT>0){gainT-=rdt;if(gainT<=0){gainBox.hidden=true;if(toastQ.length)toastNow(toastQ.shift());}}if(flashT>0)flashT=Math.max(0,flashT-rdt);if(state==='dead'&&deathT<9)deathT+=rdt;
+    if(!itemBelt.hidden&&state==='play'&&!paused&&(beltTime-=rdt)<=0)itemBelt.hidden=true;
     if(talk){sceneT+=rdt;talk.faceAge+=rdt;if(talk.arena){const boss=enemies.find(e=>e.type==='boss');if(boss){const focus=(p.x+p.w/2+boss.x+boss.w/2)/2;cam+=(clamp(focus-W*.5,0,Math.max(0,WORLD-W))-cam)*Math.min(1,rdt*3.6);if(!boss.dead){boss.face=boss.x>p.x?-1:1;p.face=-boss.face;}}}typeTalk(rdt);if(state==='talk'||passage)return;}else if(state==='talk')return;
     if(secretRoom&&state==='play'){updateSecretRoom(dt);return;}
     if(state==='play')titleT=Math.max(0,titleT-dt);
@@ -2963,7 +2988,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       ?clamp(1-p.atkCd/(BOW_INTERVAL-BOW_RECOIL),0,1):0;
     p.castCd=Math.max(0,p.castCd-dt);const stand=p.buffer>0&&p.ground&&D.d&&deckUnderfoot();
     if(stand){dropThroughDeck(stand);p.rollFromGround=false;dust(p.x+13,p.y+p.h,4,0);}
-    else if(p.buffer>0&&(p.coyote>0||(p.char==='lamp'&&p.jumps<2))){p.vy=p.cutQueued?-230:-FEEL.jumpSpeed-p.skills.spring*30;p.jumps=p.coyote>0?1:2;p.jumpRising=!p.cutQueued;p.cutQueued=false;p.ground=false;p.coyote=0;p.buffer=0;p.on=null;if(p.jumps>1)burst(p.x+13,p.y+44,'#9fe0d4',8);else dust(p.x+13,p.y+p.h,5,0);beep(340,.07);}
+    else if(p.buffer>0&&(p.coyote>0||(p.char==='lamp'&&p.jumps<2))){p.vy=p.cutQueued?-280:-FEEL.jumpSpeed-p.skills.spring*30;p.jumps=p.coyote>0?1:2;p.jumpRising=!p.cutQueued;p.cutQueued=false;p.ground=false;p.coyote=0;p.buffer=0;p.on=null;if(p.jumps>1)burst(p.x+13,p.y+44,'#9fe0d4',8);else dust(p.x+13,p.y+p.h,5,0);beep(340,.07);}
     const was=p.ground,fall=p.vy;
     if(p.drop&&p.y>=p.drop.y)p.drop=null;if(p.dash>0)p.vy=0;else p.vy+=(p.vy>40?FEEL.grav*FEEL.fall:FEEL.grav)*dt;
     const rope=activeClimb(D);
@@ -3065,7 +3090,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     const traveler=nearbyWayfarer();
     const kind=nearSecretDoor()?'secret':traveler?'wayfarer':nearShadeHook()?(keepsakes.shade&&!run.found?.shadeHome?'returnShade':'shadeHook'):nearFire()?'fire':nearShop()?'shop':nearNpc()?'npc':nearLore()?'lore':nearMapStand()?(hasMap()?'mapOwned':'mapStand'):nearbyChest()?'chest':'';
     if(kind!==nearKind){nearKind=kind;nearChest=!!kind;chestBtn.hidden=!kind;chestBtn.textContent={secret:'进暗门',wayfarer:'交谈',shadeHook:'看灯钩',returnShade:'挂灯罩',fire:'休息',shop:'商店',npc:'交谈',mapStand:'购图',mapOwned:'看图',lore:'查看'}[kind]||'开箱';}
-    if(kind&&kind!=='wayfarer'&&messageT<.2){const t=coarse(),E=K('interact');say({shadeHook:t?'点「看灯钩」':'矮灯钩 · 按 '+E+' 查看',returnShade:t?'点「挂灯罩」归还阿苓的灯罩':'阿苓的矮钩 · 按 '+E+' 挂回灯罩',secret:t?'点「进暗门」进入墙后的侧室':'按 '+E+' 进暗门',fire:t?'篝火 · 点「休息」恢复状态':'篝火 · 按 '+E+' 休息（每站一次）',shop:t?'烛叟 · 点「商店」':'烛叟 · 按 '+E+' 交谈、交易',npc:t?'守钟人 · 点「交谈」':'守钟人 · 按 '+E+' 交谈',mapStand:'路图匣 · '+(t?'点「购图」':'按 '+E+' 购图')+'（'+mapPrice()+' 余烬）',mapOwned:'路图匣 · '+(t?'点「看图」':'按 '+E)+' 查看全层路图',lore:t?'有什么东西在发光 · 点「查看」':'有什么东西在发光 · 按 '+E+' 查看',chest:t?'铜色宝箱 · 点「开箱」':'铜色宝箱 · 按 '+E+' 打开'}[kind],.3);}
+    if(kind&&messageT<.2){const t=coarse(),E=K('interact');say({wayfarer:traveler?(traveler.name+' · '+(t?'点「交谈」':'按 '+E+' 交谈')):'',shadeHook:t?'点「看灯钩」':'矮灯钩 · 按 '+E+' 查看',returnShade:t?'点「挂灯罩」归还阿苓的灯罩':'阿苓的矮钩 · 按 '+E+' 挂回灯罩',secret:t?'点「进暗门」进入墙后的侧室':'按 '+E+' 进暗门',fire:t?'篝火 · 点「休息」恢复状态':'篝火 · 按 '+E+' 休息（每站一次）',shop:t?'烛叟 · 点「商店」':'烛叟 · 按 '+E+' 交谈、交易',npc:t?'守钟人 · 点「交谈」':'守钟人 · 按 '+E+' 交谈',mapStand:'路图匣 · '+(t?'点「购图」':'按 '+E+' 购图')+'（'+mapPrice()+' 余烬）',mapOwned:'路图匣 · '+(t?'点「看图」':'按 '+E)+' 查看全层路图',lore:t?'有什么东西在发光 · 点「查看」':'有什么东西在发光 · 按 '+E+' 查看',chest:t?'铜色宝箱 · 点「开箱」':'铜色宝箱 · 按 '+E+' 打开'}[kind],.3);}
     if(L.seal){if(p.x>L.seal+10){if(enemies.some(e=>e.type==='boss'&&!e.dead)){p.x=L.seal;say('铁闸紧闭 · 先击败首领',2);}else if(p.ground){nextStage();return;}}}
     else if(L.wicks&&run.doorLift<1){if(p.x+p.w>L.exit-10){p.x=L.exit-10-p.w;p.vx=Math.min(0,p.vx);}}
     else if(p.x+p.w/2>L.exit+20&&p.ground){nextStage();return;}

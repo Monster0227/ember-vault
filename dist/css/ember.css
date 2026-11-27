@@ -863,3 +863,192 @@ html,body,#stage{max-width:100%;overflow:hidden}
   .route-atlas .menu-item[data-level] small{font-size:11px}
   .route-pages>.secondary{margin-top:4px}
 }
+
+/* ===== ux-gameplay-polish: centered bounded modals, sticky close bars, alignment, HUD hints & contrast ===== */
+#panel:has(>.dialog-panel),
+#panel:has(>.reward),
+#panel:has(>.win),
+#panel:has(>.settings),
+#panel:has(>.bagview),
+#panel:has(>.chars){
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  padding:clamp(12px,3vh,32px) max(14px,env(safe-area-inset-right)) clamp(12px,3vh,32px) max(14px,env(safe-area-inset-left));
+  background:radial-gradient(circle at 50% 45%,rgba(16,22,33,.84),rgba(9,13,20,.95));
+}
+
+.sheet.dialog-panel,
+.sheet.reward,
+.sheet.win{
+  width:min(100%,540px);
+  max-width:540px;
+  max-height:100%;
+  margin:0;
+  padding:clamp(20px,3vw,30px);
+  background:#101621f5;
+  border:1px solid #485662;
+  border-radius:10px;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+  scrollbar-color:#647482 transparent;
+}
+.sheet.reward{width:min(100%,660px);max-width:660px}
+.sheet.dialog-panel h1,.sheet.win h1{font-size:clamp(34px,4.8vw,54px);margin-top:10px}
+.sheet.dialog-panel .intro,.sheet.win .intro{max-width:100%;overflow-wrap:break-word;word-break:break-word;margin:14px 0 20px}
+.panel-actions{display:flex;flex-direction:column;gap:10px;width:100%;max-width:340px;margin:0 0 6px}
+.panel-actions .primary,.panel-actions .secondary{width:100%;min-width:0;margin:0;box-sizing:border-box}
+.sheet.dialog-panel .keys{margin:16px 0 0}
+
+/* Chest reward cards: symmetrical grid without orphan wraps */
+.sheet.reward .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:16px 0 8px}
+#panel .sheet.reward .cards .card{max-width:none;width:100%;margin:0;display:flex;flex-direction:column;align-items:center}
+.sheet.reward .card small{text-wrap:pretty}
+
+/* Long scrollable modals: fixed header & footer so close/back stays visible with zero outer scrollbar */
+.sheet.settings,
+.sheet.bagview,
+.sheet.chars{
+  max-height:100%;
+  margin:0;
+  padding:0;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  border-radius:10px;
+  background:#101621f5;
+  border:1px solid #485662;
+}
+.sheet.settings{width:min(100%,740px);max-width:740px}
+.sheet.bagview{width:min(100%,900px);max-width:900px}
+.sheet.chars{width:min(100%,780px);max-width:780px}
+.modal-head{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:14px 22px 12px;
+  border-bottom:1px solid #3a4652;
+  background:#101621;
+}
+.modal-head h1{margin:2px 0 0;font-size:clamp(26px,3.6vw,40px);line-height:1.2}
+.modal-head .tabs{flex:1;margin:0;border-bottom:0}
+.modal-head .modal-close{
+  flex:0 0 auto;
+  margin:0;
+  min-width:0;
+  width:auto;
+  min-height:44px;
+  padding:8px 14px;
+  font-size:13px;
+  letter-spacing:1px;
+  white-space:nowrap;
+  border-color:#6e7c86;
+  color:#e6d7b8;
+  background:transparent;
+}
+.modal-head .modal-close:hover{border-color:#dbbc87;color:#fff2d6}
+.modal-body{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  padding:14px 22px 18px;
+  scrollbar-width:thin;
+  scrollbar-color:#5b6b78 transparent;
+}
+.modal-foot{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+  padding:10px 22px 14px;
+  border-top:1px solid #3a4652;
+  background:#101621;
+}
+.modal-foot .footnote{margin:0;color:#99a8b1}
+.modal-foot .primary,.modal-foot .secondary{margin:0}
+.chars .modal-foot .journey-actions{width:100%;margin:0}
+.touch-layout .modal-head .modal-close{position:static;background:transparent}
+
+/* Character select: equal-height cards & aligned stat bars */
+.chars .char-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:4px 0 10px}
+.chars .char-card{max-width:none;width:100%;margin:0;display:flex;flex-direction:column;align-items:stretch}
+.chars .char-card .role{min-height:2.9em;line-height:1.45;margin:4px 0 8px;text-wrap:balance}
+.chars .char-card .bars{margin-top:auto}
+
+/* Settings: aligned labels, no mid-word wrap, units & inactive touch slider styling */
+.settings .modal-body h3:first-child{margin-top:2px}
+.settings .slider span{width:96px;min-width:96px;flex-shrink:0;white-space:nowrap;color:#d3d9dc}
+.settings .slider b{width:54px;flex-shrink:0;white-space:nowrap}
+.settings .opt span{width:96px;min-width:96px;flex-shrink:0;white-space:nowrap;color:#d3d9dc}
+.touch-sliders{margin-top:4px;padding:6px 10px;border-left:2px solid #3d4d5a;border-radius:4px;background:#141d2766}
+.touch-sliders.is-inactive{opacity:.62}
+.touch-sliders-note{margin:0 0 6px;font-size:12px;line-height:1.5;color:#9eb0b8}
+
+/* HUD key badges, locked skill placeholders & Bag stat labels */
+.hud-key{
+  display:inline-block;
+  margin-left:4px;
+  padding:0 4px;
+  min-width:16px;
+  height:16px;
+  line-height:15px;
+  border-radius:3px;
+  background:#1b2732;
+  border:1px solid #8c7b5a;
+  color:#f2dfb8;
+  font:700 10px/15px Georgia,"Microsoft YaHei",sans-serif;
+  text-align:center;
+  vertical-align:middle;
+}
+#quick-item .hud-key{position:absolute;left:-4px;top:-6px;margin:0;background:#dbbc87;border-color:#f4d69f;color:#20212a}
+.skills .sk.locked{opacity:.38;border-style:dashed;border-color:#53636d;cursor:default;filter:grayscale(.75)}
+.skills .sk.locked i{background:#3b4953;color:#c4d0d6}
+.skills .sk.locked em{display:none}
+.skills .sk.locked::after{content:'锁';position:absolute;right:2px;bottom:1px;font-size:9px;line-height:1;color:#b7c4ca;background:#101820cc;padding:1px 3px;border-radius:3px}
+.purse{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:8px 12px}
+.purse .chip{display:inline-flex;align-items:center;gap:5px;margin:0}
+.purse .chip img,.purse .chip svg{margin-right:0}
+.chip-label{font-size:11px;color:#9eb0b8}
+.slots.skills .slot.locked{opacity:.65;cursor:default;border-style:dashed}
+.slots.skills .slot.locked .art{opacity:.35;filter:grayscale(.9)}
+.slots.skills .slot .locked-tag{display:block;margin-top:6px;font-size:11px;color:#9db0b8}
+
+/* Higher contrast for Codex/Lore locked & secondary text + title version badge */
+.lore p.off{color:#96a4ad}
+.lore p.off b{color:#b7c3cb}
+.gallery .pic.off{color:#93a1aa}
+.empty{color:#9aa9b4}
+.sheet h3 small{color:#9aa8b2}
+.grid .cell small{color:#b5c2c7}
+.slot small{color:#a7b6bc}
+.detail{color:#d6dde1}
+.home-version{margin:10px 0 0;font-size:11px;letter-spacing:.08em;color:#9aa9ad}
+
+@media(max-width:600px){
+  .sheet.reward .cards{grid-template-columns:1fr}
+  #panel .sheet.reward .cards .card{flex-direction:row;text-align:left;padding:8px 10px}
+  .modal-head{padding:10px 14px}
+  .modal-body{padding:12px 14px 14px}
+  .modal-foot{padding:8px 14px 12px}
+  .chars .char-cards{grid-template-columns:1fr;gap:6px}
+  .chars .char-card{display:grid;grid-template-columns:50px minmax(0,1fr);column-gap:10px;align-items:center;text-align:left}
+  .chars .char-card .role{min-height:0;margin:2px 0 5px}
+  .chars .char-card .bars{margin-top:0}
+  .panel-actions{max-width:none}
+  .settings .slider span,.settings .opt span{width:84px;min-width:84px;font-size:12px}
+}
+@media(orientation:landscape) and (max-height:500px){
+  .modal-head{padding:8px 14px}
+  .modal-head h1{font-size:24px}
+  .modal-body{padding:8px 14px 12px}
+  .modal-foot{padding:6px 14px 8px}
+  .sheet.dialog-panel,.sheet.reward,.sheet.win{padding:12px 16px}
+  .chars .char-cards{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .chars .char-card .role{min-height:0}
+}

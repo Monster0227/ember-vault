@@ -50,7 +50,7 @@ sandbox.window=sandbox;
 sandbox.matchMedia=() => ({matches:false});
 let code=fs.readFileSync(require('path').join(__dirname,'../dist/js/ember.js'),'utf8');
 // Instrument only this VM instance; no test controls are shipped in the browser.
-code=code.replace(/\}\)\(\);\s*$/, 'window.test={bounds,SCENES,drawStory,ashSignal,step,action,selectLevel,renderChapters,showWinPanel,hurt,strike,hitEnemy,killEnemy,startChapter,finish,reset,respawn,loadStage,retryStage,STAGES,TALK,get bag(){return bag},get relics(){return relics},get keepsakes(){return keepsakes},get sel(){return sel},set sel(v){sel=v},get offers(){return offers},get flags(){return flags},get run(){return run},get codex(){return codex},get thrown(){return thrown},get breakables(){return breakables},get hazards(){return hazards},get loot(){return loot},get floats(){return floats},get gateK(){return gateK},get talk(){return talk},set introSeen(v){introSeen=v},get player(){return p},get enemies(){return enemies},get shots(){return shots},get waves(){return waves},get orbs(){return orbs},get fx(){return fx},get chunks(){return chunks},get platforms(){return platforms},get chests(){return chests},get state(){return state},get score(){return score},get stage(){return stage},get unlocked(){return unlocked},set unlocked(v){unlocked=v},get L(){return L},get embers(){return embers},set embers(v){embers=v},get checkpoint(){return checkpoint},get credits(){return credits},get sceneArt(){return sceneA},get cine(){return cine},get traps(){return traps},get clears(){return clears},set clears(v){clears=v},get cycle(){return cycle},set cycle(v){cycle=v},useSkill,get secrets(){return secrets},hasMap,parseLine,relicPool,gainShard,gainBlueprint,startTutorial,finishTutorial,TUTORIAL,CHARS,SKILLS,showMenu,startJourney,continueRun,finishRebind,SONGS,get settings(){return settings},get BIND(){return BIND},set rebinding(v){rebinding=v},get cam(){return cam},set cam(v){cam=v}};})();');
+code=code.replace(/\}\)\(\);\s*$/, 'window.test={bounds,SCENES,drawStory,ashSignal,step,action,selectLevel,renderChapters,renderChars,renderSettings,openBag,makeOffers,showWinPanel,hurt,strike,hitEnemy,killEnemy,startChapter,finish,reset,respawn,loadStage,retryStage,STAGES,TALK,get time(){return time},get bag(){return bag},get relics(){return relics},get keepsakes(){return keepsakes},get sel(){return sel},set sel(v){sel=v},get offers(){return offers},get flags(){return flags},get run(){return run},get codex(){return codex},get thrown(){return thrown},get breakables(){return breakables},get hazards(){return hazards},get loot(){return loot},get floats(){return floats},get gateK(){return gateK},get talk(){return talk},set introSeen(v){introSeen=v},get player(){return p},get enemies(){return enemies},get shots(){return shots},get waves(){return waves},get orbs(){return orbs},get fx(){return fx},get chunks(){return chunks},get platforms(){return platforms},get chests(){return chests},get state(){return state},get score(){return score},get stage(){return stage},get unlocked(){return unlocked},set unlocked(v){unlocked=v},get L(){return L},get embers(){return embers},set embers(v){embers=v},get checkpoint(){return checkpoint},get credits(){return credits},get sceneArt(){return sceneA},get cine(){return cine},get traps(){return traps},get clears(){return clears},set clears(v){clears=v},get cycle(){return cycle},set cycle(v){cycle=v},useSkill,get secrets(){return secrets},hasMap,parseLine,relicPool,gainShard,gainBlueprint,startTutorial,finishTutorial,TUTORIAL,CHARS,SKILLS,showMenu,startJourney,continueRun,finishRebind,SONGS,get settings(){return settings},get BIND(){return BIND},set rebinding(v){rebinding=v},get cam(){return cam},set cam(v){cam=v}};})();');
 vm.runInNewContext(code,sandbox);
 const t=sandbox.test;
 function advance(seconds) { for(let i=0;i<Math.ceil(seconds*120);i++)t.step(1/120); }
@@ -1534,6 +1534,63 @@ test('old final chest claims stay on their replacement and leave newly added win
     t.run.found={['chest:'+i+':1']:true};t.loadStage(i);
     assert.deepEqual(Array.from(t.chests,c=>c.open),[false,false,true]);
   }
+});
+test('chest offers exclude bolt-only upgrades before bolt is available or on non-bolt heroes',()=>{
+  t.startJourney('lamp',0);finishTalk();advance(1);
+  assert(t.run.guided&&t.run.awakened<3);
+  for(let x=100;x<900;x+=17){
+    const ids=t.makeOffers({...t.chests[0],x}).map(o=>o.id);
+    assert(!ids.includes('flame')&&!ids.includes('wick'),'stage 1 locked bolt offers excluded');
+  }
+  for(const hero of ['bell','bow']){
+    t.reset(true,hero);
+    for(let x=100;x<900;x+=17){
+      const ids=t.makeOffers({...t.chests[0],x}).map(o=>o.id);
+      assert(!ids.includes('flame')&&!ids.includes('wick'),hero+' never rolls bolt-only rewards');
+    }
+  }
+});
+test('interact prompts stay contextual after chests open and mason talks within gaze range',()=>{
+  t.chests.forEach(c=>c.open=true);
+  t.player.x=150;t.player.y=428;advance(.05);
+  t.action('interact');
+  assert(!nodes.notice.textContent.includes('铜色宝箱'),'no stale chest hint after chests are opened');
+  assert.equal(nodes.notice.textContent,'附近没有可互动的对象');
+  t.player.x=t.L.wayfarer.x-72;t.player.y=t.L.wayfarer.y-t.player.h;advance(.05);
+  t.action('interact');assert.equal(t.state,'talk','mason engages smoothly within standing distance');
+  finishTalk();assert.equal(t.state,'play');assert(t.player.inv>=.7,'post-dialogue grace prevents ambush');
+});
+test('pause freezes visual effect clock and active ring animation',()=>{
+  t.reset(true,'lamp');t.player.soul=3;press('Digit2');release('Digit2');assert(t.player.ringT>4);
+  press('Escape');assert(sandbox.EmberGame.paused);
+  const frozenTime=t.time,frozenRing=t.player.ringT;
+  advance(1);
+  assert.equal(t.time,frozenTime,'world animation time stays frozen while paused');
+  assert.equal(t.player.ringT,frozenRing,'ring duration stays frozen while paused');
+  press('Escape');assert(!sandbox.EmberGame.paused);
+  advance(.2);assert(t.time>frozenTime,'world time resumes after unpausing');
+  t.action('roll');t.strike({struck:false,x:t.player.x,w:30},0,0,9999,9999,14);
+  assert(t.player.perfect,'perfect dodge started slow motion');
+  press('Escape');advance(1);press('Escape');
+  const resumed=t.time;t.step(.1);
+  assert(Math.abs(t.time-resumed-.035)<1e-8,'remaining dodge slow motion survives pause');
+});
+test('HUD key badges, locked skill slots, bag labels, settings clarity and title version render cleanly',()=>{
+  t.startJourney('lamp',0);finishTalk();advance(1);
+  assert(nodes.chips.innerHTML.includes('>L<'),'heal key badge shown on HUD');
+  assert(nodes['quick-item'].innerHTML.includes('>U<'),'quick item key badge shown on HUD');
+  assert.equal(nodes.sk1.hidden,false,'desktop HUD shows locked skill placeholder instead of blank bar');
+  assert.equal(nodes.tsk1.hidden,true,'touch HUD keeps locked skills hidden');
+  t.openBag();
+  assert(nodes.panel.innerHTML.includes('尚未觉醒'),'bag shows locked skills rather than empty area');
+  assert(nodes.panel.innerHTML.includes('花魂火释放')&&nodes.panel.innerHTML.includes(' / 3 花魂火释放'),'bag skill hint spacing fixed');
+  assert(nodes.panel.innerHTML.includes('生命')&&nodes.panel.innerHTML.includes('药瓶')&&nodes.panel.innerHTML.includes('图纸'),'bag stat chips have readable labels');
+  t.renderSettings('menu');
+  assert(nodes.panel.innerHTML.includes('设备震动'),'haptic setting clearly distinguished from screen shake');
+  assert(!nodes.panel.innerHTML.includes('<span class="chapter">设置</span>'),'duplicate settings eyebrow removed');
+  assert(nodes.panel.innerHTML.includes('%</b>')&&nodes.panel.innerHTML.includes('px</b>'),'settings sliders show units');
+  t.showMenu();
+  assert(nodes.panel.innerHTML.includes('v'+sandbox.EmberGame.version),'title screen displays version badge');
 });
 console.log('All '+passed+' gameplay checks passed.');
 
