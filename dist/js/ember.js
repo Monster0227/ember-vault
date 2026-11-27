@@ -269,7 +269,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       ens:[[590,480,'guard',{sparring:true}],[900,295,'archer'],[1280,480,'guard'],[1740,370,'guard'],
         [2310,480,'shield'],[2830,480,'flyer'],[3225,480,'crawler']],
       traps:[{k:'tspike',x:1810,n:3,per:3,ph:.3},{k:'pendulum',x:2530,top:42,len:346,amp:.36,per:3.8,ph:0}],
-      chests:[[600,370],[2050,280],[3000,280]],caches:[360,1460,2860],secrets:[[1630,FLOOR,'shard'],[3115,197,'embers']],
+      chestPlan:{relay:'spring',bridge:'heart',bridgeSlot:2},caches:[360,1460,2860],secrets:[[1630,FLOOR,'shard'],[3115,197,'embers']],
       spikes:[[2380,3]],acid:[],checks:[900,1550,2280,2910]},
     {theme:'sewers',chapter:2,chapterStart:true,name:'腐水下水道',en:'Rotwater Sewers',w:3730,exit:3550,seed:4242,hpK:1.35,dmgK:1.15,
       intro:'污水漫过旧路 · 看准喷口间歇，借浮台过水',mapStand:980,lore:{x:2100,id:'shade'},bands:[[0,'暗渠','drain'],[1240,'蓄水池','cistern'],[2490,'灯坟','nest']],
@@ -281,7 +281,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       ens:[[620,480,'guard'],[1140,480,'crawler'],[1500,480,'lurker'],[1690,480,'shield'],[2080,480,'bomber'],
         [2672,480,'guard'],[3260,480,'lurker'],[3410,480,'spear']],
       traps:[{k:'spout',x:1415,per:3.4,ph:.2,h:170},{k:'vent',x:2990,w:65,per:3,ph:0,h:210},{k:'spout',x:3290,per:3.2,ph:.5,h:180}],
-      chests:[[470,360],[2010,310],[3240,245]],caches:[535,1605,3300],secrets:[[1560,FLOOR,'blue'],[3280,245,'shard']],checks:[1060,1930,3030]},
+      chestPlan:{relay:'dash',bridge:'flask',bridgeSlot:2},caches:[535,1605,3300],secrets:[[1560,FLOOR,'blue'],[3280,245,'shard']],checks:[1060,1930,3030]},
     {theme:'ramparts',chapter:3,chapterStart:true,name:'落日城墙',en:'Sunset Ramparts',w:3930,exit:3750,seed:9090,hpK:1.7,dmgK:1.3,
       intro:'风从城垛间灌进来 · 小心断崖与弩箭',mapStand:1370,lore:{x:3060,id:'flag'},bands:[[0,'城门','gate'],[1390,'城垛','wall'],[2700,'残塔','tower']],
       plats:[[420,360,200],[760,290,200],[886,448,98],[1180,370,205],[1760,360,165],
@@ -292,7 +292,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       ens:[[600,480,'guard'],[850,290,'archer'],[1225,480,'spear'],[1830,480,'shield'],
         [2420,480,'crawler'],[2740,355,'archer'],[2970,480,'guard',{elite:true}],[3580,480,'guard']],
       traps:[{k:'wind',x0:2360,x1:2540,dir:-1,per:6,ph:0},{k:'ballista',x:3150,y:330,dir:-1,per:3.6,ph:.5}],
-      chests:[[500,360],[3420,265]],caches:[665,1320,3430],secrets:[[1620,FLOOR,'relic'],[3550,FLOOR,'shard']],
+      chestPlan:{relay:'heart',bridge:'blade',bridgeSlot:1},caches:[665,1320,3430],secrets:[[1620,FLOOR,'relic'],[3550,FLOOR,'shard']],
       shortcut:{open:2850,door:520,dest:2690},checks:[1130,1740,2670,3260]},
     {theme:'ossuary',chapter:3,name:'骸骨墓窟',en:'Bone Crypt',w:4000,exit:3820,seed:6161,hpK:2.05,dmgK:1.45,
       intro:'骨龛里的蜡烛仍在燃烧 · 沿灯穿过暗室',mapStand:1620,lore:{x:1310,id:'beads'},bands:[[0,'骨廊','oss'],[1440,'龛室','niche'],[2600,'夜殿','nave']],
@@ -305,7 +305,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
         [2070,480,'spear'],[2670,480,'caster'],[3220,480,'shield'],[3500,480,'guard']],
       traps:[{k:'jet',x:1510,y:FLOOR-24,dir:1,len:105,per:3,ph:0},{k:'jet',x:2700,y:FLOOR-24,dir:1,len:150,per:3,ph:.5},
         {k:'jet',x:3430,y:FLOOR-24,dir:-1,len:150,per:3,ph:0}],
-      chests:[[470,355],[3430,217]],caches:[635,1380,3230],secrets:[[1430,FLOOR,'shard'],[3170,FLOOR,'blue']],checks:[990,1840,2220,2600,3090,3560]},
+      chestPlan:{relay:'flask',bridge:'heart',bridgeSlot:1},caches:[635,1380,3230],secrets:[[1430,FLOOR,'shard'],[3170,FLOOR,'blue']],checks:[990,1840,2220,2600,3090,3560]},
     {theme:'tower',chapter:4,chapterStart:true,name:'沉钟之巅',en:'Bell Spire',w:4100,exit:3920,seed:3131,hpK:2.4,dmgK:1.6,
       intro:'齿轮在头顶转动 · 找准落锤的节拍',mapStand:1280,lore:{x:3420,id:'journal'},bands:[[0,'齿轮廊','gears'],[1460,'钟腹','belly'],[2800,'钟舌','tongue']],
       plats:[[380,350,200],[980,350,200],[1300,290,220],[1650,360,200],[2010,305,190],
@@ -319,7 +319,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
         [2350,370,'archer'],[3010,480,'guard'],[3410,480,'shield']],
       traps:[{k:'piston',x:1420,w:72,per:3.4,ph:0},{k:'piston',x:3020,w:75,per:3.2,ph:.25},
         {k:'vent',x:3220,w:64,per:3,ph:0,h:200},{k:'pendulum',x:3610,top:40,len:360,amp:.42,per:3,ph:0}],
-      chests:[[470,350],[2150,305],[3350,235]],caches:[605,1840,3500],secrets:[[1680,FLOOR,'shard'],[3360,FLOOR,'relic']],checks:[980,1660,2400,3420]}
+      chestPlan:{relay:'blade',bridge:'flask',bridgeSlot:2},caches:[605,1840,3500],secrets:[[1680,FLOOR,'shard'],[3360,FLOOR,'relic']],checks:[980,1660,2400,3420]}
   ];
   const CHAPTERS=[
     {name:'第一章 · 灰烬囚牢',story:[['守钟人','牢门后面是守锁兽，它守着离开牢狱的路。','cells'],['守钟人','它曾替我看门。别恨它，它早就忘了自己在守什么。']]},
@@ -427,7 +427,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function layOpenRoad(room){
     const layout=roadPlans[room.theme],shift=x=>roadX(room,x);
     room.compactExit=room.exit;room.compactChecks=room.checks.slice();
-    for(const key of ['plats','terrain','ens','chests','steps','trenches','slopes','broken','movers','springs','climbs','crumbles','acid','spikes','secrets','bands']){
+    for(const key of ['plats','terrain','ens','steps','trenches','slopes','broken','movers','springs','climbs','crumbles','acid','spikes','secrets','bands']){
       for(const row of room[key]||[])row[0]=shift(row[0]);
     }
     for(const gap of room.gaps){gap[0]=shift(gap[0]);gap[1]=shift(gap[1]);}
@@ -467,6 +467,15 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     };
     room.traps.push(hazards[layout.hazard]);
     room.caches.push(room.roadBridge.x+room.roadBridge.w+55);
+    const [stepX,stepWidth,stepY]=room.terrain[0],shelfX=stepX+stepWidth-10,shelfY=stepY-54;
+    room.plats.push([shelfX-53,shelfY,110,layout.deck]);
+    const plan=room.chestPlan;
+    // Keep the saved slot of the old final chest when adding a winch to a two-chest room.
+    room.chests=[
+      {kind:'relay',slot:0,x:shelfX,y:shelfY,upgrade:plan.relay},
+      {kind:'winch',slot:plan.bridgeSlot===2?1:2,x:gateX-113,y:370,upgrade:'blade'},
+      {kind:'bridge',slot:plan.bridgeSlot,x:lampX+80,y:room.roadLamp.y,upgrade:plan.bridge}
+    ];
   }
   for(const room of mainLevels){
     room.wayfarer=WAYFARERS[room.theme];
@@ -992,13 +1001,16 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       }
     }
     if(dx>68||Math.abs(p.y+p.h-wick.y)>wickReachY(wick))return;
+    lightWick(wick);
+  }
+  function lightWick(wick,relay){
     run.litWicks++;run.wardParty=null;
     if(!wick.door){
       p.checkX=wick.x;L.checkpoint=wick.x;checkpoint=true;
       p.hp=p.max;p.potions=Math.max(p.potions,1);p.soul=3;
     }
     const colors=wickArt[L.theme];
-    fx.push({k:'kindle',x:run.guideX,y:run.guideY,toX:wick.x-(wick.door?36:0),toY:wick.y-38,c:colors[1],life:.36,max:.36});
+    fx.push({k:'kindle',x:relay?relay.x:run.guideX,y:relay?relay.y-24:run.guideY,toX:wick.x-(wick.door?36:0),toY:wick.y-38,c:colors[1],life:.36,max:.36});
     burst(wick.x,wick.y-44,colors[1],20);beep(wick.door?880:560+45*run.litWicks,.22);
     if(wick.mechanism){
       extendRoadBridge(true);
@@ -1007,7 +1019,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
         startTalk(bridgeScenes[L.theme].map(line=>['',line]),null,false,{auto:true});
       }
     }
-    say(wick.mechanism?'桥灯已亮 · 栈桥落下':wick.door?'门灯已续 · 机关启动':'续火 '+run.litWicks+' / '+L.wicks.length+' · 已记录钟火',2.6);saveRun();
+    say(relay?'引火匣把火送到了第一盏灯 · 钟火已记录':wick.mechanism?'桥灯已亮 · 栈桥落下':wick.door?'门灯已续 · 机关启动':'续火 '+run.litWicks+' / '+L.wicks.length+' · 已记录钟火',2.6);saveRun();
   }
   function guideGoal(){
     const wick=L.wicks[run.litWicks];
@@ -1114,9 +1126,9 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     }
     // 二周目起，每三个狱卒里有一个换成精英
     let guardIndex=0;enemies=L.ens.map(a=>enemy(a[0],a[1],a[2],cycle&&a[2]==='guard'&&guardIndex++%3===1?Object.assign({},a[3],{elite:true}):a[3]));
-    chests=L.chests.map(([x,y],i)=>{
-      const key='chest:'+n+':'+i;
-      return {x,y,key,open:!!run.found?.[key]};
+    chests=L.chests.map(cache=>{
+      const key='chest:'+n+':'+cache.slot;
+      return {...cache,key,open:!!run.found?.[key]};
     });
     traps=(L.traps||[]).map(t=>{const o=Object.assign({},t,{t:((t.ph||0)+(cycle?cycle*.17%1:0))*(t.per||3)});if(!cycle&&L.lesson&&!t.teach&&o.per){const pace=routePace[L.theme].trapPeriod;o.per*=pace;o.t*=pace;}if(cycle>0&&!L.arena){const shift=Math.min(140,22*cycle);if(o.per)o.per=Math.max(1.35,o.per*(1-.05*Math.min(cycle,8)));if(o.x!=null&&!o.teach)o.x+=shift;if(o.x0!=null){o.x0+=shift;o.x1+=shift;}}return o;});signAt=-1;secrets=(L.secrets||[]).map((a,i)=>({x:a[0],y:a[1]||FLOOR,reward:a[2],hp:3,claimed:run.found?.['s'+n+':'+i]===true,open:!!(run.found&&run.found['s'+n+':'+i]),t:1,shake:0}));
     Object.assign(p,{x:120,y:FLOOR-p.h,vx:0,vy:0,face:1,jumps:0,ground:true,coyote:FEEL.coyote,buffer:0,cutQueued:false,jumpRising:false,roll:0,rollFromGround:false,rollCd:0,attack:0,atkCd:0,combo:0,comboT:0,castCd:0,drop:null,inv:0,hit:new Set(),hurtT:0,landT:0,trail:[],cape:null,safeX:120,safeY:FLOOR-p.h,dash:0,ringT:0,domeT:0,on:null,checkX:null,bowDraw:0,bowRecoil:0,aimTarget:null,aimReady:false,bowAngle:0,kbT:0});
@@ -1822,6 +1834,9 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   }
   function closeShop(){if(state!=='shop')return;state='play';panel.hidden=true;keys={};clearHeld();say('一路顺风 · 门在右边',1.8);}
   // 重叠时优先进入暗门或与身边的人交谈。
+  function nearbyChest(){
+    return chests.find(c=>!c.open&&Math.abs(c.x-p.x-p.w/2)<64&&Math.abs(c.y-p.y-p.h)<34);
+  }
   function interact(){
     const door=nearSecretDoor();
     if(door){scenePass(()=>enterSecretRoom(door));return;}
@@ -1851,16 +1866,23 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       return;
     }
     if(nearMapStand()){useMapStand();return;}
-    const c=chests.find(c=>!c.open&&Math.abs(c.x-p.x)<85&&Math.abs(c.y-p.y-p.h)<75);if(!c){if(!L.arena)say(L.rest?'走到烛叟身边再交易':'靠近平台上的铜色宝箱再开启',2);return;}
+    const c=nearbyChest();if(!c){if(!L.arena)say(L.rest?'走到烛叟身边再交易':'靠近平台上的铜色宝箱再开启',2);return;}
     // 开箱：先播 0.85 秒开盖动画（世界停住），再弹出三选一
     c.open=true;c.openT=0;chestC=c;nearChest=false;nearKind='';chestBtn.hidden=true;state='chest';keys={};clearHeld();offers=makeOffers(c);beep(180,.3,'square');}
   // 宝箱三选一：一项强化、一样道具，第三项多半是还没拿到的护符
-  function makeOffers(c){const r=rng(runSeed+stage*97+Math.round(c.x)),pick=a=>a[Math.floor(r()*a.length)],free=relicPool().filter(id=>!relics[id]),ups=['blade','heart','flask'].concat(Object.keys(p.skills).filter(id=>p.skills[id]<3)),skills=ups.filter(id=>p.skills[id]!=null),a=pick(stage===0&&c.x===600&&skills.length?skills:ups);
+  const chestBenefits={spring:'跳得更高',dash:'翻滚冷却缩短',heart:'生命上限 +1',flask:'药瓶 +2',blade:'攻击 +12'};
+  function chestUpgrade(c){return p.skills[c.upgrade]>=3?'blade':c.upgrade;}
+  function chestTitle(c){
+    if(c.kind==='relay')return run.litWicks===0?'引火匣 · 续亮首灯':'引火匣';
+    if(c.kind==='winch')return run.found?.['latch'+stage]?'绞盘匣':'绞盘匣 · 升闸';
+    return '桥头补给箱';
+  }
+  function makeOffers(c){const r=rng(runSeed+stage*97+Math.round(c.x)),pick=a=>a[Math.floor(r()*a.length)],free=relicPool().filter(id=>!relics[id]),ups=['blade','heart','flask'].concat(Object.keys(p.skills).filter(id=>p.skills[id]<3)),a=chestUpgrade(c);
     const o=[{kind:'up',id:a},Object.assign({kind:'use'},pick([{id:'bomb',n:2},{id:'knife',n:4},{id:'frost',n:1}]))];
     o.push(free.length&&r()<.8?{kind:'relic',id:pick(free)}:{kind:'up',id:pick(ups.filter(u=>u!==a))});return o;}
   function offerText(o){if(o.kind==='up'){const u=UPS.find(q=>q.id===o.id);return{name:u.name+(p.skills[o.id]!=null?' · '+(p.skills[o.id]+1)+'级':''),info:u.info,tag:p.skills[o.id]!=null?'被动修炼':'强化'};}const it=ITEMS[o.id];return{name:it.name+(o.n>1?' ×'+o.n:''),info:it.info,tag:o.kind==='use'?'道具':'护符'};}
   // 三张卡片：画在前，名字和说明在下；宝箱上方也浮着这三样东西
-  function showOffers(){state='upgrade';revealC=chestC;chestC=null;panel.innerHTML='<div class="sheet reward"><span class="chapter">余火的馈赠 · 三选一</span><h1>拾起余烬</h1><div class="cards">'+offers.map((o,i)=>{const t=offerText(o);return'<button data-pick="'+i+'" class="card k-'+o.kind+'"><b class="num">'+(i+1)+'</b><span class="art">'+artImg(o.id)+(o.n>1?'<i class="qty">×'+o.n+'</i>':'')+'</span><span class="txt"><em class="tag">'+t.tag+'</em><strong>'+t.name.replace(/ ×\d+$/,'')+'</strong><small>'+t.info+'</small></span></button>';}).join('')+'</div><p class="keys">'+(coarse()?'点选一项':'按 1 / 2 / 3 快速选择')+'</p></div>';panel.hidden=false;panel.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>pickOffer(+b.dataset.pick));beep(660,.2);}
+  function showOffers(){state='upgrade';revealC=chestC;chestC=null;panel.innerHTML='<div class="sheet reward"><span class="chapter">'+chestTitle(revealC)+' · 三选一</span><h1>拾起余烬</h1><div class="cards">'+offers.map((o,i)=>{const t=offerText(o);return'<button data-pick="'+i+'" class="card k-'+o.kind+'"><b class="num">'+(i+1)+'</b><span class="art">'+artImg(o.id)+(o.n>1?'<i class="qty">×'+o.n+'</i>':'')+'</span><span class="txt"><em class="tag">'+t.tag+'</em><strong>'+t.name.replace(/ ×\d+$/,'')+'</strong><small>'+t.info+'</small></span></button>';}).join('')+'</div><p class="keys">'+(coarse()?'点选一项':'按 1 / 2 / 3 快速选择')+'</p></div>';panel.hidden=false;panel.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>pickOffer(+b.dataset.pick));beep(660,.2);}
   // ---- 道具：U 用选中的，Q 换下一种；用完了自动换成还有的那种 ----
   // 近战命中积攒魂火；魂火弹与普通消耗品分开计数。
   function castSoul(){if(run.guided&&run.awakened<3)return;if(p.soul<3||p.castCd>0||p.roll>0){if(p.soul<3)say('挥刀命中敌人，积满三格魂火',1.5);return;}if(!L.tutorial)p.soul-=3;p.castCd=L.tutorial?0:.5;if(relics.wick&&p.hp<p.max){const h=Math.min(LIFE,p.max-p.hp);p.hp+=h;pop(p.x+13,p.y-15,'+'+(h/LIFE),'#9be3c8');}const x=p.x+p.w/2+p.face*20,y=p.y+23;thrown.push({k:'soul',x:x,y:y,vx:p.face*630,vy:0,t:0,r:0,hits:new Set(),pierce:2+p.skills.flame});fx.push({k:'ring',x:x,y:y,life:.25,max:.25,r:38});burst(x,y,'#8fead7',10);beep(480,.14,'sine');beep(720,.2,'sine');hudKey='';if(run.practiceSlot===3&&CHARS[p.char].skills[2]==='bolt')endPractice(true);}
@@ -2440,9 +2462,17 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       else entry.relics[o.id]=true;
       gain(o.id,o.n);
     }
-    rememberDiscovery(revealC.key,true);
+    const cache=revealC;
+    rememberDiscovery(cache.key,true);
     loot.push({id:o.id,x:revealC.x+(i-1)*46,y:revealC.y-92,vx:0,vy:-120,t:.3});
-    revealC=null;offers=[];state='play';panel.hidden=true;hudKey='';saveRun();beep(660,.2);
+    revealC=null;offers=[];state='play';panel.hidden=true;hudKey='';beep(660,.2);
+    const first=L.wicks[0];
+    if(cache.kind==='relay'&&run.litWicks===0&&!first.sentry&&(!L.lesson.door||run['les'+stage])){
+      lightWick(first,cache);
+    }else{
+      const latch=cache.kind==='winch'&&breakables.find(b=>b.gate&&!b.broken);
+      if(latch)breakCache(latch);else saveRun();
+    }
   }
   function burst(x,y,c,n){for(let i=0;i<n;i++)emit_particles(x,y,(Math.random()-.5)*330,(Math.random()-.7)*230,.3+Math.random()*.35,.65,c,2+Math.random()*4,1,undefined,undefined,undefined,undefined);}
   function ember(x,y,n,c){for(let i=0;i<n;i++)emit_particles(x+(Math.random()-.5)*10,y+(Math.random()-.5)*10,(Math.random()-.5)*50,-30-Math.random()*60,.6+Math.random()*.8,1.4,c||'#ffa04a',1+Math.random()*1.6,-.15,true,undefined,undefined,undefined);}
@@ -3033,7 +3063,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     // 敌人散出的余烬：先四散，再飞向主角
     let got=false;orbs.forEach(o=>{o.t+=dt;if(o.t<.35){o.vx*=Math.pow(.03,dt);o.vy+=420*dt;}else{const dx=p.x+13-o.x,dy=p.y+22-o.y,d=Math.hypot(dx,dy)||1,sp=500+o.t*900;o.vx+=(dx/d*sp-o.vx)*Math.min(1,dt*7);o.vy+=(dy/d*sp-o.vy)*Math.min(1,dt*7);if(d<14){o.t=-1;got=true;}}o.x+=o.vx*dt;o.y+=o.vy*dt;});orbs=orbs.filter(o=>o.t>=0&&o.t<5);if(got)beep(920,.04,'sine');
     const traveler=nearbyWayfarer();
-    const kind=nearSecretDoor()?'secret':traveler?'wayfarer':nearShadeHook()?(keepsakes.shade&&!run.found?.shadeHome?'returnShade':'shadeHook'):nearFire()?'fire':nearShop()?'shop':nearNpc()?'npc':nearLore()?'lore':nearMapStand()?(hasMap()?'mapOwned':'mapStand'):chests.some(c=>!c.open&&Math.abs(c.x-p.x)<85&&Math.abs(c.y-p.y-p.h)<75)?'chest':'';
+    const kind=nearSecretDoor()?'secret':traveler?'wayfarer':nearShadeHook()?(keepsakes.shade&&!run.found?.shadeHome?'returnShade':'shadeHook'):nearFire()?'fire':nearShop()?'shop':nearNpc()?'npc':nearLore()?'lore':nearMapStand()?(hasMap()?'mapOwned':'mapStand'):nearbyChest()?'chest':'';
     if(kind!==nearKind){nearKind=kind;nearChest=!!kind;chestBtn.hidden=!kind;chestBtn.textContent={secret:'进暗门',wayfarer:'交谈',shadeHook:'看灯钩',returnShade:'挂灯罩',fire:'休息',shop:'商店',npc:'交谈',mapStand:'购图',mapOwned:'看图',lore:'查看'}[kind]||'开箱';}
     if(kind&&kind!=='wayfarer'&&messageT<.2){const t=coarse(),E=K('interact');say({shadeHook:t?'点「看灯钩」':'矮灯钩 · 按 '+E+' 查看',returnShade:t?'点「挂灯罩」归还阿苓的灯罩':'阿苓的矮钩 · 按 '+E+' 挂回灯罩',secret:t?'点「进暗门」进入墙后的侧室':'按 '+E+' 进暗门',fire:t?'篝火 · 点「休息」恢复状态':'篝火 · 按 '+E+' 休息（每站一次）',shop:t?'烛叟 · 点「商店」':'烛叟 · 按 '+E+' 交谈、交易',npc:t?'守钟人 · 点「交谈」':'守钟人 · 按 '+E+' 交谈',mapStand:'路图匣 · '+(t?'点「购图」':'按 '+E+' 购图')+'（'+mapPrice()+' 余烬）',mapOwned:'路图匣 · '+(t?'点「看图」':'按 '+E)+' 查看全层路图',lore:t?'有什么东西在发光 · 点「查看」':'有什么东西在发光 · 按 '+E+' 查看',chest:t?'铜色宝箱 · 点「开箱」':'铜色宝箱 · 按 '+E+' 打开'}[kind],.3);}
     if(L.seal){if(p.x>L.seal+10){if(enemies.some(e=>e.type==='boss'&&!e.dead)){p.x=L.seal;say('铁闸紧闭 · 先击败首领',2);}else if(p.ground){nextStage();return;}}}
@@ -5383,7 +5413,40 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       else if(v<.78){circle(x,a.y+.5,2.4+q*2,T.moss[0]);circle(x+3,a.y-.5,1.8+q,T.moss[1]);}
       else if(v<.85){box(x-1.5,a.y-7,3,7,'#d9cfb5');flame(x,a.y-7,.35,x);addLight(x-cam,a.y-10,42,'#ffcf86',.35);}}}
   function spikes(s){const x=s[0],n=s[1],warn=!!s.warn,wob=warn?Math.sin(time*42)*2.4:0,c0=warn?'#ffb35c':T.spikeC[0],c1=warn?'#ff6a3a':T.spikeC[1];box(x-2+wob,FLOOR-3,n*20,3,warn?'#6a3a22':'#3a4148');if(warn){ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=.5;circle(x+n*10,FLOOR-12,24+Math.sin(time*30)*5,'#ffb35c');ctx.restore();text('！',x+n*10,FLOOR-36-Math.abs(Math.sin(time*20))*6,16,'#ffd2a0','center',true);}for(let k=0;k<n;k++){const sx=x+k*20+wob;poly([sx,FLOOR-2,sx+8,FLOOR-20,sx+16,FLOOR-2],c0,OL,1.2);poly([sx+8,FLOOR-20,sx+16,FLOOR-2,sx+10,FLOOR-2],c1);poly([sx+6.5,FLOOR-15,sx+8,FLOOR-20,sx+9.5,FLOOR-15],'#8a4a3a');}}
-  function chest(c){const x=c.x,y=c.y;if(!c.open)addLight(x-cam,y-14,64,'#ffd38a',.32+Math.sin(time*3)*.08);
+  function drawChestLink(c){
+    if(c.kind==='bridge')return;
+    const winch=c.kind==='winch',target=winch?L.roadGate:L.wicks[0];
+    if(target.x<cam-12||c.x>cam+W+12)return;
+    const x=c.x+18,y=c.y-16,endX=target.x+(winch?13:0),endY=winch?308:target.y-18;
+    const live=winch?run.found?.['latch'+stage]:run.litWicks>0;
+    ctx.save();ctx.beginPath();ctx.moveTo(x,y);
+    ctx.quadraticCurveTo(x+(endX-x)*.42,Math.max(y,endY)+(winch?9:14),endX,endY);
+    ctx.lineWidth=3;ctx.strokeStyle='#302c29';ctx.stroke();ctx.lineWidth=1;
+    ctx.strokeStyle=live?'#bfa075':'#8d7a60';ctx.stroke();
+    if(winch){circle(endX,endY,5,'#51483b','#b59d72',1.5);circle(endX,endY,1.5,'#ccb893');}
+    ctx.restore();
+  }
+  function drawChestMark(c){
+    const x=c.x,y=c.y-49;
+    line([x-1,y+15,x-1,y+7],2,'#8b7250');
+    poly([x-8,y,x,y-9,x+8,y,x,y+8],'#302c28','#c49a60',1.4);
+    if(c.kind==='relay'){
+      shape(()=>{ctx.moveTo(x-3,y+2);ctx.quadraticCurveTo(x-4,y,x,y-5);ctx.quadraticCurveTo(x+6,y+3,x,y+4);ctx.closePath();},'#ffd284');
+    }else if(c.kind==='winch'){
+      circle(x,y,3,null,'#e9c17d',1.2);line([x-4,y+3,x+4,y-3,x+5,y-2],1.4,'#e9c17d');
+    }else{line([x-4,y,x+4,y],2,'#e5c993');line([x,y-4,x,y+4],2,'#e5c993');}
+  }
+  function drawChestPreview(c){
+    const title=chestTitle(c),benefit='可选 · '+chestBenefits[chestUpgrade(c)];
+    const unit=Math.max(1,Math.min(devicePixelRatio||1,2)/scale);
+    const width=Math.max(title.length,benefit.length)*13+14;
+    const x=clamp(c.x,cam+width*unit/2+6,cam+W-width*unit/2-6);
+    const top=Math.max(c.y-64-34*unit,viewY+6);
+    ctx.save();ctx.translate(x,top);ctx.scale(unit,unit);
+    box(-width/2,0,width,34,'rgba(25,22,20,.91)');box(-width/2,0,2,34,'#d4ac70');
+    text(title,0,14,13,'#ffe0a6','center');text(benefit,0,28,12,'#e8e0cb','center');ctx.restore();
+  }
+  function chest(c){const x=c.x,y=c.y;if(!c.open){drawChestMark(c);addLight(x-cam,y-14,64,'#ffd38a',.32+Math.sin(time*3)*.08);}
     box(x-19,y-24,38,24,'#6a4a2f');box(x-19,y-24,38,4,'#7f5a39');for(let k=-12;k<=12;k+=8)box(x+k,y-20,1.5,18,'#5a3d27');box(x-19,y-14,38,3,'#4a4f55');box(x-15,y-24,3,24,'#4a4f55');box(x+12,y-24,3,24,'#4a4f55');ctx.strokeStyle=OL;ctx.lineWidth=1.5;ctx.strokeRect(x-19,y-24,38,24);
     // 开箱动画：先抖两下，再掀开盖子，金光从缝里射出来
     if(c.open){const k=c.openT==null?1:c.openT,ease=k<.3?0:1-Math.pow(1-(k-.3)/.7,3),ang=-1.15*ease+(k<.3?Math.sin(time*70)*.06*(k/.3):0);
@@ -6907,7 +6970,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(L.rest){if(Math.abs(L.fire-cam-W/2)<W)campfire(L.fire);if(Math.abs(L.shop-cam-W/2)<W)merchant(L.shop);if(hasShadeHook())drawShadeHook(L.shop+155,FLOOR,1,time,0);}
     if(L.exit&&L.exit>cam-120&&L.exit<cam+W+120)exitDoor(L.exit);
     if(L.npc!=null&&L.npc<cam+W+80)keeper(L.npc);if(L.mapStand!=null&&L.mapStand>cam-120&&L.mapStand<cam+W+120)drawMapStand(L.mapStand);if(L.lore&&L.lore.x>cam-120&&L.lore.x<cam+W+120)loreSpot(L.lore);
-    drawCaches();for(const c of chests)if(c.x>cam-60&&c.x<cam+W+60)chest(c);
+    drawCaches();for(const c of chests){drawChestLink(c);if(c.x>cam-60&&c.x<cam+W+60)chest(c);}
     if(L.wicks)L.wicks.forEach(drawWick);else if(L.checkpoint!=null&&L.checkpoint>cam-80&&L.checkpoint<cam+W+80)brazier(L.checkpoint,checkpoint);
     if(L.shortcut&&L.shortcut.door>cam-52&&L.shortcut.door<cam+W+52)drawSallyPort(L.shortcut.door,run.shortcut);
     if(L.arena){if(L.gate>cam-60&&L.gate<cam+W+60)portcullis(L.gate,gateK);if(L.seal+44>cam-60&&L.seal+44<cam+W+60)portcullis(L.seal+44,sealK);}
@@ -6922,6 +6985,10 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(L.arena&&L.bossKind==='brood')drawWater();
     // The threshold scene pauses combat. Keep the animated scenery visible while stored combat effects wait offscreen.
     if(!talk?.coda){drawReveal();drawSlash();drawShots();drawThrown();drawWaves();drawHazards();drawFx();drawParticles();drawOrbs();drawLoot();drawFloats();}
+    if(state==='play'&&!paused&&titleT<=0){
+      const cache=chests.find(c=>!c.open&&c.x>=cam&&c.x<=cam+W&&Math.abs(c.x-p.x-p.w/2)<265&&Math.abs(c.y-p.y-p.h)<175);
+      if(cache)drawChestPreview(cache);
+    }
     ctx.restore();
     drawFore();drawMotes(z);drawWeather();
     ctx.save();ctx.globalCompositeOperation='lighter';const n=lowFx?Math.min(6,lights.length):lights.length;for(let i=0;i<n;i++)glow(lights[i]);ctx.restore();

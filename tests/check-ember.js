@@ -275,7 +275,7 @@ test('healing consumes one flask only when injured',()=>{
   t.action('heal');assert.equal(t.player.hp,100);
 });
 test('chest pops open with a short animation, then offers rewards and stops combat',()=>{
-  t.player.x=600;t.player.y=318;t.action('interact');assert.equal(t.state,'chest');assert(t.chests[0].open);
+  t.player.x=t.chests[0].x;t.player.y=t.chests[0].y-t.player.h;t.action('interact');assert.equal(t.state,'chest');assert(t.chests[0].open);
   const x=t.player.x,ex=t.enemies[0].x;advance(.4);assert.equal(t.state,'chest');assert(t.chests[0].openT>.3&&t.chests[0].openT<1);assert.equal(t.enemies[0].x,ex,'the world waits');
   advance(.6);assert.equal(t.state,'upgrade');assert.equal(t.offers.length,3);advance(2);assert.equal(t.player.x,x);
 });
@@ -364,7 +364,7 @@ test('slain enemies fade out before disappearing',()=>{
   assert(e.dead);assert(e.dieT>.3);advance(.55);assert.equal(e.dieT,0);
 });
 test('the interaction button offers an unopened chest and hides on an empty stretch',()=>{
-  t.player.x=600;t.player.y=318;t.player.vy=0;advance(.02);assert.equal(nodes['chest-btn'].hidden,false);
+  t.player.x=t.chests[0].x;t.player.y=t.chests[0].y-t.player.h;t.player.vy=0;advance(.02);assert.equal(nodes['chest-btn'].hidden,false);
   assert.equal(nodes['chest-btn'].textContent,'开箱');
   t.player.x=190;t.player.y=428;advance(.02);assert.equal(nodes['chest-btn'].hidden,true);
 });
@@ -683,11 +683,11 @@ test('new relics reward soul casting, healthy swordplay and repeated kills',()=>
   t.reset();t.relics.hunter=true;const e=t.enemies[0];e.hp=100;e.cd=99;t.player.x=e.x-45;t.player.inv=100;t.action('attack');advance(.12);assert.equal(e.hp,100-Math.round(t.player.damage*1.3));
   t.reset();t.relics.salvager=true;for(const foe of t.enemies.slice(0,4))t.killEnemy(foe);assert.equal(t.bag.bomb,1);
 });
-test('climbing through the prison chest platform leaves its spring for ordinary landings',()=>{
-  const p=t.player,chest=t.chests[2];
+test('climbing through the prison spring deck still allows ordinary spring landings',()=>{
+  const p=t.player;
   const [ropeX]=t.L.climbs[0],[padX,padY,padWidth]=t.L.springs[0];
-  assert.equal(chest.y,padY);
-  assert(ropeX>=padX&&ropeX<=padX+padWidth,'the ladder meets the spring beside the chest');
+  assert(t.platforms.some(a=>a.y===padY&&a.x<=ropeX&&a.x+a.w>=ropeX));
+  assert(ropeX>=padX&&ropeX<=padX+padWidth,'the ladder meets the spring');
   const floor=t.platforms.find(a=>a.groundBlock&&a.x<=ropeX&&ropeX<a.x+a.w);
   const feet=()=>p.y+p.h;
   Object.assign(p,{x:ropeX-p.w/2,y:padY-p.h-18,vy:0,ground:false,inv:10});
@@ -970,7 +970,7 @@ test('five ordinary hits remove five whole ghosts and a heavy boss strike remove
 });
 test('health upgrades and healing remain whole ghosts and retry restores shield progress',()=>{
   t.player.hp=40;t.player.skills.vigor=1;t.action('heal');assert.equal(t.player.hp,100);
-  t.reset();t.player.x=600;t.player.y=318;t.action('interact');advance(1);t.offers[0]={kind:'up',id:'heart'};press('Digit1');assert.equal(t.player.max,120);assert.equal(t.player.hp,120);
+  t.reset();t.player.x=t.chests[0].x;t.player.y=t.chests[0].y-t.player.h;t.action('interact');advance(1);t.offers[0]={kind:'up',id:'heart'};press('Digit1');assert.equal(t.player.max,120);assert.equal(t.player.hp,120);
   t.reset();t.relics.plate=true;t.player.plateHits=2;t.loadStage(stageOf('sewers'));t.player.plateHits=0;t.retryStage();assert.equal(t.player.plateHits,2);t.player.inv=0;t.hurt(10,0);assert.equal(t.player.hp,100);
 });
 test('held keyboard attack repeats and a delayed strike starts a fresh combo',()=>{
@@ -1511,6 +1511,29 @@ test('a lit checkpoint and spent chest supplies survive continue without changin
   press('KeyM');release('KeyM');assert.equal(t.state,'map');listeners.pagehide();t.showMenu();t.continueRun();
   assert.equal(t.player.hp,40);assert.equal(t.player.soul,1);assert.equal(t.bag[offer.id],prior+offer.n-1);
   assert.equal(t.player.checkX,wick.x);assert(t.chests[0].open);t.retryStage();assert.equal(t.bag[offer.id],prior+offer.n);
+});
+test('each road links its optional chest landings to the first lamp, gate and bridge',()=>{
+  const stand=c=>Object.assign(t.player,{x:c.x-t.player.w/2,y:c.y-t.player.h,vy:0,vx:0,ground:true});
+  const pick=c=>{stand(c);t.action('interact');assert.equal(t.state,'chest');advance(1);assert.equal(t.offers[0].id,c.upgrade);press('Digit2');release('Digit2');};
+  for(const room of t.STAGES.filter(l=>l.wicks)){
+    t.reset(true,'bell');const stage=t.STAGES.indexOf(room);t.loadStage(stage);t.run['les'+stage]=true;
+    const [relay,winch,bridge]=t.chests;
+    assert.deepEqual(Array.from(t.chests,c=>c.kind),['relay','winch','bridge']);
+    for(const c of t.chests)assert(t.platforms.some(a=>a.y===c.y&&a.x<=c.x-18&&a.x+a.w>=c.x+18),room.theme+' chest feet on a landing');
+    assert(relay.x<room.wicks[0].x&&winch.x<room.roadGate.x&&bridge.x>room.roadLamp.x);
+    stand(relay);t.player.y=room.terrain[0][2]-t.player.h;t.action('interact');assert(!relay.open,'the box cannot be opened through the shelf');if(t.state==='talk')finishTalk();
+    pick(relay);assert.equal(t.run.litWicks,1);assert.equal(t.player.checkX,room.wicks[0].x);
+    const before=t.run.litWicks;pick(winch);assert(t.run.found['latch'+stage]);assert(!t.platforms.some(a=>a.roadGate));assert.equal(t.run.litWicks,before);
+    pick(bridge);assert.equal(t.run.litWicks,before,'bridge supplies cannot skip the bridge lamp');
+    t.showMenu();t.continueRun();assert(t.chests.every(c=>c.open));assert.equal(t.run.litWicks,before);assert(!t.platforms.some(a=>a.roadGate));
+  }
+});
+test('old final chest claims stay on their replacement and leave newly added winches available',()=>{
+  for(const theme of ['ramparts','ossuary']){
+    t.reset(true,'lamp');const i=stageOf(theme);
+    t.run.found={['chest:'+i+':1']:true};t.loadStage(i);
+    assert.deepEqual(Array.from(t.chests,c=>c.open),[false,false,true]);
+  }
 });
 console.log('All '+passed+' gameplay checks passed.');
 
