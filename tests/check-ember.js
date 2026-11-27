@@ -1467,6 +1467,32 @@ test('older settings start with automatic subtitles and an explicit manual prefe
     assert.equal(game.talk.i,expected==='auto'?1:0,'first story page in '+JSON.stringify(saved));
   }
 });
+test('a chest stays available until a choice, then saves its reward once in the active journey',()=>{
+  const open=()=>{const c=t.chests[0];t.player.x=c.x;t.player.y=c.y-t.player.h;t.action('interact');advance(1);};
+  for(const selected of [false,true]){
+    t.reset(true,'lamp');
+    if(selected){t.selectLevel(t.STAGES[0]);finishTalk();}
+    else {t.startJourney('lamp',0);finishTalk();advance(1);}
+    open();assert.equal(t.state,'upgrade');listeners.pagehide();t.showMenu();t.continueRun(selected);
+    assert(!t.chests[0].open);open();const skill=t.offers[0].id,level=t.player.skills[skill];
+    assert(Number.isInteger(level));press('Digit1');release('Digit1');assert.equal(t.player.skills[skill],level+1);
+    t.showMenu();t.continueRun(selected);assert(t.chests[0].open);assert(!t.chests[1].open);
+    assert.equal(t.player.skills[skill],level+1);open();assert.equal(t.state,'play');
+    t.retryStage();assert(t.chests[0].open);assert.equal(t.player.skills[skill],level+1);
+  }
+});
+test('a lit checkpoint and spent chest supplies survive continue without changing the retry stock',()=>{
+  t.startJourney('bow',0);finishTalk();advance(1);const wick=t.L.wicks[0];
+  Object.assign(t.player,{x:wick.x-10,y:wick.y-t.player.h,hp:20,potions:0,soul:0});advance(.05);
+  assert.equal(t.player.checkX,wick.x);assert.equal(t.player.soul,3);t.showMenu();t.continueRun();
+  assert.equal(t.player.hp,t.player.max);assert.equal(t.player.potions,1);assert.equal(t.player.soul,3);
+  const chest=t.chests[0];t.player.x=chest.x;t.player.y=chest.y-t.player.h;t.action('interact');advance(1);
+  const offer=t.offers[1],prior=t.bag[offer.id];press('Digit2');release('Digit2');assert.equal(t.bag[offer.id],prior+offer.n);
+  t.action('use');assert.equal(t.bag[offer.id],prior+offer.n-1);t.player.soul=1;t.player.hp=40;
+  press('KeyM');release('KeyM');assert.equal(t.state,'map');listeners.pagehide();t.showMenu();t.continueRun();
+  assert.equal(t.player.hp,40);assert.equal(t.player.soul,1);assert.equal(t.bag[offer.id],prior+offer.n-1);
+  assert.equal(t.player.checkX,wick.x);assert(t.chests[0].open);t.retryStage();assert.equal(t.bag[offer.id],prior+offer.n);
+});
 console.log('All '+passed+' gameplay checks passed.');
 
 

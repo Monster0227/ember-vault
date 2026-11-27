@@ -1112,7 +1112,12 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       breakables.push({x:gate.x-31,y:FLOOR,kind:0,gate,broken:false});
     }
     // 二周目起，每三个狱卒里有一个换成精英
-    let guardIndex=0;enemies=L.ens.map(a=>enemy(a[0],a[1],a[2],cycle&&a[2]==='guard'&&guardIndex++%3===1?Object.assign({},a[3],{elite:true}):a[3]));chests=L.chests.map(c=>({x:c[0],y:c[1],open:false}));traps=(L.traps||[]).map(t=>{const o=Object.assign({},t,{t:((t.ph||0)+(cycle?cycle*.17%1:0))*(t.per||3)});if(!cycle&&L.lesson&&!t.teach&&o.per){const pace=routePace[L.theme].trapPeriod;o.per*=pace;o.t*=pace;}if(cycle>0&&!L.arena){const shift=Math.min(140,22*cycle);if(o.per)o.per=Math.max(1.35,o.per*(1-.05*Math.min(cycle,8)));if(o.x!=null&&!o.teach)o.x+=shift;if(o.x0!=null){o.x0+=shift;o.x1+=shift;}}return o;});signAt=-1;secrets=(L.secrets||[]).map((a,i)=>({x:a[0],y:a[1]||FLOOR,reward:a[2],hp:3,claimed:run.found?.['s'+n+':'+i]===true,open:!!(run.found&&run.found['s'+n+':'+i]),t:1,shake:0}));
+    let guardIndex=0;enemies=L.ens.map(a=>enemy(a[0],a[1],a[2],cycle&&a[2]==='guard'&&guardIndex++%3===1?Object.assign({},a[3],{elite:true}):a[3]));
+    chests=L.chests.map(([x,y],i)=>{
+      const key='chest:'+n+':'+i;
+      return {x,y,key,open:!!run.found?.[key]};
+    });
+    traps=(L.traps||[]).map(t=>{const o=Object.assign({},t,{t:((t.ph||0)+(cycle?cycle*.17%1:0))*(t.per||3)});if(!cycle&&L.lesson&&!t.teach&&o.per){const pace=routePace[L.theme].trapPeriod;o.per*=pace;o.t*=pace;}if(cycle>0&&!L.arena){const shift=Math.min(140,22*cycle);if(o.per)o.per=Math.max(1.35,o.per*(1-.05*Math.min(cycle,8)));if(o.x!=null&&!o.teach)o.x+=shift;if(o.x0!=null){o.x0+=shift;o.x1+=shift;}}return o;});signAt=-1;secrets=(L.secrets||[]).map((a,i)=>({x:a[0],y:a[1]||FLOOR,reward:a[2],hp:3,claimed:run.found?.['s'+n+':'+i]===true,open:!!(run.found&&run.found['s'+n+':'+i]),t:1,shake:0}));
     Object.assign(p,{x:120,y:FLOOR-p.h,vx:0,vy:0,face:1,jumps:0,ground:true,coyote:FEEL.coyote,buffer:0,cutQueued:false,jumpRising:false,roll:0,rollFromGround:false,rollCd:0,attack:0,atkCd:0,combo:0,comboT:0,castCd:0,drop:null,inv:0,hit:new Set(),hurtT:0,landT:0,trail:[],cape:null,safeX:120,safeY:FLOOR-p.h,dash:0,ringT:0,domeT:0,on:null,checkX:null,charge:0,bowRecoil:0,aimTarget:null,aimReady:false,bowAngle:0,kbT:0});
     shots=[];shotsPool.clear();waves=[];particles=[];particlesPool.clear();floats=[];floatsPool.clear();orbs=[];fx=[];chunks=[];hazards=[];loot=[];gateK=0;sealK=L.arena?1:0;bossCardT=0;revealC=null;keys={};clearHeld();cam=0;shake=0;hitstop=0;paused=false;checkpoint=false;nearChest=false;nearKind='';hudKey='';bellRing=0;
     viewY=verticalBase;
@@ -1517,10 +1522,12 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function journeySnapshot(){
     return {hp:p.hp,max:p.max,damage:p.damage,potions:p.potions,embers:embers,score:score,kills:kills,bag:Object.assign({},bag),relics:Object.assign({},relics),keep:Object.assign({},keepsakes),skills:Object.assign({},p.skills),soul:p.soul,plateHits:p.plateHits,leechKills:p.leechKills,shards:p.shards||0,found:Object.assign({},run.found||{}),maps:Object.assign({},run.maps||{})};
   }
-  function saveRun(coda){if(!L||!p||L.tutorial||state==='menu'||!entry)return;try{const boss=bossSnap();const record=JSON.stringify({v:9,stage:stage,char:p.char,cycle:cycle,selectedItem:sel,checkX:p.checkX,boss,afterBoss:boss?.defeated&&!coda?journeySnapshot():undefined,coda:coda,e:coda?journeySnapshot():entry,run:{guideX:Math.floor(run.guideX),litWicks:run.litWicks,wardParty:run.wardParty,guided:!!run.guided,awakened:run.awakened||0,practiceSlot:run.practiceSlot||0,lessonMask:run.lessonMask||0,keeper:!!run.keeper,c2:!!run.chapter2,c3:!!run.chapter3,c4:!!run.chapter4,seen:run.seen||{},maps:run.maps||{},found:run.found||{},visited:run.visited||{},firstElite:!!run.firstElite,time:run.time||0,deaths:run.deaths||0,shortcut:!!run.shortcut,coach:!!run.coachSkip}});localStorage.setItem(saveSlot(selectedRoute),record);lastWrittenSave=record;}catch(e){}}
+  function saveRun(coda){if(!L||!p||L.tutorial||state==='menu'||!entry)return;try{const boss=bossSnap();
+    const supplies=!coda&&!boss?.defeated&&p.hp>0?{hp:p.hp,potions:p.potions,soul:p.soul,bag}:undefined;
+    const record=JSON.stringify({v:9,stage:stage,char:p.char,cycle:cycle,selectedItem:sel,checkX:p.checkX,boss,supplies,afterBoss:boss?.defeated&&!coda?journeySnapshot():undefined,coda:coda,e:coda?journeySnapshot():entry,run:{guideX:Math.floor(run.guideX),litWicks:run.litWicks,wardParty:run.wardParty,guided:!!run.guided,awakened:run.awakened||0,practiceSlot:run.practiceSlot||0,lessonMask:run.lessonMask||0,keeper:!!run.keeper,c2:!!run.chapter2,c3:!!run.chapter3,c4:!!run.chapter4,seen:run.seen||{},maps:run.maps||{},found:run.found||{},visited:run.visited||{},firstElite:!!run.firstElite,time:run.time||0,deaths:run.deaths||0,shortcut:!!run.shortcut,coach:!!run.coachSkip}});localStorage.setItem(saveSlot(selectedRoute),record);lastWrittenSave=record;}catch(e){}}
   // A title screen, practice room or stale background tab must never create a journey.
   function saveActiveJourney(){
-    if((state!=='play'&&state!=='bag')||passage||L.tutorial||!lastWrittenSave)return;
+    if(!['play','bag','map','shop','chest','upgrade'].includes(state)||passage||L.tutorial||!lastWrittenSave)return;
     try{if(localStorage.getItem(saveSlot(selectedRoute))===lastWrittenSave)saveRun();}catch(e){}
   }
   function clearSave(){lastWrittenSave=null;try{localStorage.removeItem(saveSlot(selectedRoute));}catch(e){}}
@@ -1653,7 +1660,15 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
         return;
       }
     }
-    followEmber(0,true);saveRun();say('继续上次的旅程 · '+(checkpoint?'从钟火':'')+(L.rest?L.name:L.n+' · '+L.name),3);}
+    // Continue restores the supplies in hand. An explicit floor retry still uses entry.
+    const supplies=s.supplies;
+    if(supplies){
+      if(Number.isFinite(supplies.hp)&&supplies.hp>0)p.hp=Math.min(p.max,supplies.hp);
+      if(Number.isInteger(supplies.potions)&&supplies.potions>=0)p.potions=supplies.potions;
+      if(Number.isInteger(supplies.soul))p.soul=clamp(supplies.soul,0,3);
+      for(const id of USES){const count=supplies.bag?.[id];if(Number.isInteger(count)&&count>=0)bag[id]=count;}
+    }
+    followEmber(0,true);saveRun();syncHud();say('继续上次的旅程 · '+(checkpoint?'从钟火':'')+(L.rest?L.name:L.n+' · '+L.name),3);}
   function startJourney(ch,cyc){
     selectedRoute=false;prisonReveal=null;if(!clears)cyc=0;if(!CHARS[ch])ch='lamp';
     cycle=cyc||0;clearSave();reset(true,ch);
@@ -2405,8 +2420,26 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     panel.hidden=false;panel.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{bagTab=b.dataset.tab;renderBag();});panel.querySelectorAll('[data-sel]').forEach(b=>b.onclick=()=>{selectItem(b.dataset.sel);renderBag();panel.querySelector?.('[data-sel="'+sel+'"]')?.focus({preventScroll:true});});
     panel.querySelectorAll('[data-practice]').forEach(b=>b.onclick=()=>{closeBag();run.practiceSlot=Number(b.dataset.practice);hudKey='';syncHud();saveRun();});
     panel.querySelectorAll('[data-dex]').forEach(b=>b.onclick=()=>{const id=b.dataset.dex,f=codex.items[id],d=document.getElementById('dex-detail');d.innerHTML=f?'<b>'+ITEMS[id].name+'</b>　'+ITEMS[id].info:'还没得到过这样东西。';});document.getElementById('bag-close').onclick=menuView?renderMenu:closeBag;}
-  function pickOffer(i){if(state!=='upgrade'||!offers[i])return;const o=offers[i];if(o.kind==='up'){if(o.id==='blade')p.damage+=12;if(o.id==='heart'){p.max+=LIFE;p.hp=p.max;}if(o.id==='flask')p.potions+=2;if(p.skills[o.id]!=null)p.skills[o.id]=Math.min(3,p.skills[o.id]+1);showGain(o.id,1);}else{if(o.kind==='use')sel=o.id;gain(o.id,o.n);}
-    if(revealC)loot.push({id:o.id,x:revealC.x+(i-1)*46,y:revealC.y-92,vx:0,vy:-120,t:.3});revealC=null;state='play';panel.hidden=true;offers=[];hudKey='';beep(660,.2);}
+  function applyChestUpgrade(stats,id){
+    if(id==='blade')stats.damage+=12;
+    else if(id==='heart'){stats.max+=LIFE;stats.hp=stats.max;}
+    else if(id==='flask')stats.potions+=2;
+    else if(stats.skills[id]!=null)stats.skills[id]=Math.min(3,stats.skills[id]+1);
+  }
+  function pickOffer(i){
+    if(state!=='upgrade'||!offers[i]||!revealC)return;
+    const o=offers[i];
+    if(o.kind==='up'){
+      applyChestUpgrade(p,o.id);applyChestUpgrade(entry,o.id);showGain(o.id,1);
+    }else{
+      if(o.kind==='use'){sel=o.id;entry.bag[o.id]=(entry.bag[o.id]||0)+(o.n||1);}
+      else entry.relics[o.id]=true;
+      gain(o.id,o.n);
+    }
+    rememberDiscovery(revealC.key,true);
+    loot.push({id:o.id,x:revealC.x+(i-1)*46,y:revealC.y-92,vx:0,vy:-120,t:.3});
+    revealC=null;offers=[];state='play';panel.hidden=true;hudKey='';saveRun();beep(660,.2);
+  }
   function burst(x,y,c,n){for(let i=0;i<n;i++)emit_particles(x,y,(Math.random()-.5)*330,(Math.random()-.7)*230,.3+Math.random()*.35,.65,c,2+Math.random()*4,1,undefined,undefined,undefined,undefined);}
   function ember(x,y,n,c){for(let i=0;i<n;i++)emit_particles(x+(Math.random()-.5)*10,y+(Math.random()-.5)*10,(Math.random()-.5)*50,-30-Math.random()*60,.6+Math.random()*.8,1.4,c||'#ffa04a',1+Math.random()*1.6,-.15,true,undefined,undefined,undefined);}
   function dust(x,y,n,dir){for(let i=0;i<n;i++){const d=dir||(Math.random()<.5?-1:1);emit_particles(x+(Math.random()-.5)*14,y-2,d*(30+Math.random()*90),-10-Math.random()*40,.35+Math.random()*.3,.65,'#8a9196',2+Math.random()*3,.2,undefined,undefined,.06,true);}}
