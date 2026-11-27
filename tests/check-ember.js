@@ -103,7 +103,7 @@ test('one hit per enemy per swing, combo and kill reward',()=>{
   let n=2;while(!e.dead&&n<8){t.player.x=e.x-40;t.player.face=1;advance(.2);t.action('attack');advance(.2);n++;}
   assert(e.dead);assert(n>3,'the agile knife does not fell a guard in three hits');assert.equal(t.score,25);
 });
-test('attack recovery delays the next input without extending the swing or the bow charge',()=>{
+test('attack recovery delays the next input without extending the melee swing',()=>{
   for(const hero of ['lamp','bell']){
     t.reset(true,hero);t.action('attack');
     assert.equal(t.player.attack,14/60);assert.equal(t.player.atkCd,16/60);
@@ -111,8 +111,7 @@ test('attack recovery delays the next input without extending the swing or the b
     assert(!t.fx.some(f=>f.k==='contact'),'a missed swing draws no contact');
     t.action('attack');advance(.055);assert(t.player.attack>0,'buffered follow-up fires after recovery');
   }
-  t.reset(true,'bow');press('KeyJ');assert.equal(t.player.chargeMax,.45);release('KeyJ');t.step(1/120);
-  assert.equal(t.player.atkCd,8/60);t.reset(true,'lamp');
+  t.reset(true,'lamp');
 });
 // The open stretch isolates targeting from the authored room's enemies and ledges.
 function aimPractice(hero,offsets){
@@ -152,7 +151,7 @@ test('target selection resists small distance changes, switches to a clearly clo
   assert.strictEqual(p.aimTarget,null,'opaque wall breaks the lock');
   wall.off=true;advance(.1);assert.strictEqual(p.aimTarget,left,'collapsed wall no longer blocks sight');
   left.x=p.x+625;advance(.1);assert.strictEqual(p.aimTarget,null,'a distant enemy is out of bow range');
-  p.face=-1;press('KeyJ');advance(.04);release('KeyJ');t.step(1/120);
+  p.face=-1;press('KeyJ');release('KeyJ');t.step(1/120);
   const arrow=t.thrown.find(a=>a.k==='arrow');assert.equal(p.atkFace,-1);assert(arrow.vx<0);assert(Math.abs(arrow.vy)<1e-9);
   left.x=p.x+p.w/2-96-left.w/2;wall.off=false;advance(.20);
   assert(!t.thrown.includes(arrow));assert.equal(left.hp,left.max,'new cover stops an arrow already in flight');
@@ -251,7 +250,7 @@ test('an archer uses the blade above, below and low in front, even with a ranged
     if(air){p.y-=62;p.ground=false;}
     close.y-=elevation;close.floor-=elevation;
     press(key);press('KeyJ');release('KeyJ');release(key);
-    assert.equal(p.slash,key==='KeyW'?'up':'down');assert(p.attack>0&&!p.charge);
+    assert.equal(p.slash,key==='KeyW'?'up':'down');assert(p.attack>0&&!p.bowDraw);
     assert.strictEqual(p.aimTarget,close);if(offset<0)assert.equal(p.atkFace,-1);
     advance(.04);assert.equal(close.hp,close.max,'windup cannot hit');
     advance(.065);assert.equal(close.max-close.hp,p.damage,'blade connects once in its active window');
@@ -1037,10 +1036,30 @@ test('the bell apprentice hits slow and heavy; the archer shoots arrows that als
   t.reset(false,'bow');assert.equal(t.player.max,80);const a=t.enemies[0];a.cd=99;a.hp=a.max=500;t.player.inv=100;t.player.x=a.x-200;t.player.face=1;t.player.soul=0;
   t.action('attack');advance(.12);assert(t.thrown.some(o=>o.k==='arrow'),'an arrow flies');advance(.5);assert(a.hp<500,'and lands');assert.equal(t.player.soul,1,'arrows charge soul too');
   advance(.4);press('Digit1');release('Digit1');assert.equal(t.thrown.filter(o=>o.k==='arrow').length,5,'a fan of five');
-  t.reset(false,'bow');press('KeyJ');advance(.14);assert(t.player.charge>0);release('KeyJ');advance(.02);
-  assert(t.thrown.some(o=>o.k==='arrow'&&!o.heavy),'release early for a light arrow');
-  advance(.2);press('KeyJ');advance(.47);
-  assert(t.thrown.some(o=>o.k==='arrow'&&o.heavy),'a full draw fires a piercing arrow while held');release('KeyJ');t.reset(false,'lamp');
+  t.reset(false,'lamp');
+});
+test('a held bow fires immediately, pierces every third arrow, switches to blades and stops on release',()=>{
+  const {p}=aimPractice('bow',[]);
+  const arrows=new Set(),when=[];
+  function watch(frames){
+    for(let i=0;i<frames;i++){
+      t.step(1/120);
+      for(const a of t.thrown){
+        if(a.basicArrow&&!arrows.has(a)){arrows.add(a);when.push(frame);}
+      }
+      frame++;
+    }
+  }
+  let frame=0;
+  press('KeyJ');assert(t.thrown.some(a=>a.basicArrow),'first arrow on keydown');
+  watch(150);assert.deepEqual([...arrows].map(a=>a.heavy),[false,false,true,false]);
+  assert([...arrows][2].pierce>0);assert(when.slice(1).every((n,i)=>Math.abs(n-when[i]-42)<=1));
+  press('KeyW');watch(45);assert.equal(p.slash,'up');assert.equal(arrows.size,4);
+  release('KeyW');watch(45);assert(arrows.size>4);const count=arrows.size;
+  release('KeyJ');watch(175);assert.equal(arrows.size,count);
+  press('KeyJ');release('KeyJ');assert(t.thrown.some(a=>a.basicArrow&&!a.heavy&&!arrows.has(a)),'a new tap starts with one light arrow');
+  watch(100);assert.equal(arrows.size,count+1);
+  t.reset(true,'lamp');
 });
 test('keys can be rebound in the settings and work at once',()=>{
   t.rebinding={a:'attack',i:0};t.finishRebind('KeyX');assert.equal(t.BIND.attack[0],'KeyX');assert(JSON.parse(storage['ember:settings']).keys.attack.includes('KeyX'),'saved');
@@ -1286,7 +1305,7 @@ test('prison coaching gives one contextual prompt and survives a first-floor res
   t.player.x=260;advance(.05);
   assert(nodes.notice.textContent.includes('跳上矮台'));assert.equal(t.run.lessonMask,2);
   t.player.x=500;advance(.05);
-  assert(nodes.notice.textContent.includes('蓄满自动射，松手可提前出箭'));assert.equal(t.run.lessonMask,6);
+  assert(nodes.notice.textContent.includes('轻点射一箭，按住连射'));assert.equal(t.run.lessonMask,6);
   t.reset(false);assert(t.run.guided);assert.equal(t.run.lessonMask,6);
   t.player.x=1140;advance(.05);
   assert(nodes.notice.textContent.includes('翻滚'));assert.equal(t.run.lessonMask,14);

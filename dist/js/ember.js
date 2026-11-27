@@ -92,6 +92,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   const gainBox=document.getElementById('gain'),gainArt=document.getElementById('gain-art'),gainName=document.getElementById('gain-name'),gainInfo=document.getElementById('gain-info');
   const itemBelt=document.getElementById('item-switch');
   let beltTime=0,itemGesture=null;
+  const BOW_INTERVAL=.35, BOW_RECOIL=.17;
   const LIFE=20,FLOOR=480,CHECKPOINT=3560,ROLL=.22,TAU=Math.PI*2,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   // 手感起步值，实机可调。攻击 4 帧前摇 / 3 帧判定 / 7 帧后摇，按 60fps。
   const FEEL={coyote:.14,buffer:.16,jumpSpeed:536,grav:1320,fall:1.48,accel:.08,brake:.06,hitStop:3/60,hurtStop:6/60,shakeHit:2,shakeHurt:4,shakeDur:.1,kb:200,kbTime:.15,kbBoss:.35,hurtInv:1,dodge:.2,dodgeCd:.8,dead:.1,swing:14/60};
@@ -522,7 +523,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       {x:560,keys:['jump'],t:()=>(coarse()?'点「跳跃」':'按 '+K('jump')+' 起跳')+'。'+(p.char==='lamp'?'空中再按一次可以二段跳。':'按得越久，跳得越高。')},
       {x:1330,keys:['down','jump'],t:()=>coarse()?'向下推住摇杆，点「跳跃」穿过木台。下面能落脚时，也可以向下翻滚。':'按住 '+K('down')+'，按 '+K('jump')+' 穿过木台。下面能落脚时，也可按 '+K('roll')+' 向下翻滚。'},
       {x:1530,keys:['attack'],t:()=>p.char==='bow'
-        ?'按住'+(coarse()?'「攻击」':' '+K('attack')+' ')+'拉弓，松手放箭，蓄满能穿透。'+(coarse()?'摇杆朝上或朝下时点攻击':'按住上或下再攻击')+'会挥刀，空中下劈命中能弹起。'
+        ?'按住'+(coarse()?'「攻击」':' '+K('attack')+' ')+'连续射箭，每第三支能穿透敌人。'+(coarse()?'摇杆朝上或朝下时点攻击':'按住上或下再攻击')+'会挥刀，空中下劈命中能弹起。'
         :'靠近有标记的木桩，'+(coarse()?'点「攻击」出招。上推摇杆可上挑，空中下推可下劈。':'按 '+K('attack')+' 出招。按住 '+K('up')+' 可上挑，空中按住 '+K('down')+' 可下劈。')},
       {x:2040,keys:['down','attack'],t:()=>(coarse()?'空中向下推住摇杆，再点「攻击」。':'空中按住 '+K('down')+' 再按 '+K('attack')+'。')+'\n下劈击中尖刺或敌人就会弹起。'},
       {x:2440,keys:['roll'],t:()=>(coarse()?'点「翻滚」':K('roll')+' 翻滚')+'可以避开伤害，穿过前面的炉火。'},
@@ -872,7 +873,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     for(const lesson of prisonLessons){
       if((mask&lesson.bit)||p.x<lesson.x||p.x>lesson.x+145)continue;
       run.lessonMask=mask|lesson.bit;try{localStorage.setItem('ember:road-lessons',String(run.lessonMask));}catch(e){}saveRun();
-      const tip=lesson.action==='attack'&&p.char==='bow'?'蓄满自动射，松手可提前出箭。'+(coarse()?'摇杆朝上或下时点攻击挥刀':'按住 '+K('up')+' 或 '+K('down')+' 攻击挥刀'):lesson.tip;
+      const tip=lesson.action==='attack'&&p.char==='bow'?'轻点射一箭，按住连射，每第三箭穿透。'+(coarse()?'摇杆朝上或下时点攻击挥刀':'按住 '+K('up')+' 或 '+K('down')+' 攻击挥刀'):lesson.tip;
       say(controlLabel(lesson.action)+'　'+tip,3);break;
     }
   }
@@ -1118,7 +1119,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       return {x,y,key,open:!!run.found?.[key]};
     });
     traps=(L.traps||[]).map(t=>{const o=Object.assign({},t,{t:((t.ph||0)+(cycle?cycle*.17%1:0))*(t.per||3)});if(!cycle&&L.lesson&&!t.teach&&o.per){const pace=routePace[L.theme].trapPeriod;o.per*=pace;o.t*=pace;}if(cycle>0&&!L.arena){const shift=Math.min(140,22*cycle);if(o.per)o.per=Math.max(1.35,o.per*(1-.05*Math.min(cycle,8)));if(o.x!=null&&!o.teach)o.x+=shift;if(o.x0!=null){o.x0+=shift;o.x1+=shift;}}return o;});signAt=-1;secrets=(L.secrets||[]).map((a,i)=>({x:a[0],y:a[1]||FLOOR,reward:a[2],hp:3,claimed:run.found?.['s'+n+':'+i]===true,open:!!(run.found&&run.found['s'+n+':'+i]),t:1,shake:0}));
-    Object.assign(p,{x:120,y:FLOOR-p.h,vx:0,vy:0,face:1,jumps:0,ground:true,coyote:FEEL.coyote,buffer:0,cutQueued:false,jumpRising:false,roll:0,rollFromGround:false,rollCd:0,attack:0,atkCd:0,combo:0,comboT:0,castCd:0,drop:null,inv:0,hit:new Set(),hurtT:0,landT:0,trail:[],cape:null,safeX:120,safeY:FLOOR-p.h,dash:0,ringT:0,domeT:0,on:null,checkX:null,charge:0,bowRecoil:0,aimTarget:null,aimReady:false,bowAngle:0,kbT:0});
+    Object.assign(p,{x:120,y:FLOOR-p.h,vx:0,vy:0,face:1,jumps:0,ground:true,coyote:FEEL.coyote,buffer:0,cutQueued:false,jumpRising:false,roll:0,rollFromGround:false,rollCd:0,attack:0,atkCd:0,combo:0,comboT:0,castCd:0,drop:null,inv:0,hit:new Set(),hurtT:0,landT:0,trail:[],cape:null,safeX:120,safeY:FLOOR-p.h,dash:0,ringT:0,domeT:0,on:null,checkX:null,bowDraw:0,bowRecoil:0,aimTarget:null,aimReady:false,bowAngle:0,kbT:0});
     shots=[];shotsPool.clear();waves=[];particles=[];particlesPool.clear();floats=[];floatsPool.clear();orbs=[];fx=[];chunks=[];hazards=[];loot=[];gateK=0;sealK=L.arena?1:0;bossCardT=0;revealC=null;keys={};clearHeld();cam=0;shake=0;hitstop=0;paused=false;checkpoint=false;nearChest=false;nearKind='';hudKey='';bellRing=0;
     viewY=verticalBase;
     flags={};if(L.lore?.id==='shade'&&(keepsakes.shade||run.found?.shadeHome))flags.lore=true;
@@ -1139,7 +1140,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     return room===ramparts?'ramparts':room.bossKind;
   }
   function playExitStory(id){
-    Object.assign(p,{face:1,vx:0,vy:0,roll:0,dash:0,attack:0,charge:0,hurtT:0,bowRecoil:0});
+    Object.assign(p,{face:1,vx:0,vy:0,roll:0,dash:0,attack:0,bowDraw:0,hurtT:0,bowRecoil:0});
     if(id==='warden'){finish(true);return;}
     messageT=0;notice.style.opacity=0;titleT=0;shake=0;
     gainBox.hidden=true;gainT=0;toastQ.length=0;chestBtn.hidden=true;
@@ -1309,7 +1310,10 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(type==='crawler')e.cd=.35;
     if(b)Object.assign(e,{move:'',act:0,at:0,rec:0,rt:0,vx:0,lift:0,under:0,combo:0,tollCd:3,mothCd:2,struck:false,stun:false,roar:false,surfacing:false});return e;}
   function down(a){return Object.keys(held).some(k=>held[k]===a);}
-  function action(a){if(state!=='play'||paused||passage)return;if(secretRoom&&a!=='bag'&&a!=='map'){secretAction(a);return;}if(a==='jump'){p.buffer=FEEL.buffer;p.cutQueued=false;}if(a==='attack'){inputQueue.push(1);if(p.atkCd<=0&&p.roll<=0&&p.dash<=0){inputQueue.take(1);attack();}}if(a==='roll'){const d=dirs();p.nextRollDir=d.l===d.r?p.face:(d.r?1:-1);inputQueue.push(2);if(p.rollCd<=0&&(p.attack<=0||heroFSM.canCancel())){inputQueue.take(2);roll();}}if(a==='interact')interact();if(a==='use')useItem();if(a==='cast')castSoul();if(a==='skill1')useSkill(1);if(a==='skill2')useSkill(2);if(a==='skill3')useSkill(3);if(a==='cycle')cycleItem();if(a==='map')openMap();if(a==='bag')openBag();if(a==='heal')drinkPotion();}
+  function action(a){if(state!=='play'||paused||passage)return;if(secretRoom&&a!=='bag'&&a!=='map'){secretAction(a);return;}if(a==='jump'){p.buffer=FEEL.buffer;p.cutQueued=false;}if(a==='attack'){
+    if(p.char==='bow'&&attackDirection(dirs())==='side')attack();
+    else {inputQueue.push(1);if(p.atkCd<=0&&p.roll<=0&&p.dash<=0){inputQueue.take(1);attack();}}
+  }if(a==='roll'){const d=dirs();p.nextRollDir=d.l===d.r?p.face:(d.r?1:-1);inputQueue.push(2);if(p.rollCd<=0&&(p.attack<=0||heroFSM.canCancel())){inputQueue.take(2);roll();}}if(a==='interact')interact();if(a==='use')useItem();if(a==='cast')castSoul();if(a==='skill1')useSkill(1);if(a==='skill2')useSkill(2);if(a==='skill3')useSkill(3);if(a==='cycle')cycleItem();if(a==='map')openMap();if(a==='bag')openBag();if(a==='heal')drinkPotion();}
   function drinkPotion(){
     if(p.hp>=p.max){say('生命已满，无需治疗。',1.8);return;}
     if(!p.potions){say('药瓶已用完，到篝火驿站可以补充。',2);return;}
@@ -1320,7 +1324,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   }
   function dirs(){return{l:!!(isKey('left')||stick.x<-FEEL.dead||down('left')),r:!!(isKey('right')||stick.x>FEEL.dead||down('right')),u:!!(isKey('up')||stick.y<-FEEL.dead),d:!!(isKey('down')||stick.y>FEEL.dead)};}
   // 挥刀（参考空洞骑士）：按住上 = 上挑；空中按住下 = 下劈，打中会弹起来；否则朝面向或按住的左右侧劈，侧劈第三下是重劈
-  // 拾灯弓手横向蓄力射箭，明确向上或向下则拔刀。摇杆横向移动时容许手指略微倾斜。
+  // 拾灯弓手横向按住连射，明确向上或向下则拔刀。摇杆横向移动时容许手指略微倾斜。
   function attackDirection(d){
     if(p.char==='bow'){
       if(isKey('up'))return 'up';
@@ -1373,19 +1377,19 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     }
   }
   function attack(){
-    if(p.atkCd>0||p.roll>0||p.dash>0||p.charge>0)return;
+    if(p.atkCd>0||p.roll>0||p.dash>0)return;
     const C=CHARS[p.char],d=dirs();
     if(d.l!==d.r)p.face=d.r?1:-1;
     p.slash=attackDirection(d);
     const combo=p.slash==='side'?nextCombo():p.combo;
     aimAttack(p.slash,combo,p.face);
-    if(p.char==='bow'&&p.slash==='side'){p.charge=.001;p.chargeMax=.45;return;}
-    if(p.slash==='side'){p.combo=combo;p.comboT=1.2;}
+    if(p.slash==='side'){
+      p.combo=combo;p.comboT=1.2;
+      if(p.char==='bow'){fireBowArrow(combo===0);return;}
+    }
     p.attack=C.swing;p.atkCd=C.atkCd;p.hit.clear();p.pogo=false;heroFSM.enter('attack','combat',C.swing);
   }
-  function fireCharge(full){
-    if(!(p.charge>0))return;
-    const powered=!!full||p.charge>=(p.chargeMax||.45)-.02;
+  function fireBowArrow(powered){
     const dmg=Math.round(p.damage*(powered?2.4:1)*(relics.hunter&&p.hp/p.max>.7?1.3:1));
     const x=p.x+p.w/2,y=p.y+22,speed=powered?1040:900;
     const c=Math.cos(p.bowAngle),s=p.bowAngle===Math.PI?0:Math.sin(p.bowAngle);
@@ -1393,7 +1397,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     const e=p.aimTarget,near=e&&Math.hypot(e.x+e.w/2-x,bowTargetY(e,x,y)-y)<42;
     const offset=near||arrowBlocked(x,y,c*14,s*14)?0:14;
     thrown.push({k:'arrow',basicArrow:true,x:x+c*offset,y:y+s*offset,vx:c*speed,vy:s*speed,t:0,r:0,dmg,soul:true,heavy:powered,pierce:powered?6:0,hits:powered?new Set():null});
-    p.bowRecoil=.17;p.charge=0;p.atkCd=8/60;beep(powered?480:720,.07,'triangle');
+    p.bowRecoil=BOW_RECOIL;p.bowDraw=0;p.atkCd=BOW_INTERVAL;beep(powered?480:720,.07,'triangle');
   }
   function attackEvent(){
     if(p.char==='bell'&&p.slash==='side'&&p.combo===0&&p.ground)thrown.push({k:'pwave',x:p.x+p.w/2+p.atkFace*34,y:p.y+p.h,vx:0,vy:0,dir:p.atkFace,t:0,r:0,life:.5,hits:new Set(),dmg:p.damage*.5});
@@ -1419,7 +1423,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   }
   function roll(){
     if(p.rollCd>0)return;
-    p.aimTarget=null;p.aimReady=false;p.charge=0;p.bowRecoil=0;p.perfect=false;
+    p.aimTarget=null;p.aimReady=false;p.bowDraw=0;p.bowRecoil=0;p.perfect=false;
     p.face=p.nextRollDir;p.rollFromGround=p.ground;p.roll=ROLL;p.rollDir=p.face;
     p.rollCd=(relics.feather?.48:FEEL.dodgeCd)*(1-p.skills.dash*.13);
     p.inv=Math.max(p.inv,FEEL.dodge);p.attack=0;p.trail=[];p.trailT=0;
@@ -1824,7 +1828,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     const wayfarer=nearbyWayfarer();
     if(wayfarer){
       const toward=Math.sign(wayfarer.x-p.x-p.w/2)||p.face;
-      p.face=toward;p.atkFace=toward;p.charge=0;p.attack=0;p.bowRecoil=0;
+      p.face=toward;p.atkFace=toward;p.bowDraw=0;p.attack=0;p.bowRecoil=0;
       speakWayfarer(wayfarer);return;
     }
     if(nearShadeHook()){inspectShadeHook();return;}
@@ -1901,7 +1905,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   const CHARS={
     lamp:{id:'lamp',name:'小引灯人',title:'敏捷 · 二段跳，攻击最弱，每三杀回一口火',info:'只有她能二段跳，刀是三人里最轻的。每打倒三个敌人，余火自己回来一口。',hp:5,dmg:14,atkCd:16/60,swing:FEEL.swing,power:.28,speedK:.9,skills:['shade','ring','bolt']},
     bell:{id:'bell',name:'钟锤学徒',title:'近战 · 三连，第三击击退，血厚步慢',info:'连砍三下，第三锤把敌人推开，并震出一道地波。生命多，开局多一瓶药，走得慢，没有二段跳。',hp:6,dmg:36,atkCd:16/60,swing:FEEL.swing,power:.86,speedK:.42,skills:['quake','dome','toll']},
-    bow:{id:'bow',name:'拾灯弓手',title:'弓与短刀 · 蓄力穿透，上挑下劈',info:'按住攻击蓄力，松手射箭，蓄满自动穿透。向上攻击用短刀上挑，向下攻击用短刀下劈，空中劈中能弹起。生命少，开局多一瓶药和三把飞刀，护身铃每层挡一次伤害。',hp:4,dmg:17,atkCd:16/60,swing:FEEL.swing,power:.46,speedK:.78,skills:['fan','trap','pierce']}};
+    bow:{id:'bow',name:'拾灯弓手',title:'弓与短刀 · 三箭穿透，上挑下劈',info:'轻点攻击射一箭，按住连续射击，松手停射。连射的第三箭能穿透敌人。向上攻击用短刀上挑，向下攻击用短刀下劈，空中劈中能弹起。生命少，开局多一瓶药和三把飞刀，护身铃每层挡一次伤害。',hp:4,dmg:17,atkCd:16/60,swing:FEEL.swing,power:.46,speedK:.78,skills:['fan','trap','pierce']}};
   const SKILLS={
     shade:{name:'影步斩',cost:1,info:'化作影子向前冲斩一段，冲刺中不会受伤。'},
     ring:{name:'魂灯环',cost:2,info:'三团魂火绕身旋转 5 秒：烧伤碰到的敌人，挡下飞来的东西。'},
@@ -1975,7 +1979,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
         thrown.push({k:'bigarrow',x:cx,y,vx:Math.cos(a)*1150,vy:Math.sin(a)*1150,t:0,r:a,hits:new Set(),dmg:55+p.damage*1.6});
         shake=Math.max(shake,5);beep(180,.3,'sawtooth');beep(1200,.1,'triangle');
       }
-      p.bowRecoil=.17;p.charge=0;p.atkCd=Math.max(p.atkCd,p.bowRecoil);
+      p.bowRecoil=BOW_RECOIL;p.bowDraw=0;p.atkCd=Math.max(p.atkCd,p.bowRecoil);
     }
     if(id!=='trap')fx.push({k:'ring',x:cx,y:cy,life:.25,max:.25,r:34});if(run.practiceSlot===i)endPractice(true);}
   // 盾卫正面挡下横斩和飞来的东西
@@ -2133,7 +2137,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     secretRoom=null;document.getElementById('stage').classList.remove('in-secret');hudKey='';
   }
   function enterSecretRoom(door){
-    p.aimTarget=null;p.aimReady=false;p.charge=0;secretRoom={door,x:100,y:0,vy:0,face:1,stride:0};
+    p.aimTarget=null;p.aimReady=false;p.bowDraw=0;secretRoom={door,x:100,y:0,vy:0,face:1,stride:0};
     document.getElementById('stage').classList.add('in-secret');
     nearKind='';titleT=0;messageT=0;hudKey='';
     say(door.claimed?'原路从左边的拱门出去':'走到右边的石台取出藏品',2);
@@ -2481,7 +2485,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     return wick?wick.y:FLOOR;
   }
   function respawn(){panel.classList.remove('late');const spot=(p.checkX!=null?p.checkX:(L.checkpoint!=null?L.checkpoint:120))+20,kept=enemies.filter(e=>e.type==='boss'&&!e.dead).map(e=>({hp:e.hp,phase:e.phase||0,rage:!!e.rage,phase3:!!e.phase3}));
-    Object.assign(p,{x:spot,y:checkpointFeet(p.checkX)-p.h,safeX:spot,safeY:checkpointFeet(p.checkX)-p.h,vx:0,vy:0,face:1,hp:p.max,jumps:0,ground:true,coyote:FEEL.coyote,buffer:0,cutQueued:false,jumpRising:false,roll:0,rollFromGround:false,rollCd:0,attack:0,atkCd:0,inv:1.2,hit:new Set(),hurtT:0,trail:[],cape:null,dash:0,charge:0,bowRecoil:0,aimTarget:null,aimReady:false,bowAngle:0,kbT:0,ringT:0,domeT:0,on:null});p.potions=Math.max(p.potions,1);p.soul=3;p.castCd=0;
+    Object.assign(p,{x:spot,y:checkpointFeet(p.checkX)-p.h,safeX:spot,safeY:checkpointFeet(p.checkX)-p.h,vx:0,vy:0,face:1,hp:p.max,jumps:0,ground:true,coyote:FEEL.coyote,buffer:0,cutQueued:false,jumpRising:false,roll:0,rollFromGround:false,rollCd:0,attack:0,atkCd:0,inv:1.2,hit:new Set(),hurtT:0,trail:[],cape:null,dash:0,bowDraw:0,bowRecoil:0,aimTarget:null,aimReady:false,bowAngle:0,kbT:0,ringT:0,domeT:0,on:null});p.potions=Math.max(p.potions,1);p.soul=3;p.castCd=0;
     enemies.forEach(e=>{if(e.type!=='boss'||e.dead)return;const k=kept[0];Object.assign(e,{x:e.origin,y:e.floor-e.h,hp:k?k.hp:e.max,phase:k?k.phase:0,rage:k?k.rage:false,phase3:k?k.phase3:false,face:-1,cd:1.2,wind:0,wt:0,flash:0,spell:false,spellCd:3.5,swing:0,kb:0,kbT:0,hitT:0,frozen:0,daze:0,move:'',act:0,at:0,rec:0,rt:0,vx:0,lift:0,under:0,combo:0,tollCd:3,mothCd:2,struck:false,stun:false,roar:false,surfacing:false,phaseInv:0});});
     shots=[];shotsPool.clear();waves=[];floats=[];floatsPool.clear();orbs=[];fx=[];chunks=[];thrown=[];hazards=[];loot=[];gateK=0;bossCardT=0;flags.boss=false;keys={};clearHeld();hitstop=0;shake=0;shakeT=0;paused=false;hudKey='';state='play';panel.hidden=true;hud.hidden=false;touch.hidden=!coarse();checkpoint=p.checkX!=null||!!L.checkpoint;
     followEmber(0,true);viewY=verticalBase;cam=clamp(p.x-W*.46,0,Math.max(0,WORLD-W));say(L.arena?'余火重燃 · 已打下的阶段还在':'余火重燃 · 从钟火继续',2.2);syncHud();saveRun();
@@ -2741,7 +2745,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(e.summonCd>0)e.summonCd-=dt;if(e.zoneCd>0)e.zoneCd-=dt;if(e.weakCd>0)e.weakCd-=dt;if(e.chaseCd>0)e.chaseCd-=dt;
     if(e.rage&&Math.random()<dt*(lowFx?6:14))rageFx(e);
     const ph=e.hp<=e.max*.33?2:e.hp<=e.max*.66?1:0;
-    if((e.phase||0)<ph){if(p.attack>0||p.charge>0)return;e.phase=ph;e.rage=ph>=1;e.phase3=ph>=2;e.phaseInv=1.5;e.move='';e.wind=e.act=0;e.vx=0;e.spell=false;e.stun=false;if(e.lift){e.lift=0;e.y=e.floor-e.h;}if(e.under)e.surfacing=true;e.roar=true;recover(e,1.5,1.2);punchShake(6);flashT=Math.max(flashT,.22);bellRing=Math.max(bellRing,1.4);burst(ec,e.y+30,BOSSES[e.kind].color,26);bossCue('rage');say((PHASE_LINE[e.kind]||[])[ph]||BOSSES[e.kind].rage,2.6);saveRun();return;}
+    if((e.phase||0)<ph){if(p.attack>0)return;e.phase=ph;e.rage=ph>=1;e.phase3=ph>=2;e.phaseInv=1.5;e.move='';e.wind=e.act=0;e.vx=0;e.spell=false;e.stun=false;if(e.lift){e.lift=0;e.y=e.floor-e.h;}if(e.under)e.surfacing=true;e.roar=true;recover(e,1.5,1.2);punchShake(6);flashT=Math.max(flashT,.22);bellRing=Math.max(bellRing,1.4);burst(ec,e.y+30,BOSSES[e.kind].color,26);bossCue('rage');say((PHASE_LINE[e.kind]||[])[ph]||BOSSES[e.kind].rage,2.6);saveRun();return;}
     e.spellCd-=dt;
     if(e.wind>0){e.wind-=dt;if(A.tick)A.tick(e,dt);if(e.wind<=0){e.wind=0;A.release(e);}return;}
     if(e.act>0){e.act-=dt;A.active(e,dt);if(e.act<=0&&e.wind<=0&&e.rec<=0){e.act=0;A.finish(e);}return;}
@@ -2912,7 +2916,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(state==='menu'){cam=200+Math.max(0,WORLD-W-400)*(1-Math.cos(time*.03))/2;if(Math.random()<rdt*5)ember(cam+Math.random()*W,FLOOR-10-Math.random()*60,1,'#ffb35c');return;}
     if(state!=='play')return;if(hitstop>0){hitstop-=dt;syncHud();return;}
     inputQueue.tick(dt);p.bowRecoil=Math.max(0,(p.bowRecoil||0)-dt);p.inv=Math.max(0,p.inv-dt);p.rollCd=Math.max(0,p.rollCd-dt);p.atkCd=Math.max(0,p.atkCd-dt);p.attack=Math.max(0,p.attack-dt);p.comboT=Math.max(0,p.comboT-dt);p.buffer=Math.max(0,p.buffer-dt);p.coyote=p.ground?FEEL.coyote:Math.max(0,p.coyote-dt);p.hurtT=Math.max(0,p.hurtT-dt);p.landT=Math.max(0,p.landT-dt);
-    heroFSM.tick(dt,p);if(p.rollCd<=0&&(p.attack<=0||heroFSM.canCancel())&&inputQueue.take(2))roll();if(p.atkCd<=0&&p.roll<=0&&p.dash<=0&&!p.charge&&inputQueue.take(1))attack();
+    heroFSM.tick(dt,p);if(p.rollCd<=0&&(p.attack<=0||heroFSM.canCancel())&&inputQueue.take(2))roll();if(p.atkCd<=0&&p.roll<=0&&p.dash<=0&&inputQueue.take(1))attack();
     updatePlatforms(dt);
     const D=dirs(),l=D.l,r=D.r,wasRolling=p.roll>0;
     if(p.dash>0){p.dash-=dt;p.vx=p.face*960;if((p.trailT-=dt)<=0){p.trailT=.028;(p.dtrail=p.dtrail||[]).push({x:p.x+p.w/2,y:p.y+p.h,f:p.face,life:.24});}dashHits();if(p.dash<=0){p.vx=p.face*245;dust(p.x+13,p.y+p.h,5,p.face);}}
@@ -2922,8 +2926,11 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       else if(m){p.vx+=m*(vmax/FEEL.accel)*dt;p.vx=clamp(p.vx,-vmax,vmax);}else{const s=Math.sign(p.vx);p.vx=s*Math.max(0,Math.abs(p.vx)-(vmax/FEEL.brake)*dt);}
       if(m&&!(p.attack>.1)&&!(p.kbT>0))p.face=m;}
     p.trail.forEach(t=>t.life-=dt);p.trail=p.trail.filter(t=>t.life>0);if(p.dtrail){p.dtrail.forEach(t=>t.life-=dt);p.dtrail=p.dtrail.filter(t=>t.life>0);}
-    if(p.charge>0){aimAttack(p.slash,p.combo,p.face);if(isKey('attack')||down('attack')){p.charge=Math.min(p.chargeMax||.45,p.charge+dt);if(p.charge>=(p.chargeMax||.45)-.001)fireCharge(true);}else fireCharge(false);}
-    else if(down('attack')||isKey('attack'))attack();
+    const attackHeld=isKey('attack')||down('attack');
+    if(attackHeld)attack();
+    // After the string settles, nock the next arrow only while the attack is held.
+    p.bowDraw=p.char==='bow'&&attackHeld&&p.atkCd>0&&p.bowRecoil===0&&p.roll<=0&&p.dash<=0&&p.slash==='side'&&attackDirection(D)==='side'
+      ?clamp(1-p.atkCd/(BOW_INTERVAL-BOW_RECOIL),0,1):0;
     p.castCd=Math.max(0,p.castCd-dt);const stand=p.buffer>0&&p.ground&&D.d&&deckUnderfoot();
     if(stand){dropThroughDeck(stand);p.rollFromGround=false;dust(p.x+13,p.y+p.h,4,0);}
     else if(p.buffer>0&&(p.coyote>0||(p.char==='lamp'&&p.jumps<2))){p.vy=p.cutQueued?-230:-FEEL.jumpSpeed-p.skills.spring*30;p.jumps=p.coyote>0?1:2;p.jumpRising=!p.cutQueued;p.cutQueued=false;p.ground=false;p.coyote=0;p.buffer=0;p.on=null;if(p.jumps>1)burst(p.x+13,p.y+44,'#9fe0d4',8);else dust(p.x+13,p.y+p.h,5,0);beep(340,.07);}
@@ -3041,11 +3048,10 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     const targetX=clamp(cam+screenX-clamp(screenX,W*.36,W*.56),lo,hi);
     cam=clamp(cam+(targetX-cam)*(1-Math.exp(-dt*9)),lo,hi);
     if(bossCardT>0){bossCardT=Math.max(0,bossCardT-dt);notice.style.opacity=0;}markSeen();
-    if(!p.charge){
-      if(p.roll>0||p.dash>0){p.aimTarget=null;p.aimReady=false;}
-      else if(p.attack>0)chooseAim(p.slash,p.combo,p.face);
-      else chooseAim(attackDirection(D),nextCombo(),p.face);
-    }
+    if(p.roll>0||p.dash>0){p.aimTarget=null;p.aimReady=false;}
+    else if(p.bowDraw>0)aimAttack('side',p.combo,p.face);
+    else if(p.attack>0)chooseAim(p.slash,p.combo,p.face);
+    else chooseAim(attackDirection(D),nextCombo(),p.face);
     if(state==='play')run.time=(run.time||0)+dt;noteBand();syncHud();
   }
 
@@ -5449,12 +5455,12 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     poly([bx+nx*1.6,by+ny*1.6,tx+nx*1.1,ty+ny*1.1,tx+dx*2.6,ty+dy*2.6,tx-nx*1.1,ty-ny*1.1,bx-nx*1.6,by-ny*1.6],P.nail,OL,1.2);line([bx+nx*.5,by+ny*.5,tx+nx*.3,ty+ny*.3],.7,P.nailHi);}
   // Weapon and shoulders share one stroke. Contact falls on the existing active frames.
   function strokePose(ch,atk){
-    if(ch==='bow'&&(p.charge>0||((p.bowRecoil||0)>0&&atk<0))){
+    if(ch==='bow'&&atk<0&&(p.bowDraw>0||p.bowRecoil>0)){
       const a=Math.atan2(Math.sin(p.bowAngle),p.atkFace*Math.cos(p.bowAngle));
-      const up=Math.max(0,-Math.sin(a)),draw=p.charge>0?clamp(p.charge/(p.chargeMax||.45),0,1):0;
-      const release=p.charge>0?0:p.bowRecoil/.17;
+      const up=Math.max(0,-Math.sin(a)),draw=p.bowDraw||0;
+      const release=(p.bowRecoil||0)/BOW_RECOIL;
       return {bow:true,a,hx:Math.cos(a)*(11+draw*3),hy:-30+Math.sin(a)*(11+draw*3),
-        pull:p.charge>0?3+draw*14:Math.sin(release*Math.PI*3)*release*2,
+        pull:draw>0?3+draw*14:Math.sin(release*Math.PI*3)*release*2,
         reach:draw,release,lean:-.06-up*.10-draw*.12+release*.14,
         x:draw*-2-release*2,y:draw};
     }
@@ -5502,7 +5508,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     if(q.bow){
       const grip=armPose(5,-23,q.hx+6*dx,q.hy+6*dy,1);
       const x=grip.hx-6*dx,y=grip.hy-6*dy;
-      const back=3+(p.charge>0?q.pull:2+18*q.release);
+      const back=3+(q.reach>0?q.pull:2+18*q.release);
       sleeve(-2,-23,x-back*dx,y-back*dy,-7,P,true);
       bowW(x,y,a,q.pull);
       sleeve(5,-23,grip.hx,grip.hy,1,P,false,grip);
@@ -5538,7 +5544,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     const bl=28+p.skills.reach*4;if(ch==='bell')hammer(hx,hy,na,bl-3);
     else{nail(hx,hy,na,P,bl);if(p.damage>=44&&P===GH_CHAPTER[clamp((L.chapter||1)-1,0,3)]){ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=.3+.12*Math.sin(time*6);line([hx+Math.cos(na)*5,hy+Math.sin(na)*5,hx+Math.cos(na)*(bl+1),hy+Math.sin(na)*(bl+1)],2.6,p.damage>=64?'#ffc070':'#ffe2b0');ctx.restore();}}
     circle(hx,hy,3.3,P.body,OL,1.4);}
-  function drawHero(){if(state==='dead'){if(deathT<.5){const k=deathT/.5;ctx.save();ctx.translate(deathX,deathY+26);ctx.scale(p.face*(1+k*.3),1+k*.3);ctx.globalAlpha=1-k;drawGhost(GH_TRAIL,0,0);ctx.strokeStyle='rgba(20,30,40,'+(.8*(1-k)).toFixed(2)+')';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(-2,-46);ctx.lineTo(3,-34);ctx.lineTo(-4,-24);ctx.lineTo(2,-14);ctx.moveTo(3,-34);ctx.lineTo(11,-30);ctx.stroke();ctx.restore();addLight(deathX-cam,deathY,120*(1-k)+40,'#cfefff',.5*(1-k));}return;}const P=heroPal(),f=p.roll<=0&&(p.attack>0||p.charge>0||p.bowRecoil>0)?p.atkFace:p.face,cx=p.x+p.w/2,cy=p.y+p.h,D=dirs(),C=CHARS[p.char]||CHARS.lamp,ch=C.id;
+  function drawHero(){if(state==='dead'){if(deathT<.5){const k=deathT/.5;ctx.save();ctx.translate(deathX,deathY+26);ctx.scale(p.face*(1+k*.3),1+k*.3);ctx.globalAlpha=1-k;drawGhost(GH_TRAIL,0,0);ctx.strokeStyle='rgba(20,30,40,'+(.8*(1-k)).toFixed(2)+')';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(-2,-46);ctx.lineTo(3,-34);ctx.lineTo(-4,-24);ctx.lineTo(2,-14);ctx.moveTo(3,-34);ctx.lineTo(11,-30);ctx.stroke();ctx.restore();addLight(deathX-cam,deathY,120*(1-k)+40,'#cfefff',.5*(1-k));}return;}const P=heroPal(),f=p.roll<=0&&(p.attack>0||p.bowDraw>0||p.bowRecoil>0)?p.atkFace:p.face,cx=p.x+p.w/2,cy=p.y+p.h,D=dirs(),C=CHARS[p.char]||CHARS.lamp,ch=C.id;
     let shadowY=p.ground?cy:Infinity;
     if(!p.ground)for(const a of platforms){
       if(!a.off&&cx>=a.x&&cx<=a.x+a.w&&a.y>=cy-1&&a.y<shadowY)shadowY=a.y;

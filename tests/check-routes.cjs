@@ -49,7 +49,9 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
       const nextStop=combat&&[spoke?null:npc,chest.open?null:chest,t.flags.lore?null:lore].filter(o=>o&&o.x<=(wick?.x||room.exit)).sort((a,b)=>a.x-b.x)[0];
       const groundFoe=combat&&roadFoes.find(e=>!e.dead&&e.origin<=Math.min(nextStop?.x??Infinity,(wick?.x||room.exit)+25));
       const stop=(!groundFoe&&!ward)&&nextStop;
-      if(stop&&Math.abs(p.x+p.w/2-stop.x)<38&&Math.abs(p.y+p.h-stop.y)<(stop===npc?34:68)){
+      // A revealed secret entrance overlaps the western edge of the tower lore prompt.
+      const stopRadius=stop===lore?5:38;
+      if(stop&&Math.abs(p.x+p.w/2-stop.x)<stopRadius&&Math.abs(p.y+p.h-stop.y)<(stop===npc?34:68)){
         t.action('interact');
         if(t.state!=='play'){if(stop===npc)spoke=true;continue;}
       }
@@ -62,7 +64,7 @@ module.exports = function checkRoutes({ t, press, release, stageOf, finishTalk, 
       if(groundFoe)target=bank?Math.max(bank.x+p.w+12,Math.min(bank.x+bank.w-p.w-12,fightingX)):fightingX;
       if(ward)target=Math.max(wick.x-65,Math.min(wick.x+36,ward.x-36));
       if(stop)target=stop.x-p.w/2;
-      const moving=Math.abs(target-p.x)>13;
+      const moving=Math.abs(target-p.x)>(stop===lore?3:13);
       if(moving&&target>p.x){release('KeyA');press('KeyD');}
       else if(moving){release('KeyD');press('KeyA');}
       else if(enemy&&Math.sign(enemy.x-p.x)!==p.face&&Math.abs(enemy.x-p.x)>5){release(enemy.x>p.x?'KeyA':'KeyD');press(enemy.x>p.x?'KeyD':'KeyA');}

@@ -42,13 +42,13 @@ for(const ch of ['lamp','bell','bow']){
   t.reset(true,ch);
   const p=t.player;
   for(const facing of [-1,1]){
-    const normal={face:facing,atkFace:facing,attack:0,ground:true,vy:0,vx:0,roll:0,dash:0,hurtT:0,landT:0,charge:0};
+    const normal={face:facing,atkFace:facing,attack:0,ground:true,vy:0,vx:0,roll:0,dash:0,hurtT:0,landT:0,bowDraw:0,bowRecoil:0};
     for(const pose of [{vx:252},{ground:false,vy:-510},{ground:false,vy:565},{landT:.12},{roll:.55*.36},{attack:.08},{hurtT:.18},{dash:.11}]){
       Object.assign(p,normal,pose);const count=bodies;t.drawHero();assert(bodies>count);
     }
     if(ch==='bow'){
       const aim=facing>0?-.48:-Math.PI+.48;
-      Object.assign(p,normal,{charge:.42,chargeMax:.45,bowAngle:aim});bowAngle=null;t.drawHero();
+      Object.assign(p,normal,{bowDraw:.92,bowAngle:aim});bowAngle=null;t.drawHero();
       equal(bowAngle,aim,'visible arrow follows its launch angle');
       for(const [slash,ground] of [['up',true],['down',true],['down',false]]){
         Object.assign(p,normal,{attack:t.CHARS.bow.swing*.5,slash,ground,bowRecoil:.05});
