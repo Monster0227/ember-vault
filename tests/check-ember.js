@@ -176,6 +176,24 @@ test('basic bow shots chip an approaching patrol shutter, flank it or hit the br
     assert.equal(t.run.wardParty[0],e.hp);
   }
 });
+test('the bow flare aims behind the bearer and bursts once across two nearby enemies',()=>{
+  const {p,guards}=aimPractice('bow',[-95,-135]);
+  guards.forEach(e=>{e.hp=e.max=100;});p.soul=3;t.action('skill2');
+  const arrow=t.thrown.find(o=>o.k==='flareArrow');
+  assert(arrow&&arrow.vx<0);assert.equal(p.soul,1);assert.equal(p.face,1);
+  advance(.32);assert(!t.thrown.includes(arrow));
+  guards.forEach(e=>assert.equal(100-e.hp,Math.round(40+p.damage*.8)));
+});
+test('a flare fired without a lock stops on cover and the blast cannot damage a guard through it',()=>{
+  const {p,guards:[guard]}=aimPractice('bow',[108]);
+  t.platforms.push({x:p.x+60,y:355,w:12,h:125,solid:true});
+  p.soul=2;t.action('skill2');const arrow=t.thrown.find(o=>o.k==='flareArrow');
+  assert(arrow&&arrow.vx>0);assert.equal(p.aimTarget,null);
+  advance(.25);assert(!t.thrown.includes(arrow));assert.equal(guard.hp,guard.max);
+  p.soul=1;p.castCd=0;t.action('skill2');assert(!t.thrown.length);assert.equal(p.soul,1);
+});
+
+
 test('a bow aims above or below and keeps the released trajectory',()=>{
   for(const vertical of [-1,1]){
     const {p,guards:[e]}=aimPractice('bow',[175]);
