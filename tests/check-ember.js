@@ -181,8 +181,11 @@ test('the bow flare aims behind the bearer and bursts once across two nearby ene
   guards.forEach(e=>{e.hp=e.max=100;});p.soul=3;t.action('skill2');
   const arrow=t.thrown.find(o=>o.k==='flareArrow');
   assert(arrow&&arrow.vx<0);assert.equal(p.soul,1);assert.equal(p.face,1);
+  assert.equal(t.fx.filter(f=>f.k==='flareRelease'&&f.a===arrow.r).length,1);
   advance(.32);assert(!t.thrown.includes(arrow));
   guards.forEach(e=>assert.equal(100-e.hp,Math.round(40+p.damage*.8)));
+  assert.equal(t.fx.filter(f=>f.k==='flareBloom'&&!f.blocked).length,1);
+  assert(guards.every(e=>t.fx.some(f=>f.kind==='flare'&&f.target===e)));
 });
 test('a flare fired without a lock stops on cover and the blast cannot damage a guard through it',()=>{
   const {p,guards:[guard]}=aimPractice('bow',[108]);
@@ -190,6 +193,7 @@ test('a flare fired without a lock stops on cover and the blast cannot damage a 
   p.soul=2;t.action('skill2');const arrow=t.thrown.find(o=>o.k==='flareArrow');
   assert(arrow&&arrow.vx>0);assert.equal(p.aimTarget,null);
   advance(.25);assert(!t.thrown.includes(arrow));assert.equal(guard.hp,guard.max);
+  assert(t.fx.some(f=>f.k==='flareBloom'&&f.blocked));
   p.soul=1;p.castCd=0;t.action('skill2');assert(!t.thrown.length);assert.equal(p.soul,1);
 });
 

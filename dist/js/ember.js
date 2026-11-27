@@ -1902,33 +1902,31 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       aimAttack('side',p.combo,f);
       const a=p.bowAngle;
       thrown.push({k:'flareArrow',x:cx,y:p.y+22,vx:Math.cos(a)*780,vy:Math.sin(a)*780,t:0,r:a,dmg:40+p.damage*.8});
+      fx.push({k:'flareRelease',x:cx,y:p.y+22,a,life:.19,max:.19});
       p.bowRecoil=.17;p.charge=0;beep(640,.09,'triangle',.035);
     }
     else if(id==='pierce'){thrown.push({k:'bigarrow',x:cx+f*16,y:p.y+22,vx:f*1150,vy:0,t:0,r:0,hits:new Set(),dmg:55+p.damage*1.6});shake=Math.max(shake,5);beep(180,.3,'sawtooth');beep(1200,.1,'triangle');}
-    fx.push({k:'ring',x:cx,y:cy,life:.25,max:.25,r:34});if(run.practiceSlot===i)endPractice(true);}
+    if(id!=='trap')fx.push({k:'ring',x:cx,y:cy,life:.25,max:.25,r:34});if(run.practiceSlot===i)endPractice(true);}
   // 盾卫正面挡下横斩和飞来的东西
   function blocks(e,dir,vy){return e.type==='shield'&&!e.dead&&e.wind<=0&&e.swing<=0&&!(e.brk>0)&&!(e.frozen>0||e.daze>0)&&e.face===-dir&&Math.abs(vy||0)<300;}
   function clang(x,y,shieldFace){
     if(shieldFace)fx.push({k:'contact',kind:'block',x,y,a:shieldFace>0?0:Math.PI,life:.2,max:.2});
     for(let i=0;i<8;i++){const a=Math.random()*TAU,v=120+Math.random()*200;emit_particles(x,y,Math.cos(a)*v,Math.sin(a)*v-60,.2+Math.random()*.2,.4,'#fff1c2',1.4,.6,undefined,true,undefined,undefined);}fx.push({k:'star',x:x,y:y,a:Math.random()*TAU,life:.12,max:.12,r:20});beep(1500,.06,'square',.025);beep(900,.08,'triangle',.02);}
-  function burstFlareArrow(o){
+  function burstFlareArrow(o,blocked){
     o.dead=true;
     const radius=92;
     blastSecrets(o.x,o.y,radius);
     for(const e of enemies){
       const hx=clamp(o.x,e.x,e.x+e.w),hy=clamp(o.y,e.y,e.y+e.h);
       if(e.dead||Math.hypot(hx-o.x,hy-o.y)>radius||arrowBlocked(o.x,o.y,hx-o.x,hy-o.y))continue;
-      hitEnemy(e,o.dmg,e.x+e.w/2<o.x?-1:1,true,hx,hy);
+      const dir=e.x+e.w/2<o.x?-1:1;
+      hitEnemy(e,o.dmg,dir,true,hx,hy,Math.atan2(e.y+e.h/2-o.y,e.x+e.w/2-o.x),'flare');
     }
     for(const cache of breakables){
       const dx=cache.x-o.x,dy=cache.y-16-o.y;
       if(!cache.broken&&Math.hypot(dx,dy)<radius&&!arrowBlocked(o.x,o.y,dx,dy))breakCache(cache);
     }
-    fx.push({k:'flareBloom',x:o.x,y:o.y,life:.38,max:.38,r:radius,a:o.r});
-    for(let i=0;i<(lowFx?7:14);i++){
-      const a=i*2.4,v=105+Math.random()*115;
-      emit_particles(o.x,o.y,Math.cos(a)*v,Math.sin(a)*v-38,.28+Math.random()*.2,.45,i%3?'#ffd088':'#9de7d7',2,.35,true);
-    }
+    fx.push({k:'flareBloom',x:o.x,y:o.y,life:.62,max:.62,r:radius,a:o.r,blocked});
     shake=Math.max(shake,3);beep(155,.18,'triangle',.055);
   }
   function advanceFlareArrow(o,dt){
@@ -1941,14 +1939,15 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     for(const e of enemies)if(!e.dead&&!bossShielded(e))collide(e);
     for(const cache of breakables)if(!cache.broken)collide({x:cache.x-13,y:cache.y-31,w:26,h:31});
     for(const door of secrets)if(!door.open)collide({x:door.x-30,y:door.y-84,w:60,h:84});
-    if(arrowBlocked(o.x,o.y,dx*first,dy*first)){
+    const blocked=arrowBlocked(o.x,o.y,dx*first,dy*first);
+    if(blocked){
       // Stop on the near face so the blast and the aiming reticle agree about cover.
       let near=0,far=first;
       for(let i=0;i<5;i++){const mid=(near+far)*.5;if(arrowBlocked(o.x,o.y,dx*mid,dy*mid))far=mid;else near=mid;}
       first=near;contact=true;
     }
     o.x+=dx*first;o.y+=dy*first;
-    if(contact||o.t>=.76||o.x<=0||o.x>=WORLD)burstFlareArrow(o);
+    if(contact||o.t>=.76||o.x<=0||o.x>=WORLD)burstFlareArrow(o,blocked);
   }
   function updatePlayerShot(o,dt){
     if(o.k==='pwave'){o.x+=o.dir*430*dt;o.life-=dt;if(Math.random()<dt*30)dust(o.x,o.y,1,o.dir);enemies.forEach(e=>{if(e.dead||o.hits.has(e))return;if(o.x>e.x-14&&o.x<e.x+e.w+14&&e.y+e.h>o.y-50&&e.y<o.y+4){o.hits.add(e);hitEnemy(e,o.dmg,o.dir,true,clamp(o.x,e.x,e.x+e.w),e.y+e.h-10,o.dir>0?0:Math.PI);}});if(o.life<=0||o.x<0||o.x>WORLD)o.dead=true;return true;}
@@ -2406,16 +2405,20 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
   function contactMark(e,x,y,ang,kind,heavy,open){
     const direction=ang!=null?ang:p.slash==='up'?-Math.PI/2:p.slash==='down'?(p.char==='bow'&&p.ground?(p.atkFace>0?.76:Math.PI-.76):Math.PI/2):p.atkFace>0?0:Math.PI;
     const a=kind==='blade'?direction+(p.combo===2?.65:-.65)*(Math.cos(direction)<0?-1:1):direction;
-    const life=kind==='arrow'&&!heavy?.29:.21;
+    const life=kind==='flare'?.32:kind==='arrow'&&!heavy?.29:.21;
     fx.push({k:'contact',kind,x,y,a,heavy,open,life,max:life,target:e,dx:x-e.x,dy:y-e.y});
     return direction;
   }
   function hitFx(x,y,e,heavy,ang,kind){
     if(kind==='pulse'){fx.push({k:'star',x,y,a:0,life:.1,max:.1,r:16});burst(x,y,'#9ff3e0',4);beep(700,.04,'triangle',.02);return;}
     const a=contactMark(e,x,y,ang,kind,heavy,false),bone=e.type==='archer'||e.type==='caster';
-    const count=lowFx?4:heavy?12:8;
-    for(let i=0;i<count;i++){const s=a+(Math.random()-.5)*1.1,v=220+Math.random()*(heavy?420:300);emit_particles(x,y,Math.cos(s)*v,Math.sin(s)*v-40,.16+Math.random()*.22,.38,bone?'#e6dcc4':i%3?'#fff1d0':'#ffc46a',1.2+Math.random()*1.4,.7,undefined,true,.03,undefined);}
-    burst(x,y,bone?'#cfc5ad':'#f4c98a',heavy?8:4);hitstop=Math.max(hitstop,FEEL.hitStop);punchShake(FEEL.shakeHit);impactSound(heavy);
+    // The center of a flare already has its own burst. Give each victim one attached ember.
+    if(kind!=='flare'){
+      const count=lowFx?4:heavy?12:8;
+      for(let i=0;i<count;i++){const s=a+(Math.random()-.5)*1.1,v=220+Math.random()*(heavy?420:300);emit_particles(x,y,Math.cos(s)*v,Math.sin(s)*v-40,.16+Math.random()*.22,.38,bone?'#e6dcc4':i%3?'#fff1d0':'#ffc46a',1.2+Math.random()*1.4,.7,undefined,true,.03,undefined);}
+      burst(x,y,bone?'#cfc5ad':'#f4c98a',heavy?8:4);
+    }
+    hitstop=Math.max(hitstop,FEEL.hitStop);punchShake(FEEL.shakeHit);impactSound(heavy);
   }
   // 击杀：身体碎成几块（颜色取自它的盔甲 / 斗篷），在地上弹两下再淡出
   function killFx(e){const boss=e.type==='boss',arch=e.type==='archer',P=PAL[e.type]||PAL.guard,home=platforms.find(a=>a.y===e.floor&&e.x+e.w/2>=a.x&&e.x+e.w/2<a.x+a.w);
@@ -5906,7 +5909,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       if(f.k!=='contact')continue;
       const u=1-f.life/f.max,k=1-u,arrow=f.kind==='arrow',dark='#382638';
       let x=f.x,y=f.y;
-      if(arrow&&!f.heavy&&f.target&&!f.target.dead){x=f.target.x+f.dx;y=f.target.y+f.dy;}
+      if((arrow&&!f.heavy||f.kind==='flare')&&f.target&&!f.target.dead){x=f.target.x+f.dx;y=f.target.y+f.dy;}
       if(x<cam-65||x>cam+W+65)continue;
       ctx.save();ctx.translate(x-cam,y);ctx.rotate(f.a);
       ctx.globalAlpha=Math.min(1,k*2.8);
@@ -5915,6 +5918,11 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
         shape(()=>ctx.arc(0,0,rim,-1.12,1.12),null,'#203749',5*k+2);
         shape(()=>ctx.arc(0,0,rim,-1.12,1.12),null,'#a2e6ff',2*k+1);
         for(const d of [-1,1])line([rim-3,d*10,rim+7+7*u,d*(16+6*u)],2*k+1,'#e4fbff',dark);
+      }else if(f.kind==='flare'){
+        const r=4+u*8;
+        shape(()=>ctx.arc(0,0,r,-1.1,1.1),null,'#395951',3*k+1.2);
+        shape(()=>ctx.arc(0,0,r,-1.1,1.1),null,'#a9f5dc',1.8*k+.7);
+        sparkle2(2+5*u,-2-5*u,2+4*k,'#fff1b0');
       }else if(arrow){
         // A loose arrow briefly vibrates in the target. A piercing shot leaves an exit spray.
         if(!f.heavy){
@@ -5941,20 +5949,75 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       ctx.restore();
     }
   }
+  function drawFlareRelease(f,u){
+    ctx.rotate(f.a);ctx.translate(12,0);
+    const fade=1-u,spread=8+15*u;
+    ctx.globalAlpha=fade;
+    // The two halves of the string light up along the shot axis, then peel away.
+    for(const side of [-1,1]){
+      shape(()=>{ctx.moveTo(-7,side*spread);ctx.quadraticCurveTo(5,side*spread*.58,11+9*u,0);
+        ctx.quadraticCurveTo(1,side*spread*.33,-7,side*spread);},side>0?'#e1aa5e':'#80d8bb');
+    }
+    sparkle2(6,0,8*fade,'#fff2bd');addLight(f.x-cam,f.y,38,'#f6bb72',fade*.27);
+  }
+  function drawFlareBurst(f,u){
+    const wave=Math.min(1,u/.52),radius=8+(f.r-8)*(1-(1-wave)*(1-wave));
+    ctx.globalCompositeOperation='source-over';
+    // The shock front opens first, leaving a clear center around the struck enemy.
+    if(wave<1){
+      ctx.save();ctx.rotate(f.a-.18);ctx.globalAlpha=.86*(1-wave);
+      for(let offset=f.blocked?Math.PI:0;offset<=Math.PI;offset+=Math.PI){
+        shape(()=>ctx.arc(0,0,radius,offset-.88,offset+.65),null,'#ffbf70',2.6*(1-wave)+.7);
+        shape(()=>ctx.arc(0,0,radius*.88,offset+.68,offset+1.45),null,'#a5efd4',1.6);
+      }
+      const hot=Math.max(0,1-u/.30);
+      if(hot>0){
+        ctx.scale(1.6,.8);sparkle2(0,0,18*hot,'#ffe9a4');
+        bloom(0,0,22*hot,'#ffb750',.42*hot);
+      }
+      ctx.restore();
+    }
+    // Torn ribbons of flame carry the eye from the impact to the first flying embers.
+    if(u<.55){
+      const burn=u/.55,open=1-(1-burn)*(1-burn),base=3+open*19;
+      ctx.save();ctx.globalAlpha=(1-burn)*.96;
+      const tongues=lowFx?3:5;
+      for(let i=0;i<tongues;i++){
+        ctx.save();ctx.rotate(f.a+(f.blocked?Math.PI+Math.sin(i*2.4)*1.10:i*TAU/tongues-.58));
+        const tip=base+(12+24*open)*(i%2?.72:1),mid=(base+tip)*.5;
+        shape(()=>{ctx.moveTo(base,0);ctx.quadraticCurveTo(mid,-10,tip,-6);
+          ctx.quadraticCurveTo(mid+6,-3,mid+4,0);ctx.quadraticCurveTo(mid,5,base,0);},
+          i%2?'#56c6a7':'#eea153',i%2?'#3a7a70':'#b86d3a',.9);
+        shape(()=>{ctx.moveTo(base+2,0);ctx.quadraticCurveTo(mid,-4,tip-2,-6);ctx.quadraticCurveTo(mid,-1,base+2,0);},'#fff1ba');
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+    // Short amber comets open into drifting jade fireflies. Gravity stays in world space.
+    const count=lowFx?4:8,travel=1-(1-u)*(1-u),trail=Math.max(0,travel-.18*(1-u));
+    const lift=22*u*u,fade=Math.min(1,(1-u)*2.5);
+    for(let i=0;i<count;i++){
+      const a=f.a+(f.blocked?Math.PI+1.12*Math.sin(i*2.4+.22):i*2.4+.22);
+      const reach=f.r*(.54+(i%3)*.15),bend=(i%2?1:-1)*16;
+      const dx=Math.cos(a),dy=Math.sin(a),curve=bend*travel*travel,tailCurve=bend*trail*trail;
+      const x=dx*reach*travel-dy*curve,y=dy*reach*travel+dx*curve;
+      const tx=dx*reach*trail-dy*tailCurve,ty=dy*reach*trail+dx*tailCurve,wing=Math.sin(u*18+i)*2.5;
+      ctx.globalAlpha=fade;
+      ctx.strokeStyle=i%3?'#f2b55f':'#5db99e';ctx.lineWidth=1.1+1.9*(1-u);
+      ctx.beginPath();ctx.moveTo(tx,ty-lift+2);ctx.quadraticCurveTo((tx+x)*.5,(ty+y)*.5-lift+wing,x,y-lift);ctx.stroke();
+      if(!lowFx&&u>.22){ctx.globalAlpha=fade*.60;
+        oval(x-2,y-lift-1.5,2.5,1.1,'#93dbc6');oval(x+1,y-lift-2+wing*.4,1.3,2,'#bddfc9');}
+      ctx.globalAlpha=fade;circle(x,y-lift,1.6+1.1*(1-u),i%3?'#ffe2a4':'#c9ffe4',i%3?'#bb834d':'#548d76',.7);
+    }
+    addLight(f.x-cam,f.y,48+30*(1-wave),'#ffbc70',.42*(1-u));
+  }
   function drawFx(){if(!fx.length)return;ctx.save();ctx.globalCompositeOperation='lighter';
     for(const f of fx){if(f.k==='icon'||f.k==='contact')continue;const k=f.life/f.max,u=1-k;ctx.save();ctx.translate(f.x,f.y);
       if(f.k==='kindle'){const px=(f.toX-f.x)*u,py=(f.toY-f.y)*u-Math.sin(u*Math.PI)*16;
         ctx.globalAlpha=Math.sin(u*Math.PI);line([px-6,py+2,px,py],2,f.c);circle(px,py,3,f.c);}
       else if(f.k==='star'){ctx.rotate(f.a);const r=f.r*(.6+u*.8);ctx.globalAlpha=k;ctx.fillStyle='#fff6dc';ctx.beginPath();for(let i=0;i<8;i++){const rr=i%2?r*.22:r,t=i*Math.PI/4;ctx.lineTo(Math.cos(t)*rr,Math.sin(t)*rr);}ctx.closePath();ctx.fill();ctx.globalAlpha=k*.5;ctx.beginPath();ctx.arc(0,0,r*.45,0,TAU);ctx.fill();addLight(f.x-cam,f.y,f.r*3,'#ffd27a',.6*k);}
-      else if(f.k==='flareBloom'){
-        const reach=f.r*(1-k*k),fade=Math.min(1,k*2);
-        ctx.rotate(f.a);ctx.globalAlpha=fade;
-        for(let i=0;i<7;i++){const r=reach*(i%2?.78:1);
-          shape(()=>{ctx.moveTo(r*.40,0);ctx.quadraticCurveTo(r*.70,-(4+6*k),r,0);ctx.quadraticCurveTo(r*.72,3+3*k,r*.40,0);},i%2?'rgba(137,220,199,.7)':'rgba(244,173,88,.78)');
-          ctx.rotate(TAU/7);
-        }
-        sparkle2(0,0,20*k,'#fff0b5');addLight(f.x-cam,f.y,f.r,'#ffc582',.40*k);
-      }
+      else if(f.k==='flareRelease')drawFlareRelease(f,u);
+      else if(f.k==='flareBloom')drawFlareBurst(f,u);
       else if(f.k==='frost'){ctx.beginPath();ctx.arc(0,0,f.r*(.2+u*.8),0,TAU);ctx.globalAlpha=k*.16;ctx.fillStyle='#bfe8ff';ctx.fill();ctx.globalAlpha=k*.8;ctx.strokeStyle='#d8f2ff';ctx.lineWidth=4*k+1;ctx.stroke();}
       else{ctx.globalAlpha=k*.8;ctx.strokeStyle='#ffe2a8';ctx.lineWidth=3*k+1;ctx.beginPath();ctx.arc(0,0,f.r*(.3+u*.9),0,TAU);ctx.stroke();}
       ctx.restore();}
@@ -6007,6 +6070,33 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
     shape(()=>{ctx.moveTo(-10,0);ctx.quadraticCurveTo(-16,-12,-9,-22);ctx.lineTo(-6,-26);ctx.lineTo(6,-26);ctx.lineTo(9,-22);ctx.quadraticCurveTo(16,-12,10,0);ctx.closePath();},lg(-14,0,14,0,'#3a3030','#76645a','#3a3030'),OL,1.8);shape(()=>ctx.rect(-7,-29,14,4),'#8a7468',OL,1.4);line([-11,-12,11,-12],1.2,'rgba(255,230,200,.18)');
     ctx.globalCompositeOperation='lighter';ctx.globalAlpha=g;line([-4,-21,0,-14,-3,-8,1,-2],1.9,color);circle(0,-14,2.2,color);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.restore();addLight(x-cam,y-14,34,color,.14+.1*g);}}
   // 扔出去的东西也是画出来的：旋转的火油罐（布条在烧）、飞刀、魂火弹（拖着尾巴的青色火）
+  function drawFlareFlight(o){
+    ctx.rotate(o.r);
+    const tail=Math.min(104,o.t*Math.hypot(o.vx,o.vy)),wobble=Math.sin(o.t*25)*3;
+    ctx.save();
+    if(tail>4){
+      const width=Math.min(1,tail/48);
+      // Keep colored silhouettes on sunlit stone as well as over the black of a pit.
+      shape(()=>{ctx.moveTo(0,0);ctx.bezierCurveTo(-tail*.28,-11*width,-tail*.70,7*width,-tail,-2*width);
+        ctx.bezierCurveTo(-tail*.66,11*width,-tail*.35,-1*width,0,3*width);},'rgba(36,115,105,.77)');
+      for(const side of [-1,1]){
+        const curve=side*(8+wobble)*width;
+        shape(()=>{ctx.moveTo(0,0);ctx.bezierCurveTo(-tail*.29,curve*2,-tail*.63,-curve,-tail,curve*.60);
+          ctx.bezierCurveTo(-tail*.67,-curve*.15,-tail*.30,curve*.1,0,0);},side>0?'#f1ae61':'#68d4b9');
+      }
+      shape(()=>{ctx.moveTo(-3,0);ctx.quadraticCurveTo(-tail*.42,-3*width,-tail*.78,2*width);},null,'#ffedb0',1.5);
+      if(!lowFx)for(let i=0;i<3;i++){
+        const age=(o.t*4+i/3)%1;
+        circle(-tail*age,Math.sin(age*8+i)*4*age,1.8-age,rgba('#ffe5a1',1-age));
+      }
+    }
+    ctx.restore();
+    // The brass point meets the simulated contact point in every direction.
+    ctx.translate(-21,0);ctx.scale(.82,.82);flareArrowArt();
+    shape(()=>{ctx.moveTo(14,-5);ctx.quadraticCurveTo(20,-5,29,0);ctx.quadraticCurveTo(20,4,14,5);ctx.lineTo(19,0);},'#ffe195','#bb824a',1);
+    sparkle2(23,-1,4.2,'#fff4bd');
+    addLight(o.x-cam,o.y,45,'#efb362',.38);
+  }
   function drawThrown(){for(const o of thrown){ctx.save();ctx.translate(o.x,o.y);
       if(o.k==='bomb'){ctx.rotate(o.r);drawArt('bomb',0,-2,24);ctx.restore();addLight(o.x-cam,o.y-8,34,'#ffb347',.5);}
       else if(o.k==='soul'){ctx.scale(o.vx>0?1:-1,1);ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=.4;shape(()=>{ctx.moveTo(6,0);ctx.quadraticCurveTo(-12,-11,-44,0);ctx.quadraticCurveTo(-12,11,6,0);},'#62e9d2');ctx.restore();ctx.rotate(-Math.PI/2);fl(0,10,.8+.08*Math.sin(time*30),['#2fa39b','#7fe6d4','#effff9']);ctx.restore();addLight(o.x-cam,o.y,72,'#76f1d1',.6);}
@@ -6014,10 +6104,7 @@ root.EmberCore={ObjectPool,InputQueue,HierarchicalFSM,HeroFSM,Physics,sweepAABB,
       else if(o.k==='arrow'){ctx.rotate(Math.atan2(o.vy,o.vx));ctx.globalAlpha=.3;box(-34,-.6,22,1.2,o.heavy?'#9ff3e0':'#ffe6b0');ctx.globalAlpha=1;line([-12,0,9,0],1.6,'#c9b48a',OL);poly([9,-2.8,15,0,9,2.8],'#e8eef0',OL,1);poly([-12,0,-17,-3.4,-14,0,-17,3.4],'#e8e0cc');ctx.restore();if(o.heavy)addLight(o.x-cam,o.y,30,'#9ff3e0',.3);}
       else if(o.k==='bigarrow'){ctx.scale(o.vx>0?1:-1,1);ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=.45;shape(()=>{ctx.moveTo(30,0);ctx.lineTo(-90,-10);ctx.lineTo(-90,10);ctx.closePath();},'#ffe6a8');ctx.restore();ctx.scale(1.6,1.6);line([-16,0,12,0],2.4,'#e6c078',OL);poly([12,-4,22,0,12,4],'#fff1c2',OL,1.2);poly([-16,0,-23,-5,-19,0,-23,5],'#ffe2a8');ctx.restore();addLight(o.x-cam,o.y,90,'#ffd27a',.6);}
       else if(o.k==='pwave'){ctx.scale(o.dir,1);const a=clamp(o.life/.3,0,1);ctx.globalAlpha=a;ctx.globalCompositeOperation='lighter';ctx.strokeStyle='#ffe2a8';for(let i=0;i<3;i++){ctx.lineWidth=4-i;ctx.beginPath();ctx.moveTo(-26-i*8,0);ctx.quadraticCurveTo(-4-i*8,-34+i*8,8-i*8,0);ctx.stroke();}ctx.restore();addLight(o.x-cam,o.y-14,50,'#ffd27a',.3*a);}
-      else if(o.k==='flareArrow'){
-        ctx.rotate(o.r);shape(()=>{ctx.moveTo(9,-2);ctx.quadraticCurveTo(-17,-5,-38,0);ctx.quadraticCurveTo(-16,4,9,2);},'rgba(253,179,83,.48)');
-        ctx.scale(.8,.8);flareArrowArt();ctx.restore();addLight(o.x-cam,o.y,35,'#f4ae62',.4);
-      }
+      else if(o.k==='flareArrow'){drawFlareFlight(o);ctx.restore();}
       else{ctx.scale(o.vx>0?1:-1,1);ctx.globalAlpha=.3;box(-30,-.6,20,1.2,'#dfeaff');ctx.globalAlpha=1;shape(()=>{ctx.moveTo(-6,-2.2);ctx.lineTo(8,-1.2);ctx.lineTo(13,0);ctx.lineTo(8,1.2);ctx.lineTo(-6,2.2);ctx.closePath();},lg(0,-2,0,2,'#ffffff','#b8c8d0','#7f929c'),OL,1);box(-8,-3,2.4,6,'#8a96a0');box(-14,-1.6,6,3.2,'#5a3d27');circle(-16,0,2,null,'#9aa8b0',1.2);ctx.restore();}}}
   // 被冻住的敌人：整套配色混进冰蓝色
   const ICE=new Map();
