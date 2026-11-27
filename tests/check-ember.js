@@ -187,6 +187,38 @@ test('the bow flare aims behind the bearer and bursts once across two nearby ene
   assert.equal(t.fx.filter(f=>f.k==='flareBloom'&&!f.blocked).length,1);
   assert(guards.every(e=>t.fx.some(f=>f.kind==='flare'&&f.target===e)));
 });
+test('fan and piercing skills shoot toward the elevated lock without turning the runner',()=>{
+  for(const slot of [1,3]){
+    const {p,guards:[enemy]}=aimPractice('bow',[-158]);
+    enemy.floor-=60;enemy.y=enemy.floor-enemy.h;enemy.hp=enemy.max=500;
+    p.soul=3;t.action('skill'+slot);
+    const shots=t.thrown.filter(o=>slot===1?o.fan:o.k==='bigarrow');
+    assert.equal(shots.length,slot===1?5:1);
+    const center=shots[Math.floor(shots.length/2)];assert(center.vx<0&&center.vy<0);
+    assert.equal(p.face,1);assert.equal(p.atkFace,-1);assert(p.bowRecoil>0);
+    advance(.36);assert(enemy.hp<500);assert.equal(p.soul,3-slot);
+  }
+  const {p,guards:[enemy]}=aimPractice('bow',[125]);
+  t.platforms.push({x:p.x+58,y:335,w:24,h:145,solid:true});
+  p.soul=1;t.action('skill1');advance(.4);assert.equal(enemy.hp,enemy.max);
+});
+test('a locked bow arrow strikes the marked upper weak point during the flag bearer opening',()=>{
+  t.reset(true,'bow');t.loadStage(t.STAGES.findIndex(s=>s.bossKind==='standard'));
+  const p=t.player,b=t.enemies.find(e=>e.type==='boss');
+  Object.assign(p,{x:560,y:480-p.h,ground:true,inv:9});
+  Object.assign(b,{x:806,y:480-b.h,weak:1.5,frozen:4});
+  t.flags.boss=true;press('KeyJ');advance(.04);release('KeyJ');advance(.4);
+  assert.equal(b.max-b.hp,Math.round(p.damage*2.2));assert.equal(p.soul,1);
+});
+test('a fan volley gives each target one full hit and halves follow-up hits until the next volley',()=>{
+  const {p,guards:[e]}=aimPractice('bow',[30]);
+  e.hp=e.max=500;e.frozen=4;p.soul=3;
+  const expected=Math.round(p.damage*.9)+4*Math.round(p.damage*.45);
+  for(let n=1;n<=2;n++){
+    Object.assign(e,{x:p.x+p.w/2+30-e.w/2,y:480-e.h,kb:0,kbT:0});
+    t.action('skill1');advance(.5);assert.equal(e.max-e.hp,n*expected);
+  }
+});
 test('a flare fired without a lock stops on cover and the blast cannot damage a guard through it',()=>{
   const {p,guards:[guard]}=aimPractice('bow',[108]);
   t.platforms.push({x:p.x+60,y:355,w:12,h:125,solid:true});
@@ -790,6 +822,52 @@ test('boss health scales by encounter and cycle and preserves wounded saves at t
     }
   }
   t.cycle=0;
+});
+test('campaign and free selection resume a fallen boss before or after its one-time reward',()=>{
+  for(const selected of [false,true]){
+    const key=selected?'ember:selected-save':'ember:save';
+    for(const arena of t.STAGES.filter(s=>s.arena)){
+      t.showMenu();
+      if(selected)t.selectLevel(t.STAGES.find(s=>s.chapter===arena.chapter&&!s.arena&&!s.rest));
+      else t.reset(true,'lamp');
+      finishTalk();
+      t.player.shards=2;t.player.soul=1;
+      t.loadStage(t.STAGES.indexOf(arena));
+      const entryMax=t.player.max,entryCoins=t.embers;
+      t.killEnemy(t.enemies.find(e=>e.type==='boss'));
+      const coins=t.embers;
+      assert(coins>entryCoins);assert.equal(JSON.parse(storage[key]).boss.rewarded,false);
+      t.showMenu();t.continueRun(selected);
+      assert.equal(t.state,'talk');assert.equal(t.player.shards,2);assert.equal(t.embers,coins);
+      assert(t.enemies.find(e=>e.type==='boss').dead);assert(t.talk.arena);
+      t.showMenu();t.continueRun(selected);finishTalk();
+      assert.equal(t.player.shards,3);assert.equal(t.player.max,entryMax+20);
+      assert.equal(JSON.parse(storage[key]).boss.rewarded,true);
+      for(let i=0;i<2;i++){
+        t.showMenu();t.continueRun(selected);
+        assert.equal(t.state,'play');assert.equal(t.player.max,entryMax+20);
+        assert.equal(t.player.shards,3);assert.equal(t.embers,coins);
+        assert(t.enemies.find(e=>e.type==='boss').dead);
+        assert(t.player.x>arena.gate&&t.player.x<arena.seal);
+      }
+      t.retryStage();assert(!t.enemies.find(e=>e.type==='boss').dead);
+      assert.equal(t.player.shards,2);assert.equal(t.player.max,entryMax);assert.equal(t.embers,entryCoins);
+    }
+  }
+  t.showMenu();
+});
+test('reloading or reviving at every elevated wick places the player on its original deck',()=>{
+  for(const room of t.STAGES.filter(room=>room.wicks)){
+    for(const wick of room.wicks.filter(wick=>wick.y<480)){
+      t.reset(true,'lamp');t.loadStage(t.STAGES.indexOf(room));
+      const save=JSON.parse(storage['ember:save']);save.checkX=wick.x;
+      save.run.litWicks=room.wicks.indexOf(wick)+1;storage['ember:save']=JSON.stringify(save);
+      t.showMenu();t.continueRun();
+      assert.equal(t.player.y+t.player.h,wick.y,room.name+' continues on the lamp deck');
+      t.respawn();assert.equal(t.player.y+t.player.h,wick.y,room.name+' rekindles on the lamp deck');
+      assert(t.platforms.some(a=>a.y===wick.y&&t.player.x>=a.x&&t.player.x<=a.x+a.w));
+    }
+  }
 });
 test('later chapters introduce their own story when entered from the waystation',()=>{
   for(const chapter of [2,3,4]){t.reset();const idx=t.STAGES.findIndex(s=>s.chapterStart&&s.chapter===chapter);t.loadStage(idx-1);assert(t.L.rest);t.player.x=t.L.exit+25;t.player.y=428;advance(1);assert.equal(t.stage,idx);assert.equal(t.state,'talk');assert(t.talk.lines.length>=3);finishTalk();assert.equal(t.state,'play');}
